@@ -18,10 +18,7 @@ interface HeaderField {
 }
 
 function readFirmwareFields(): HeaderField[] {
-	const header = readFileSync(
-		path.resolve(process.cwd(), "../../firmware/main/config.h"),
-		"utf8",
-	);
+	const header = readFileSync(path.resolve(process.cwd(), "../../firmware/main/config.h"), "utf8");
 	const matches = [
 		...header.matchAll(
 			/X\((\w+),\s*"([^"]+)",\s*([\d.]+)f,\s*([\d.]+)f,\s*(true|false),\s*([\d.]+)f\)/g,

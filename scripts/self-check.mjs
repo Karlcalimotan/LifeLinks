@@ -20,6 +20,9 @@ const baseEnv = {
 	DATABASE_URL:
 		process.env.DATABASE_URL ??
 		"postgresql://lifelink:lifelink@localhost:5432/lifelink?schema=public",
+	DIRECT_URL:
+		process.env.DIRECT_URL ??
+		"postgresql://lifelink:lifelink@localhost:5432/lifelink?schema=public",
 	AUTH_SECRET: process.env.AUTH_SECRET ?? "self-check-only-secret-0123456789",
 	NEXT_PUBLIC_BASE_URL: process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000",
 	NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",

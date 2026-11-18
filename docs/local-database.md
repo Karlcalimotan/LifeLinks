@@ -65,6 +65,11 @@ Supabase **Data API** for the project (Project Settings → API) unless you add
 explicit RLS policies; otherwise the `public` schema may be reachable through
 PostgREST with an anon key.
 
+The **anon key** and **service-role key** are API keys, not database credentials.
+Prisma cannot connect with them. Keep the service-role key server-side only; it
+bypasses RLS. The optional `NEXT_PUBLIC_SUPABASE_*` variables exist only for a
+future Supabase client integration and can stay empty.
+
 ## 4. Deploying
 
 Set `DATABASE_URL` and `DIRECT_URL` as environment variables in your host
