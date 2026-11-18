@@ -10,6 +10,8 @@ All notable changes to this project are documented here. The format follows
 
 - Lean vehicle-alert console: dashboard, vehicles, incidents, trackers and settings.
 - Row-level security on every application table for the Supabase deployment.
+- Vercel deployment allowlist: automatic deployments are restricted to `main`
+  and `develop`; preview deployments from other branches are disabled.
 - Device API: ingest, incident, cancel, command poll, command acknowledgement and
   signed-release OTA check.
 - Prisma schema, initial migration and idempotent demo seed.
@@ -22,6 +24,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- CI runs on pushes to `main`/`develop` and on pull requests, instead of every
+  branch push and the matching pull request.
 - Access model reduced to three roles: `USER` (vehicle owner, scoped to their own
   vehicles), `RESPONDER` (CDRRMO / Pulis, whole-fleet incident response) and
   `ADMIN` (members, trackers and settings). Vehicles now carry an optional
