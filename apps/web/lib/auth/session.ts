@@ -6,8 +6,20 @@ import { SignJWT, jwtVerify } from "jose";
 import { getLocale } from "next-intl/server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { type MemberRoleName, isMemberRole } from "./roles";
 
-export type MemberRoleName = "OWNER" | "ADMIN" | "OPERATOR" | "VIEWER";
+export type { MemberRoleName };
+export {
+	MEMBER_ROLES,
+	canAdminister,
+	canManageIncidents,
+	canManageSettings,
+	canViewAllVehicles,
+	canViewDevices,
+	roleLabelKey,
+	vehicleRelationScope,
+	vehicleScope,
+} from "./roles";
 
 export interface SessionPayload {
 	sub: string;
@@ -58,7 +70,7 @@ export async function getSession(): Promise<SessionPayload | null> {
 		if (
 			typeof payload.sub !== "string" ||
 			typeof payload.orgId !== "string" ||
-			typeof payload.role !== "string" ||
+			!isMemberRole(payload.role) ||
 			typeof payload.email !== "string" ||
 			typeof payload.name !== "string"
 		) {
@@ -67,7 +79,7 @@ export async function getSession(): Promise<SessionPayload | null> {
 		return {
 			sub: payload.sub,
 			orgId: payload.orgId,
-			role: payload.role as MemberRoleName,
+			role: payload.role,
 			email: payload.email,
 			name: payload.name,
 		};
@@ -136,12 +148,4 @@ export async function requireRole(...allowed: MemberRoleName[]): Promise<Current
 		redirect(`/${locale}/dashboard`);
 	}
 	return current;
-}
-
-export function canWrite(role: MemberRoleName): boolean {
-	return role === "OWNER" || role === "ADMIN" || role === "OPERATOR";
-}
-
-export function canAdminister(role: MemberRoleName): boolean {
-	return role === "OWNER" || role === "ADMIN";
 }

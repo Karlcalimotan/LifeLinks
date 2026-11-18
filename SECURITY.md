@@ -16,7 +16,9 @@ issue with a working exploit or a real device token.
 - **Tenant scope** comes from the membership row on every request, not from a
   client-supplied organization id.
 - **Role checks** happen in the page or action before a write; the role is
-  re-read from the database, not trusted from the cookie alone.
+  re-read from the database, not trusted from the cookie alone. A `USER`
+  (vehicle owner) is additionally scoped by `Vehicle.ownerId` in every list,
+  detail query and incident mutation; `RESPONDER` and `ADMIN` are org-scoped.
 - **Rate limits** cover login attempts per email + IP. They are in-process; a
   multi-instance deployment should replace the store with PostgreSQL or Redis.
 - **Idempotency** prevents a retried SOS from creating duplicate incidents or

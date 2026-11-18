@@ -10,6 +10,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { Link } from "@/i18n/routing";
+import { vehicleScope } from "@/lib/auth/roles";
 import { requireUser } from "@/lib/auth/session";
 import { deviceConnectionState } from "@/lib/device/status";
 import prisma from "@/lib/prisma";
@@ -24,7 +25,7 @@ export default async function VehiclesPage({ params }: { params: Promise<{ local
 	const t = await getTranslations({ locale, namespace: "vehicles" });
 
 	const vehicles = await prisma.vehicle.findMany({
-		where: { orgId: current.org.id },
+		where: vehicleScope(current.role, current.org.id, current.user.id),
 		orderBy: { plateNo: "asc" },
 		include: {
 			devices: true,
@@ -34,7 +35,10 @@ export default async function VehiclesPage({ params }: { params: Promise<{ local
 
 	return (
 		<>
-			<PageHeader title={t("title")} subtitle={t("subtitle")} />
+			<PageHeader
+				title={current.role === "USER" ? t("ownerTitle") : t("title")}
+				subtitle={current.role === "USER" ? t("ownerSubtitle") : t("subtitle")}
+			/>
 			<Card>
 				<CardContent className="pt-5">
 					{vehicles.length === 0 ? (

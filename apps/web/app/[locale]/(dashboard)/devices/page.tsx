@@ -11,7 +11,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { Link } from "@/i18n/routing";
-import { canAdminister, requireUser } from "@/lib/auth/session";
+import { canAdminister, requireRole } from "@/lib/auth/session";
 import { deviceConnectionState } from "@/lib/device/status";
 import prisma from "@/lib/prisma";
 import { formatRelative } from "@/lib/utils";
@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 
 export default async function DevicesPage({ params }: { params: Promise<{ locale: string }> }) {
 	const { locale } = await params;
-	const current = await requireUser();
+	const current = await requireRole("ADMIN");
 	const t = await getTranslations({ locale, namespace: "devices" });
 
 	const [devices, vehicles] = await Promise.all([

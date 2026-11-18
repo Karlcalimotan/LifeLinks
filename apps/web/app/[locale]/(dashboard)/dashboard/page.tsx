@@ -11,6 +11,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { Link } from "@/i18n/routing";
+import { vehicleScope } from "@/lib/auth/roles";
 import { requireUser } from "@/lib/auth/session";
 import { DEVICE_OFFLINE_AFTER_MIN } from "@/lib/constants";
 import { deviceConnectionState } from "@/lib/device/status";
@@ -30,6 +31,10 @@ export default async function DashboardPage({ params }: { params: Promise<{ loca
 
 	const now = new Date();
 	const onlineCutoff = minutesAgo(DEVICE_OFFLINE_AFTER_MIN, now);
+	const scope = vehicleScope(current.role, current.org.id, current.user.id);
+	const ownedRelation =
+		current.role === "USER" ? { vehicle: { is: { ownerId: current.user.id } } } : {};
+	const incidentWhere = { orgId: current.org.id, ...ownedRelation };
 	const today = new Date(
 		`${new Intl.DateTimeFormat("en-CA", {
 			timeZone: "Asia/Manila",
@@ -41,27 +46,27 @@ export default async function DashboardPage({ params }: { params: Promise<{ loca
 
 	const [vehicleCount, onlineCount, openIncidents, alertsToday, recentIncidents, vehicles] =
 		await Promise.all([
-			prisma.vehicle.count({ where: { orgId: current.org.id } }),
+			prisma.vehicle.count({ where: scope }),
 			prisma.trackerDevice.count({
-				where: { orgId: current.org.id, lastSeenAt: { gte: onlineCutoff } },
+				where: { orgId: current.org.id, ...ownedRelation, lastSeenAt: { gte: onlineCutoff } },
 			}),
 			prisma.impactEvent.count({
 				where: {
-					orgId: current.org.id,
+					...incidentWhere,
 					status: { in: ["SUSPECTED", "CONFIRMED", "ACKNOWLEDGED"] },
 				},
 			}),
 			prisma.impactEvent.count({
-				where: { orgId: current.org.id, detectedAt: { gte: today } },
+				where: { ...incidentWhere, detectedAt: { gte: today } },
 			}),
 			prisma.impactEvent.findMany({
-				where: { orgId: current.org.id },
+				where: incidentWhere,
 				orderBy: { detectedAt: "desc" },
 				take: 5,
 				include: { vehicle: true, alerts: true },
 			}),
 			prisma.vehicle.findMany({
-				where: { orgId: current.org.id },
+				where: scope,
 				orderBy: { plateNo: "asc" },
 				take: 8,
 				include: { devices: true },
@@ -71,8 +76,8 @@ export default async function DashboardPage({ params }: { params: Promise<{ loca
 	return (
 		<>
 			<PageHeader
-				title={t("title")}
-				subtitle={t("subtitle")}
+				title={current.role === "USER" ? t("ownerTitle") : t("title")}
+				subtitle={current.role === "USER" ? t("ownerSubtitle") : t("subtitle")}
 				actions={
 					<Link
 						href="/incidents"

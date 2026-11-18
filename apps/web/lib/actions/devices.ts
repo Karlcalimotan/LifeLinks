@@ -1,6 +1,6 @@
 "use server";
 
-import { canAdminister, canWrite, requireUser } from "@/lib/auth/session";
+import { canAdminister, requireUser } from "@/lib/auth/session";
 import { generateDeviceToken, hashDeviceToken } from "@/lib/device/auth";
 import { commandSchema, createDeviceSchema, normalizeMac } from "@/lib/device/validation";
 import prisma from "@/lib/prisma";
@@ -24,7 +24,7 @@ export async function createDeviceAction(
 ): Promise<DeviceTokenState> {
 	const current = await requireUser();
 	if (!canAdminister(current.role)) {
-		return { ok: false, error: "Only owners and admins can register trackers." };
+		return { ok: false, error: "Only admins can register trackers." };
 	}
 
 	const parsed = createDeviceSchema.safeParse({
@@ -80,7 +80,7 @@ export async function rotateDeviceTokenAction(
 ): Promise<DeviceTokenState> {
 	const current = await requireUser();
 	if (!canAdminister(current.role)) {
-		return { ok: false, error: "Only owners and admins can rotate device tokens." };
+		return { ok: false, error: "Only admins can rotate device tokens." };
 	}
 
 	const deviceId = String(formData.get("deviceId") ?? "");
@@ -112,7 +112,7 @@ export async function rotateDeviceTokenAction(
 export async function commandDeviceAction(formData: FormData) {
 	const locale = localeFrom(formData);
 	const current = await requireUser();
-	if (!canWrite(current.role)) redirect(`/${locale}/devices?error=forbidden`);
+	if (!canAdminister(current.role)) redirect(`/${locale}/devices?error=forbidden`);
 
 	const deviceId = String(formData.get("deviceId") ?? "");
 	const kind = commandSchema.safeParse(String(formData.get("kind") ?? ""));

@@ -2,18 +2,16 @@ import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { LogoutButton } from "@/components/layout/logout-button";
 import { MobileNav, Sidebar } from "@/components/layout/sidebar";
 import { Badge } from "@/components/ui/badge";
-import type { MemberRoleName } from "@/lib/auth/session";
+import type { MemberRoleName } from "@/lib/auth/roles";
 
 function roleTone(role: MemberRoleName) {
 	switch (role) {
-		case "OWNER":
-			return "info" as const;
 		case "ADMIN":
 			return "success" as const;
-		case "OPERATOR":
+		case "RESPONDER":
 			return "warning" as const;
 		default:
-			return "muted" as const;
+			return "info" as const;
 	}
 }
 
@@ -22,6 +20,7 @@ export function AppShell({
 	user,
 	org,
 	role,
+	roleLabel,
 	navLabels,
 	signOutLabel,
 	children,
@@ -30,6 +29,7 @@ export function AppShell({
 	user: { name: string; email: string };
 	org: { name: string; slug: string };
 	role: MemberRoleName;
+	roleLabel: string;
 	navLabels: Record<string, string>;
 	signOutLabel: string;
 	children: React.ReactNode;
@@ -43,7 +43,7 @@ export function AppShell({
 
 	return (
 		<div className="min-h-screen">
-			<Sidebar labels={navLabels} />
+			<Sidebar labels={navLabels} role={role} />
 			<div className="lg:pl-64">
 				<header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-slate-800/70 bg-[#060b14]/80 px-4 py-3 backdrop-blur md:px-6">
 					<div className="min-w-0">
@@ -53,7 +53,7 @@ export function AppShell({
 						<p className="truncate text-sm font-medium text-slate-200">{user.email}</p>
 					</div>
 					<div className="flex shrink-0 items-center gap-2">
-						<Badge tone={roleTone(role)}>{role}</Badge>
+						<Badge tone={roleTone(role)}>{roleLabel}</Badge>
 						<div className="hidden items-center gap-2 sm:flex">
 							<LocaleSwitcher />
 							<LogoutButton locale={locale} label={signOutLabel} />
@@ -67,7 +67,7 @@ export function AppShell({
 					{children}
 				</main>
 			</div>
-			<MobileNav labels={navLabels} />
+			<MobileNav labels={navLabels} role={role} />
 		</div>
 	);
 }

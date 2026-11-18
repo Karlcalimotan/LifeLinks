@@ -6,7 +6,7 @@ import {
 	falseAlarmAction,
 	resolveIncidentAction,
 } from "@/lib/actions/incidents";
-import { type MemberRoleName, canWrite } from "@/lib/auth/session";
+import { type MemberRoleName, canManageIncidents } from "@/lib/auth/roles";
 import { type ImpactStatusName, isTerminal } from "@/lib/incidents/state";
 
 export function IncidentActions({
@@ -20,7 +20,7 @@ export function IncidentActions({
 	status: string;
 	role: MemberRoleName;
 }) {
-	if (!canWrite(role)) return null;
+	if (!canManageIncidents(role)) return null;
 	if (isTerminal(status as ImpactStatusName)) return null;
 
 	return (

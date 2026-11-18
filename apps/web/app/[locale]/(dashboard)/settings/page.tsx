@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, Input, Label, Textarea } from "@/components/ui/field";
 import { PageHeader } from "@/components/ui/page-header";
 import { updateSettingsAction } from "@/lib/actions/settings";
-import { canAdminister, requireUser } from "@/lib/auth/session";
+import { canAdminister, requireRole } from "@/lib/auth/session";
 import prisma from "@/lib/prisma";
 import { getOrgSettings } from "@/lib/settings/org";
 import { getTranslations } from "next-intl/server";
@@ -19,7 +19,7 @@ export default async function SettingsPage({
 }) {
 	const { locale } = await params;
 	const { saved, error } = await searchParams;
-	const current = await requireUser();
+	const current = await requireRole("ADMIN");
 	const t = await getTranslations({ locale, namespace: "settings" });
 
 	const [org, settings] = await Promise.all([

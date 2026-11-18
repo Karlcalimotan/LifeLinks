@@ -29,15 +29,17 @@ SEED_DEMO=yes pnpm seed                  # PowerShell: $env:SEED_DEMO="yes"; pnp
 pnpm dev
 ```
 
-Open http://localhost:3000 and sign in with:
+Open http://localhost:3000 and sign in with one of the three demo roles:
 
-```
-admin@lifelink.local
-Admin123!
-```
+| Role | Email | Password | Sees |
+| --- | --- | --- | --- |
+| Admin | `admin@lifelink.local` | `Admin123!` | The whole fleet, trackers and settings |
+| Vehicle owner | `owner@lifelink.local` | `Owner123!` | Only the vehicles owned by that user |
+| CDRRMO / Pulis | `responder@lifelink.local` | `Responder123!` | The whole fleet and every incident |
 
-The seed creates two vehicles, three trackers (one pending approval), an
-incident with evidence, telemetry and an alert trail.
+The seed creates three vehicles (two owned by the demo owner plus a fleet
+reserve), three trackers (one pending approval), an incident with evidence,
+telemetry and an alert trail.
 
 The app needs a Supabase project (or any PostgreSQL 14+ instance). See
 [`docs/local-database.md`](docs/local-database.md) for the pooled `DATABASE_URL`,

@@ -43,7 +43,11 @@ function testSamples(base: Date, deviceOffset: number) {
 async function main() {
 	assertDemoTarget();
 
-	const passwordHash = await hash("Admin123!", 12);
+	const [adminHash, ownerHash, responderHash] = await Promise.all([
+		hash("Admin123!", 12),
+		hash("Owner123!", 12),
+		hash("Responder123!", 12),
+	]);
 
 	const org = await prisma.organization.upsert({
 		where: { slug: "demo" },
@@ -51,21 +55,48 @@ async function main() {
 		update: { name: "LifeLink Demo Fleet" },
 	});
 
-	const user = await prisma.user.upsert({
-		where: { email: "admin@lifelink.local" },
-		create: {
-			email: "admin@lifelink.local",
-			name: "Demo Administrator",
-			passwordHash,
-		},
-		update: { name: "Demo Administrator", passwordHash },
-	});
+	const [admin, owner, responder] = await Promise.all([
+		prisma.user.upsert({
+			where: { email: "admin@lifelink.local" },
+			create: {
+				email: "admin@lifelink.local",
+				name: "LifeLink Administrator",
+				passwordHash: adminHash,
+			},
+			update: { name: "LifeLink Administrator", passwordHash: adminHash },
+		}),
+		prisma.user.upsert({
+			where: { email: "owner@lifelink.local" },
+			create: {
+				email: "owner@lifelink.local",
+				name: "Demo Vehicle Owner",
+				passwordHash: ownerHash,
+			},
+			update: { name: "Demo Vehicle Owner", passwordHash: ownerHash },
+		}),
+		prisma.user.upsert({
+			where: { email: "responder@lifelink.local" },
+			create: {
+				email: "responder@lifelink.local",
+				name: "CDRRMO / Pulis Responder",
+				passwordHash: responderHash,
+			},
+			update: { name: "CDRRMO / Pulis Responder", passwordHash: responderHash },
+		}),
+	]);
 
-	await prisma.membership.upsert({
-		where: { orgId_userId: { orgId: org.id, userId: user.id } },
-		create: { orgId: org.id, userId: user.id, role: "OWNER" },
-		update: { role: "OWNER" },
-	});
+	const memberships = [
+		{ userId: admin.id, role: "ADMIN" as const },
+		{ userId: owner.id, role: "USER" as const },
+		{ userId: responder.id, role: "RESPONDER" as const },
+	];
+	for (const membership of memberships) {
+		await prisma.membership.upsert({
+			where: { orgId_userId: { orgId: org.id, userId: membership.userId } },
+			create: { orgId: org.id, ...membership },
+			update: { role: membership.role },
+		});
+	}
 
 	await prisma.orgSettings.upsert({
 		where: { orgId: org.id },
@@ -100,6 +131,7 @@ async function main() {
 		where: { orgId_plateNo: { orgId: org.id, plateNo: "ABC 1234" } },
 		create: {
 			orgId: org.id,
+			ownerId: owner.id,
 			plateNo: "ABC 1234",
 			make: "Nissan",
 			model: "Navara",
@@ -107,13 +139,14 @@ async function main() {
 			driverName: "Jeff Dela Cruz",
 			driverPhone: "+639171234567",
 		},
-		update: {},
+		update: { ownerId: owner.id },
 	});
 
 	const hilux = await prisma.vehicle.upsert({
 		where: { orgId_plateNo: { orgId: org.id, plateNo: "XYZ 5678" } },
 		create: {
 			orgId: org.id,
+			ownerId: owner.id,
 			plateNo: "XYZ 5678",
 			make: "Toyota",
 			model: "Hilux",
@@ -121,7 +154,22 @@ async function main() {
 			driverName: "Maria Santos",
 			driverPhone: "+639181234567",
 		},
-		update: {},
+		update: { ownerId: owner.id },
+	});
+
+	// A fleet reserve without an owner: responders and admins see it, the demo
+	// vehicle owner does not. It proves the owner scope in the seeded demo.
+	await prisma.vehicle.upsert({
+		where: { orgId_plateNo: { orgId: org.id, plateNo: "DEF 9012" } },
+		create: {
+			orgId: org.id,
+			plateNo: "DEF 9012",
+			make: "Isuzu",
+			model: "D-Max",
+			year: 2020,
+			driverName: "Fleet reserve",
+		},
+		update: { ownerId: null },
 	});
 
 	const navaraDevice = await prisma.trackerDevice.upsert({
@@ -328,16 +376,18 @@ async function main() {
 		await prisma.auditLog.create({
 			data: {
 				orgId: org.id,
-				actorId: user.id,
+				actorId: admin.id,
 				action: "demo.seeded",
 				target: org.id,
-				metadata: { vehicles: 2, devices: 3 },
+				metadata: { vehicles: 3, devices: 3 },
 			},
 		});
 	}
 
 	console.log("LifeLink demo seed complete.");
-	console.log("Login: admin@lifelink.local / Admin123!");
+	console.log("Admin:         admin@lifelink.local / Admin123!");
+	console.log("Vehicle owner: owner@lifelink.local / Owner123!");
+	console.log("Responder:     responder@lifelink.local / Responder123!");
 	console.log("Navara token: llk_demo_navara_token");
 	console.log("Hilux token: llk_demo_hilux_token");
 	console.log("Spare token: llk_demo_spare_token");

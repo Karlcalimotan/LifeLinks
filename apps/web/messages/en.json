@@ -27,6 +27,11 @@
 		"signOut": "Sign out",
 		"menu": "Menu"
 	},
+	"roles": {
+		"user": "Vehicle owner",
+		"responder": "CDRRMO / Pulis",
+		"admin": "Admin"
+	},
 	"auth": {
 		"signIn": "Sign in",
 		"signInSubtitle": "Access the LifeLink fleet console.",
@@ -34,11 +39,13 @@
 		"password": "Password",
 		"signingIn": "Signing in…",
 		"invalid": "Invalid email or password.",
-		"demoHint": "Demo: admin@lifelink.local / Admin123!"
+		"demoHint": "Demo: admin@lifelink.local / Admin123! · owner@lifelink.local / Owner123! · responder@lifelink.local / Responder123!"
 	},
 	"dashboard": {
 		"title": "Fleet overview",
 		"subtitle": "Live status, open incidents and the health of every tracker.",
+		"ownerTitle": "My vehicles",
+		"ownerSubtitle": "Live status and incidents for the vehicles registered to you.",
 		"totalVehicles": "Vehicles",
 		"onlineTrackers": "Online trackers",
 		"openIncidents": "Open incidents",
@@ -53,6 +60,8 @@
 	"vehicles": {
 		"title": "Vehicles",
 		"subtitle": "Every vehicle, its tracker and its latest known position.",
+		"ownerTitle": "My vehicles",
+		"ownerSubtitle": "The vehicles registered to you and their trackers.",
 		"plate": "Plate",
 		"makeModel": "Vehicle",
 		"driver": "Driver",
@@ -155,7 +164,7 @@
 		"incidentRetention": "Incident retention (days)",
 		"parkedImpactAlerts": "Alert on impacts while parked",
 		"saveSettings": "Save settings",
-		"adminOnly": "Only owners and admins can change these settings."
+		"adminOnly": "Only admins can change these settings."
 	},
 	"errors": {
 		"notFound": "Page not found",

@@ -44,9 +44,12 @@ export default async function IncidentsPage({
 		? (status as (typeof FILTERS)[number])
 		: "ALL";
 
+	const ownership =
+		current.role === "USER" ? { vehicle: { is: { ownerId: current.user.id } } } : {};
 	const incidents = await prisma.impactEvent.findMany({
 		where: {
 			orgId: current.org.id,
+			...ownership,
 			...(filter === "ALL" ? {} : { status: filter as ImpactStatus }),
 		},
 		orderBy: { detectedAt: "desc" },

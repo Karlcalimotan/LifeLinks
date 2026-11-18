@@ -72,7 +72,7 @@ cover the matrix above; the vehicle bench test is what proves it.
 | --- | --- | --- |
 | SMS (A7670E) | Countdown expires | Retry every `sos_retry_s`; works without the backend |
 | HTTP incident | At confirmation and on every retry | Idempotent by incident id; a retry never duplicates |
-| Dashboard | When the incident reaches the server | The operator sees the evidence and the alert trail |
+| Dashboard | When the incident reaches the server | The responder sees the evidence and the alert trail |
 
 The SMS body is short and ASCII:
 

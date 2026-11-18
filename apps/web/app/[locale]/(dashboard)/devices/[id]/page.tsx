@@ -17,7 +17,7 @@ import {
 	commandDeviceAction,
 	rejectDeviceAction,
 } from "@/lib/actions/devices";
-import { canAdminister, canWrite, requireUser } from "@/lib/auth/session";
+import { canAdminister, requireRole } from "@/lib/auth/session";
 import { deviceConnectionState, gpsAgeSeconds } from "@/lib/device/status";
 import { buildFirmwareConfig } from "@/lib/firmware/config";
 import prisma from "@/lib/prisma";
@@ -45,7 +45,7 @@ export default async function DeviceDetailPage({
 }) {
 	const { locale, id } = await params;
 	const { command, error } = await searchParams;
-	const current = await requireUser();
+	const current = await requireRole("ADMIN");
 	const t = await getTranslations({ locale, namespace: "devices" });
 
 	const device = await prisma.trackerDevice.findFirst({
@@ -191,7 +191,7 @@ export default async function DeviceDetailPage({
 						<CardTitle>{t("commands")}</CardTitle>
 					</CardHeader>
 					<CardContent className="flex flex-col gap-4">
-						{canWrite(current.role) ? (
+						{canAdminister(current.role) ? (
 							<div className="flex flex-wrap gap-2">
 								{COMMANDS.map((entry) => (
 									<form key={entry.kind} action={commandDeviceAction}>

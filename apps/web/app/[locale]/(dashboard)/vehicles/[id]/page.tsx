@@ -15,6 +15,7 @@ import {
 	TableRow,
 } from "@/components/ui/table";
 import { Link } from "@/i18n/routing";
+import { canAdminister, vehicleScope } from "@/lib/auth/roles";
 import { requireUser } from "@/lib/auth/session";
 import { deviceConnectionState, gpsAgeSeconds } from "@/lib/device/status";
 import { isValidCoordinate, mapLink } from "@/lib/geo";
@@ -37,7 +38,7 @@ export default async function VehicleDetailPage({
 	const inc = await getTranslations({ locale, namespace: "incidents" });
 
 	const vehicle = await prisma.vehicle.findFirst({
-		where: { id, orgId: current.org.id },
+		where: { id, ...vehicleScope(current.role, current.org.id, current.user.id) },
 		include: {
 			devices: true,
 			trips: { orderBy: { startedAt: "desc" }, take: 5 },
@@ -148,12 +149,16 @@ export default async function VehicleDetailPage({
 					<CardContent>
 						{device ? (
 							<div className="flex flex-col gap-2 text-sm">
-								<Link
-									href={`/devices/${device.id}`}
-									className="text-brand-400 hover:text-brand-300"
-								>
-									{device.label}
-								</Link>
+								{canAdminister(current.role) ? (
+									<Link
+										href={`/devices/${device.id}`}
+										className="text-brand-400 hover:text-brand-300"
+									>
+										{device.label}
+									</Link>
+								) : (
+									<span className="text-slate-200">{device.label}</span>
+								)}
 								<p className="text-xs text-slate-500">MAC {device.mac}</p>
 								<p className="text-xs text-slate-500">
 									Firmware {device.firmwareVersion ?? "unknown"} · config rev{" "}

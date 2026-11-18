@@ -22,6 +22,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Access model reduced to three roles: `USER` (vehicle owner, scoped to their own
+  vehicles), `RESPONDER` (CDRRMO / Pulis, whole-fleet incident response) and
+  `ADMIN` (members, trackers and settings). Vehicles now carry an optional
+  `ownerId`.
 - Database hosting moved from local Docker Compose PostgreSQL to Supabase, with
   a pooled `DATABASE_URL` and a separate `DIRECT_URL` for migrations and seed.
 - The ESP32 sketch is now `firmware/main/main.ino`; PlatformIO's `src_dir` and all
