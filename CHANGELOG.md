@@ -15,6 +15,8 @@ All notable changes to this project are documented here. The format follows
   allowlist is mirrored in `apps/web/vercel.json` for the monorepo root.
 - Night Highway Dispatch design system: emergency signal palette, Barlow
   display/UI type, signal-plate logo, favicon and responsive console shell.
+- `API_REGULATION.md`, the Next.js conformance notes and `pnpm api:latency` for
+  warm-up/p95/max checks.
 - Redesigned login, dashboard, incident, vehicle, tracker, settings and public
   pages; the evidence chart now renders immediately without animation.
 - Device API: ingest, incident, cancel, command poll, command acknowledgement and
@@ -29,6 +31,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Adopt the global API regulation: matching request IDs, `error.request_id`,
+  `X-Response-Time`, 2 s hot-route timeouts, SLOW/VIOLATION logs and no-store
+  device responses.
+- Vercel Functions are pinned to Singapore (`sin1`) next to the Supabase
+  `ap-southeast-1` pooler.
+- Org settings are cached for 60 s and invalidated after a settings write; the
+  device-watch cron uses batched reads/inserts instead of an N+1 loop.
 - Vercel builds use `pnpm build` so `prisma generate` runs before `next build`.
 - The runtime accepts the Supabase–Vercel integration names
   (`POSTGRES_PRISMA_URL` / `POSTGRES_URL_NON_POOLING`) as aliases for

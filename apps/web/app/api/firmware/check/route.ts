@@ -61,5 +61,5 @@ export const GET = withApi(
 			notes: release.notes,
 		});
 	},
-	{ route: "GET /api/firmware/check", timeoutMs: 10_000 },
+	{ route: "GET /api/firmware/check" },
 );

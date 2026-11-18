@@ -79,6 +79,11 @@ to set `AUTH_SECRET` and `CRON_SECRET` yourself. After redeploying, open
 cron secret are present, plus whether the database is reachable. It never
 returns the values.
 
+Set the Vercel **Function Region** to Singapore (`sin1`), closest to the
+`ap-southeast-1` Supabase pooler. The repository also declares
+`"regions": ["sin1"]` in `vercel.json`; keep `Settings → Functions → Function
+Regions` aligned. Measure with `pnpm api:latency`.
+
 The **anon key** and **service-role key** are API keys, not database credentials.
 Prisma cannot connect with them. Keep the service-role key server-side only; it
 bypasses RLS. The optional `NEXT_PUBLIC_SUPABASE_*` variables exist only for a

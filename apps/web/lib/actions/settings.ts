@@ -4,7 +4,7 @@ import { normalizePhone } from "@/lib/alerts/templates";
 import { canAdminister, requireUser } from "@/lib/auth/session";
 import { CONFIG_FIELDS } from "@/lib/firmware/config";
 import prisma from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
@@ -118,6 +118,7 @@ export async function updateSettingsAction(formData: FormData) {
 		}),
 	]);
 
+	revalidateTag("org-settings", "max");
 	revalidatePath(`/${locale}/settings`);
 	revalidatePath(`/${locale}/dashboard`);
 	revalidatePath(`/${locale}/devices`);
