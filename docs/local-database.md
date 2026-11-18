@@ -70,6 +70,11 @@ Prisma cannot connect with them. Keep the service-role key server-side only; it
 bypasses RLS. The optional `NEXT_PUBLIC_SUPABASE_*` variables exist only for a
 future Supabase client integration and can stay empty.
 
+The `20261118000100_enable_rls` migration enables row-level security on every
+application table. Prisma uses the `postgres` role, which bypasses RLS, so the
+app is unaffected. If you later use the Supabase client, add explicit policies
+for the tables it needs; otherwise the Data API returns no rows.
+
 ## 4. Deploying
 
 Set `DATABASE_URL` and `DIRECT_URL` as environment variables in your host

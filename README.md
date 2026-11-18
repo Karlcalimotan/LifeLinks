@@ -76,7 +76,7 @@ apps/web/                 Next.js console and device API
   lib/firmware/           server half of the config contract
   lib/incidents/          severity and state transitions
   prisma/                 schema, migration, seed
-firmware/                 PlatformIO project, pure headers, native tests
+firmware/main/            PlatformIO sketch (main.ino), pure headers, native tests
 docs/                     architecture, hardware, safety, API, ADRs
 stack/                    reusable scaffold + generators (not copied to new projects)
 ```
