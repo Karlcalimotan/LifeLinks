@@ -44,6 +44,12 @@ export default async function IncidentsPage({
 		? (status as (typeof FILTERS)[number])
 		: "ALL";
 
+	function filterLabel(value: string): string {
+		if (value === "ALL") return "All";
+		const words = value.replaceAll("_", " ").toLowerCase();
+		return words.charAt(0).toUpperCase() + words.slice(1);
+	}
+
 	const ownership =
 		current.role === "USER" ? { vehicle: { is: { ownerId: current.user.id } } } : {};
 	const incidents = await prisma.impactEvent.findMany({
@@ -66,13 +72,13 @@ export default async function IncidentsPage({
 					<Link
 						key={entry}
 						href={entry === "ALL" ? "/incidents" : `/incidents?status=${entry}`}
-						className={`rounded-full border px-3 py-1 text-[11px] transition-colors ${
+						className={`rounded-[3px] border px-3 py-1 text-[11px] transition-colors ${
 							filter === entry
-								? "border-brand-500/40 bg-brand-500/10 text-brand-300"
-								: "border-slate-800 text-slate-500 hover:border-slate-700 hover:text-slate-300"
+								? "border-signal-500/40 bg-signal-500/10 text-signal-300"
+								: "border-ink-700 text-fog-500 hover:border-ink-600 hover:text-fog-300"
 						}`}
 					>
-						{entry === "ALL" ? "All" : entry.replaceAll("_", " ").toLowerCase()}
+						{filterLabel(entry)}
 					</Link>
 				))}
 			</div>
@@ -99,26 +105,24 @@ export default async function IncidentsPage({
 										<TableCell>
 											<Link
 												href={`/incidents/${incident.id}`}
-												className="font-medium text-brand-400 hover:text-brand-300"
+												className="font-medium text-signal-400 hover:text-signal-300"
 											>
 												{formatDateTime(incident.detectedAt, locale)}
 											</Link>
 										</TableCell>
-										<TableCell className="text-slate-200">{incident.vehicle.plateNo}</TableCell>
+										<TableCell className="text-fog-100">{incident.vehicle.plateNo}</TableCell>
 										<TableCell>
 											<SeverityBadge peakAccelG={incident.peakAccelG} tiltDeg={incident.tiltDeg} />
 										</TableCell>
 										<TableCell>
 											<IncidentStatusBadge status={incident.status} />
 										</TableCell>
-										<TableCell className="text-xs text-slate-400">
+										<TableCell className="text-xs text-fog-500">
 											{incident.lat != null && incident.lng != null
 												? `${incident.lat.toFixed(4)}, ${incident.lng.toFixed(4)}`
 												: "—"}
 										</TableCell>
-										<TableCell className="text-xs text-slate-400">
-											{incident.alerts.length}
-										</TableCell>
+										<TableCell className="text-xs text-fog-500">{incident.alerts.length}</TableCell>
 									</TableRow>
 								))}
 							</TableBody>

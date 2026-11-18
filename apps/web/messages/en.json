@@ -34,11 +34,21 @@
 	},
 	"auth": {
 		"signIn": "Sign in",
-		"signInSubtitle": "Access the LifeLink fleet console.",
+		"signInSubtitle": "Sign in to the crash response console.",
 		"email": "Email",
 		"password": "Password",
 		"signingIn": "Signing in…",
 		"invalid": "Invalid email or password.",
+		"rateLimited": "Too many attempts. Wait a few minutes and try again.",
+		"consoleLabel": "Crash response console",
+		"heroTitle": "The first minute has a destination.",
+		"heroBody": "LifeLink turns a crash signal into a confirmed location, a driver cancel window, and an SMS to the people who can respond.",
+		"pathImpact": "Impact detected",
+		"pathConfirm": "Confirm window",
+		"pathCancel": "Driver cancel",
+		"pathAlert": "SMS and console",
+		"prototypeNote": "Prototype. Call local emergency services first.",
+		"demoAccess": "Demo access",
 		"demoHint": "Demo: admin@lifelink.local / Admin123! · owner@lifelink.local / Owner123! · responder@lifelink.local / Responder123!"
 	},
 	"dashboard": {
@@ -52,6 +62,13 @@
 		"alertsToday": "Alerts today",
 		"recentIncidents": "Recent incidents",
 		"fleetStatus": "Fleet status",
+		"liveBoard": "Live incident board",
+		"openBoard": "Open incident board",
+		"incidentBoardHint": "Confirmed impacts and the response state.",
+		"cancelWindow": "Driver cancel window",
+		"sosRetry": "SOS retry",
+		"open": "Open",
+		"resolvedToday": "Resolved today",
 		"noIncidents": "No incidents recorded. Keep it that way.",
 		"viewAll": "View all",
 		"attention": "Needs attention",
@@ -174,10 +191,12 @@
 	},
 	"privacy": {
 		"title": "Privacy notice",
-		"body": "LifeLink stores vehicle location and crash telemetry to deliver emergency alerts. Location data is available only to members of your organization and is retained for the period configured in Settings."
+		"body": "LifeLink stores vehicle location and crash telemetry to deliver emergency alerts. Location data is available only to members of your organization and is retained for the period configured in Settings.",
+		"extra": "Telemetry is retained for the period configured in Settings. Incident evidence is retained separately because it may be needed for insurance or legal review. Members of other organizations cannot query your vehicles or incidents."
 	},
 	"terms": {
 		"title": "Terms of use",
-		"body": "LifeLink is a prototype emergency-response aid. It does not replace emergency services, a functioning vehicle, or a qualified driver. Always call local emergency services first."
+		"body": "LifeLink is a prototype emergency-response aid. It does not replace emergency services, a functioning vehicle, or a qualified driver. Always call local emergency services first.",
+		"extra": "The platform is provided as-is for a capstone prototype. A missed alert can have consequences beyond the software's control: cellular coverage, GPS visibility, device power, and sensor mounting all matter. Test the installation on the bench and in the vehicle before relying on it."
 	}
 }

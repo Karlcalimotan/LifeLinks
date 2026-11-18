@@ -1,17 +1,38 @@
 @import "tailwindcss";
 
 @theme {
-	--color-brand-50: #ecfeff;
-	--color-brand-100: #cffafe;
-	--color-brand-200: #a5f3fc;
-	--color-brand-300: #67e8f9;
-	--color-brand-400: #22d3ee;
-	--color-brand-500: #06b6d4;
-	--color-brand-600: #0891b2;
-	--color-brand-700: #0e7490;
-	--color-brand-800: #155e75;
-	--color-brand-900: #164e63;
-	--font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+	--color-ink-950: #071013;
+	--color-ink-900: #0a1519;
+	--color-ink-800: #0d1c21;
+	--color-ink-700: #122a30;
+	--color-ink-600: #1a3a42;
+
+	--color-fog-50: #f4fbfc;
+	--color-fog-100: #e8f1f2;
+	--color-fog-300: #b8c9cb;
+	--color-fog-500: #8fa3a6;
+	--color-fog-600: #657b7f;
+
+	--color-signal-300: #ffa07a;
+	--color-signal-400: #ff7a45;
+	--color-signal-500: #ff5a1f;
+	--color-signal-600: #e94a12;
+
+	--color-alarm-300: #ffa39e;
+	--color-alarm-400: #ff6b61;
+	--color-alarm-500: #e5342b;
+
+	--color-caution-300: #ffd27a;
+	--color-caution-400: #ffb020;
+
+	--color-rescue-300: #9bdcf5;
+	--color-rescue-400: #45b8e8;
+
+	--color-clear-300: #8ce9c6;
+	--color-clear-400: #2fcf8f;
+
+	--font-sans: var(--font-barlow), ui-sans-serif, system-ui, sans-serif;
+	--font-display: var(--font-barlow-condensed), "Arial Narrow", ui-sans-serif, sans-serif;
 }
 
 :root {
@@ -19,7 +40,7 @@
 }
 
 * {
-	border-color: rgb(30 41 59);
+	border-color: var(--color-ink-700);
 }
 
 html,
@@ -28,27 +49,72 @@ body {
 }
 
 body {
-	background: radial-gradient(1200px 600px at 80% -10%, rgba(34, 211, 238, 0.08), transparent 60%),
-		radial-gradient(900px 500px at 0% 20%, rgba(251, 191, 36, 0.05), transparent 55%), #060b14;
-	color: #e2e8f0;
+	background-color: var(--color-ink-950);
+	color: var(--color-fog-100);
 	-webkit-font-smoothing: antialiased;
 }
 
 ::selection {
-	background: rgba(34, 211, 238, 0.25);
+	background: rgb(255 90 31 / 0.35);
+	color: var(--color-fog-50);
 }
 
 :focus-visible {
-	outline: 2px solid #22d3ee;
+	outline: 2px solid var(--color-signal-400);
 	outline-offset: 2px;
 }
 
+/* A flat panel with a physical top highlight, not a soft drop shadow. */
 .card-sheen {
-	background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0)), #0b1220;
+	background: var(--color-ink-800);
+	box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.045);
 }
 
-.grid-lines {
-	background-image: linear-gradient(rgba(148, 163, 184, 0.05) 1px, transparent 1px),
-		linear-gradient(90deg, rgba(148, 163, 184, 0.05) 1px, transparent 1px);
-	background-size: 32px 32px;
+/* Reflective edge: used on primary plates and the sidebar only. */
+.hazard-stripe {
+	background-image: repeating-linear-gradient(
+		135deg,
+		var(--color-signal-500) 0 10px,
+		var(--color-ink-950) 10px 20px
+	);
+}
+
+.cut-corner {
+	clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 0 100%);
+}
+
+.console-grid {
+	background-image: linear-gradient(rgb(143 163 166 / 0.055) 1px, transparent 1px),
+		linear-gradient(90deg, rgb(143 163 166 / 0.055) 1px, transparent 1px);
+	background-size: 44px 44px;
+}
+
+.signal-rail {
+	box-shadow: inset 3px 0 0 var(--color-signal-500);
+}
+
+.beacon-pulse {
+	animation: beacon-pulse 2.6s ease-in-out infinite;
+}
+
+@keyframes beacon-pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.35;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.beacon-pulse {
+		animation: none;
+	}
+	*,
+	*::before,
+	*::after {
+		scroll-behavior: auto !important;
+		transition-duration: 0.01ms !important;
+	}
 }

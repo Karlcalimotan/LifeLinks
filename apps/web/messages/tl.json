@@ -34,11 +34,21 @@
 	},
 	"auth": {
 		"signIn": "Mag-sign in",
-		"signInSubtitle": "Pumasok sa LifeLink fleet console.",
+		"signInSubtitle": "Pumasok sa crash response console.",
 		"email": "Email",
 		"password": "Password",
 		"signingIn": "Nag-sign in?",
 		"invalid": "Mali ang email o password.",
+		"rateLimited": "Masyadong maraming pagsubok. Maghintay ng ilang minuto at subukan muli.",
+		"consoleLabel": "Console ng crash response",
+		"heroTitle": "May destinasyon ang unang minuto.",
+		"heroBody": "Ginagawang kumpirmadong lokasyon, cancel window ng driver, at SMS sa mga tutugon ang isang crash signal ng LifeLink.",
+		"pathImpact": "Na-detect ang impact",
+		"pathConfirm": "Confirm window",
+		"pathCancel": "Kanselasyon ng driver",
+		"pathAlert": "SMS at console",
+		"prototypeNote": "Prototype. Tumawag muna sa lokal na emergency services.",
+		"demoAccess": "Demo access",
 		"demoHint": "Demo: admin@lifelink.local / Admin123! · owner@lifelink.local / Owner123! · responder@lifelink.local / Responder123!"
 	},
 	"dashboard": {
@@ -52,6 +62,13 @@
 		"alertsToday": "Mga alert ngayong araw",
 		"recentIncidents": "Mga kamakailang insidente",
 		"fleetStatus": "Katayuan ng fleet",
+		"liveBoard": "Live na incident board",
+		"openBoard": "Buksan ang incident board",
+		"incidentBoardHint": "Mga kumpirmadong impact at ang katayuan ng tugon.",
+		"cancelWindow": "Cancel window ng driver",
+		"sosRetry": "SOS retry",
+		"open": "Bukas",
+		"resolvedToday": "Naresolba ngayon",
 		"noIncidents": "Walang naitalang insidente.",
 		"viewAll": "Tingnan lahat",
 		"attention": "Kailangan ng atensyon",
@@ -174,10 +191,12 @@
 	},
 	"privacy": {
 		"title": "Privacy notice",
-		"body": "LifeLink stores vehicle location and crash telemetry to deliver emergency alerts. Location data is available only to members of your organization and is retained for the period configured in Settings."
+		"body": "LifeLink stores vehicle location and crash telemetry to deliver emergency alerts. Location data is available only to members of your organization and is retained for the period configured in Settings.",
+		"extra": "Ang telemetry ay itinatago sa panahong nakatakda sa Settings. Ang incident evidence ay hiwalay na itinatago dahil maaaring kailanganin para sa insurance o legal review. Hindi kayang i-query ng ibang organization ang iyong mga sasakyan o insidente."
 	},
 	"terms": {
 		"title": "Terms of use",
-		"body": "LifeLink is a prototype emergency-response aid. It does not replace emergency services, a functioning vehicle, or a qualified driver. Always call local emergency services first."
+		"body": "LifeLink is a prototype emergency-response aid. It does not replace emergency services, a functioning vehicle, or a qualified driver. Always call local emergency services first.",
+		"extra": "Ang platform ay ibinibigay as-is para sa capstone prototype. Ang hindi naipadalang alert ay maaaring may epekto na lampas sa kontrol ng software: mahalaga ang cellular coverage, GPS visibility, device power, at sensor mounting. I-bench test at i-test sa sasakyan bago umasa dito."
 	}
 }

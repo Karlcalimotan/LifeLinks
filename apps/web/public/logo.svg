@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 64" fill="none">
+	<path d="M4 0h46l14 14v46a4 4 0 0 1-4 4H4a4 4 0 0 1-4-4V4a4 4 0 0 1 4-4Z" fill="#FF5A1F"/>
+	<path d="M14 20v24h10l5-19 6 25 5-12h10" stroke="#071013" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+	<rect x="46" y="34" width="8" height="8" rx="1" fill="#F4FBFC"/>
+	<text x="80" y="39" fill="#E8F1F2" font-family="'Barlow Condensed','Arial Narrow',sans-serif" font-size="31" font-weight="600" letter-spacing="-0.5">LifeLink</text>
+	<text x="81" y="54" fill="#8FA3A6" font-family="Barlow,Arial,sans-serif" font-size="8.5">Crash response network</text>
+</svg>

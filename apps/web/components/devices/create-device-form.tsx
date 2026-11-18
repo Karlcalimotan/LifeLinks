@@ -56,18 +56,18 @@ export function CreateDeviceForm({
 			</form>
 
 			{state.error ? (
-				<p className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+				<p className="rounded border border-alarm-500/30 bg-alarm-500/10 px-3 py-2 text-xs text-alarm-300">
 					{state.error}
 				</p>
 			) : null}
 
 			{state.ok && state.token ? (
-				<div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4">
-					<p className="text-xs font-semibold text-emerald-200">
+				<div className="rounded border border-clear-500/30 bg-clear-500/10 p-4">
+					<p className="text-xs font-semibold text-clear-200">
 						Tracker registered. Copy this token now — it is shown once.
 					</p>
 					<div className="mt-2 flex items-center gap-2">
-						<code className="min-w-0 flex-1 overflow-x-auto rounded-lg border border-emerald-500/20 bg-slate-950/60 px-3 py-2 text-xs text-emerald-200">
+						<code className="min-w-0 flex-1 overflow-x-auto rounded border border-clear-500/20 bg-ink-950/60 px-3 py-2 text-xs text-clear-200">
 							{state.token}
 						</code>
 						<Button type="button" size="sm" variant="outline" onClick={copyToken}>
@@ -75,8 +75,8 @@ export function CreateDeviceForm({
 							{copied ? "Copied" : "Copy"}
 						</Button>
 					</div>
-					<p className="mt-2 text-[11px] text-emerald-300/70">
-						MAC {state.mac} · enter the token in the device setup portal.
+					<p className="mt-2 text-[11px] text-clear-300/70">
+						MAC {state.mac}. Enter the token in the device setup portal.
 					</p>
 				</div>
 			) : null}

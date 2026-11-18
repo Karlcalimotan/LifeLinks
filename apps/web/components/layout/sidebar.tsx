@@ -1,5 +1,6 @@
 "use client";
 
+import { Logo } from "@/components/brand/logo";
 import { Link, usePathname } from "@/i18n/routing";
 import { type MemberRoleName, canAdminister } from "@/lib/auth/roles";
 import { cn } from "@/lib/utils";
@@ -12,6 +13,8 @@ const items = [
 	{ href: "/devices", key: "devices", icon: Radio, admin: true },
 	{ href: "/settings", key: "settings", icon: Settings, admin: true },
 ] as const;
+
+const safetyPath = ["Impact detected", "Confirm window", "Driver cancel", "SMS + console"] as const;
 
 function visibleItems(role: MemberRoleName) {
 	return items.filter((item) => !item.admin || canAdminister(role));
@@ -28,20 +31,13 @@ export function Sidebar({
 	const visible = visibleItems(role);
 
 	return (
-		<aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-800/70 bg-slate-950/80 backdrop-blur lg:flex">
-			<Link href="/dashboard" className="flex items-center gap-3 px-6 py-6">
-				<span className="grid size-9 place-items-center rounded-xl bg-brand-500 text-sm font-black text-slate-950">
-					LL
-				</span>
-				<span>
-					<span className="block text-sm font-semibold tracking-wide text-white">LifeLink</span>
-					<span className="block text-[10px] uppercase tracking-[0.2em] text-slate-500">
-						Fleet safety
-					</span>
-				</span>
+		<aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] flex-col border-r border-ink-700 bg-ink-950/95 backdrop-blur lg:flex">
+			<div className="h-1 hazard-stripe" aria-hidden="true" />
+			<Link href="/dashboard" className="flex items-center px-5 py-5">
+				<Logo />
 			</Link>
 
-			<nav className="flex flex-1 flex-col gap-1 px-3">
+			<nav className="flex flex-1 flex-col gap-0.5 px-3 pt-2">
 				{visible.map((item) => {
 					const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 					const Icon = item.icon;
@@ -50,10 +46,10 @@ export function Sidebar({
 							key={item.href}
 							href={item.href}
 							className={cn(
-								"flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors",
+								"flex items-center gap-3 border-l-2 px-3 py-2.5 text-sm transition-colors",
 								active
-									? "bg-brand-500/10 text-brand-300"
-									: "text-slate-400 hover:bg-slate-900 hover:text-slate-100",
+									? "border-signal-500 bg-signal-500/10 text-signal-300"
+									: "border-transparent text-fog-500 hover:bg-ink-800 hover:text-fog-100",
 							)}
 						>
 							<Icon className="size-4" />
@@ -63,13 +59,16 @@ export function Sidebar({
 				})}
 			</nav>
 
-			<div className="m-3 rounded-xl border border-slate-800/80 bg-slate-900/40 p-3">
-				<p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-					Safety path
-				</p>
-				<p className="mt-1 text-xs leading-relaxed text-slate-400">
-					Impact → confirm → 15 s cancel window → SMS + dashboard alert.
-				</p>
+			<div className="m-3 border border-ink-700 bg-ink-900/60 p-3">
+				<p className="text-[11px] font-medium text-fog-400">Crash path</p>
+				<ol className="mt-2 flex flex-col gap-1.5">
+					{safetyPath.map((step, index) => (
+						<li key={step} className="flex items-baseline gap-2 text-[11px] text-fog-500">
+							<span className="w-4 shrink-0 font-display text-signal-500">{`0${index + 1}`}</span>
+							{step}
+						</li>
+					))}
+				</ol>
 			</div>
 		</aside>
 	);
@@ -86,7 +85,7 @@ export function MobileNav({
 	const visible = visibleItems(role);
 
 	return (
-		<nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-slate-800/80 bg-slate-950/95 px-2 py-1 backdrop-blur lg:hidden">
+		<nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-ink-700 bg-ink-950/95 px-2 py-1 backdrop-blur lg:hidden">
 			{visible.map((item) => {
 				const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 				const Icon = item.icon;
@@ -95,8 +94,8 @@ export function MobileNav({
 						key={item.href}
 						href={item.href}
 						className={cn(
-							"flex flex-1 flex-col items-center gap-1 rounded-lg px-1 py-2 text-[10px]",
-							active ? "text-brand-300" : "text-slate-500",
+							"flex flex-1 flex-col items-center gap-1 rounded-[3px] px-1 py-2 text-[10px]",
+							active ? "text-signal-300" : "text-fog-500",
 						)}
 					>
 						<Icon className="size-4" />

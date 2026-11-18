@@ -51,7 +51,7 @@ export default async function DevicesPage({ params }: { params: Promise<{ locale
 							locale={locale}
 							vehicles={vehicles.map((vehicle) => ({
 								id: vehicle.id,
-								label: `${vehicle.plateNo} · ${vehicle.make} ${vehicle.model}`,
+								label: `${vehicle.plateNo}: ${vehicle.make} ${vehicle.model}`,
 							}))}
 						/>
 					</CardContent>
@@ -81,7 +81,7 @@ export default async function DevicesPage({ params }: { params: Promise<{ locale
 										<TableCell>
 											<Link
 												href={`/devices/${device.id}`}
-												className="font-medium text-brand-400 hover:text-brand-300"
+												className="font-medium text-signal-400 hover:text-signal-300"
 											>
 												{device.label}
 											</Link>
@@ -89,20 +89,20 @@ export default async function DevicesPage({ params }: { params: Promise<{ locale
 												<DeviceStatusBadge state={deviceConnectionState(device.lastSeenAt)} />
 											</span>
 										</TableCell>
-										<TableCell className="font-mono text-xs text-slate-400">{device.mac}</TableCell>
-										<TableCell className="text-slate-300">
+										<TableCell className="font-mono text-xs text-fog-500">{device.mac}</TableCell>
+										<TableCell className="text-fog-300">
 											{device.vehicle?.plateNo ?? "Unassigned"}
 										</TableCell>
 										<TableCell>
 											<ApprovalBadge status={device.approvalStatus} />
 										</TableCell>
-										<TableCell className="text-xs text-slate-400">
+										<TableCell className="text-xs text-fog-500">
 											{device.firmwareVersion ?? "—"}
 										</TableCell>
-										<TableCell className="text-xs text-slate-400">
+										<TableCell className="text-xs text-fog-500">
 											{formatRelative(device.lastSeenAt)}
 										</TableCell>
-										<TableCell className="text-xs text-slate-400">
+										<TableCell className="text-xs text-fog-500">
 											{device.batteryV != null ? `${device.batteryV.toFixed(1)} V` : "—"}
 										</TableCell>
 									</TableRow>

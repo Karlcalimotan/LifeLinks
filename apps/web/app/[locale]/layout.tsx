@@ -4,14 +4,21 @@ import { resolveSiteUrl } from "@/lib/site-url";
 import type { Metadata, Viewport } from "next";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, getTranslations } from "next-intl/server";
-import { Inter } from "next/font/google";
+import { Barlow, Barlow_Condensed } from "next/font/google";
 import { notFound } from "next/navigation";
 import { Toaster } from "sonner";
 import "../globals.css";
 
-const inter = Inter({
+const barlow = Barlow({
 	subsets: ["latin"],
-	variable: "--font-inter",
+	weight: ["400", "500", "600"],
+	variable: "--font-barlow",
+});
+
+const barlowCondensed = Barlow_Condensed({
+	subsets: ["latin"],
+	weight: ["600", "700"],
+	variable: "--font-barlow-condensed",
 });
 
 export const metadata: Metadata = {
@@ -27,7 +34,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-	themeColor: "#060b14",
+	themeColor: "#071013",
 	width: "device-width",
 	initialScale: 1,
 };
@@ -53,7 +60,7 @@ export default async function LocaleLayout({
 
 	return (
 		<html lang={locale} className="dark">
-			<body className={`${inter.variable} font-sans`}>
+			<body className={`${barlow.variable} ${barlowCondensed.variable} font-sans`}>
 				<NextIntlClientProvider messages={messages}>
 					{children}
 					<Toaster
@@ -61,9 +68,11 @@ export default async function LocaleLayout({
 						position="top-right"
 						toastOptions={{
 							style: {
-								background: "#0b1220",
-								border: "1px solid #1e293b",
-								color: "#e2e8f0",
+								background: "#0d1c21",
+								border: "1px solid #1a3a42",
+								color: "#e8f1f2",
+								borderRadius: "4px",
+								fontFamily: "var(--font-barlow), sans-serif",
 							},
 						}}
 					/>
