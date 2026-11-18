@@ -29,6 +29,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The runtime accepts the Supabase–Vercel integration names
+  (`POSTGRES_PRISMA_URL` / `POSTGRES_URL_NON_POOLING`) as aliases for
+  `DATABASE_URL` / `DIRECT_URL`, and `/api/health` reports which required
+  environment variables are present without returning their values.
 - CI runs on pushes to `main`/`develop` and on pull requests, instead of every
   branch push and the matching pull request.
 - Access model reduced to three roles: `USER` (vehicle owner, scoped to their own
