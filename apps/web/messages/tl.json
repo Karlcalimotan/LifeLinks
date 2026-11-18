@@ -27,6 +27,11 @@
 		"signOut": "Mag-sign out",
 		"menu": "Menu"
 	},
+	"roles": {
+		"user": "May-ari ng sasakyan",
+		"responder": "CDRRMO / Pulis",
+		"admin": "Admin"
+	},
 	"auth": {
 		"signIn": "Mag-sign in",
 		"signInSubtitle": "Pumasok sa LifeLink fleet console.",
@@ -34,11 +39,13 @@
 		"password": "Password",
 		"signingIn": "Nag-sign in?",
 		"invalid": "Mali ang email o password.",
-		"demoHint": "Demo: admin@lifelink.local / Admin123!"
+		"demoHint": "Demo: admin@lifelink.local / Admin123! · owner@lifelink.local / Owner123! · responder@lifelink.local / Responder123!"
 	},
 	"dashboard": {
 		"title": "Pangkalahatang tanawin ng fleet",
 		"subtitle": "Live na katayuan, bukas na insidente at kalusugan ng bawat tracker.",
+		"ownerTitle": "Aking mga sasakyan",
+		"ownerSubtitle": "Live na katayuan at insidente ng mga sasakyang nakarehistro sa iyo.",
 		"totalVehicles": "Mga Sasakyan",
 		"onlineTrackers": "Online na tracker",
 		"openIncidents": "Bukas na insidente",
@@ -53,6 +60,8 @@
 	"vehicles": {
 		"title": "Mga Sasakyan",
 		"subtitle": "Bawat sasakyan, tracker at huling lokasyon.",
+		"ownerTitle": "Aking mga sasakyan",
+		"ownerSubtitle": "Ang mga sasakyang nakarehistro sa iyo at ang kanilang tracker.",
 		"plate": "Plaka",
 		"makeModel": "Sasakyan",
 		"driver": "Drayber",
@@ -155,7 +164,7 @@
 		"incidentRetention": "Incident retention (days)",
 		"parkedImpactAlerts": "Alert on impacts while parked",
 		"saveSettings": "Save settings",
-		"adminOnly": "Only owners and admins can change these settings."
+		"adminOnly": "Only admins can change these settings."
 	},
 	"errors": {
 		"notFound": "Page not found",

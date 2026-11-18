@@ -1,6 +1,7 @@
 "use server";
 
-import { canWrite, requireUser } from "@/lib/auth/session";
+import { canManageIncidents } from "@/lib/auth/roles";
+import { requireUser } from "@/lib/auth/session";
 import { type ImpactStatusName, canTransition } from "@/lib/incidents/state";
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
@@ -15,14 +16,18 @@ async function transition(formData: FormData, to: ImpactStatusName) {
 	const incidentId = value(formData, "incidentId");
 	const current = await requireUser();
 
-	if (!canWrite(current.role)) {
+	if (!canManageIncidents(current.role)) {
 		redirect(`/${locale}/incidents/${incidentId}?error=forbidden`);
 	}
 
 	const incident = await prisma.impactEvent.findFirst({
 		where: { id: incidentId, orgId: current.org.id },
+		include: { vehicle: { select: { ownerId: true } } },
 	});
 	if (!incident) redirect(`/${locale}/incidents?error=notfound`);
+	if (current.role === "USER" && incident.vehicle.ownerId !== current.user.id) {
+		redirect(`/${locale}/incidents/${incidentId}?error=forbidden`);
+	}
 
 	if (!canTransition(incident.status as ImpactStatusName, to)) {
 		redirect(`/${locale}/incidents/${incident.id}?error=transition`);

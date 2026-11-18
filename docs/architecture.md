@@ -99,8 +99,22 @@ OrgSettings, EmergencyContact, Geofence, AuditLog
   online?"; the event log answers "what happened?".
 - `ImpactEvent` is the incident. `AlertDelivery` records every intended
   recipient and its state.
-- `AuditLog` records operator changes (acknowledge, resolve, false alarm,
+- `AuditLog` records member changes (acknowledge, resolve, false alarm,
   configuration, device token rotation).
+
+### Roles and scope
+
+LifeLink has exactly three roles:
+
+| Role | Scope |
+| --- | --- |
+| `USER` | Vehicle owner. Sees and works only the vehicles whose `ownerId` is their user id. |
+| `RESPONDER` | CDRRMO / Pulis. Sees the whole organization fleet and works every incident. |
+| `ADMIN` | Manages members, trackers, settings and the whole fleet. |
+
+The scope is enforced in the query (`Vehicle.ownerId`) and again in the incident
+action before a mutation. A stale session cookie with a removed role is rejected
+on read, so a role change takes effect on the next request.
 
 ## Auth and tenancy
 
@@ -111,7 +125,7 @@ The console uses a self-contained session:
 2. `getCurrentUser()` verifies the cookie and re-reads the membership row. The
    returned `orgId` is the only tenant scope any query may use.
 3. `requireUser()` redirects to the localized login. `requireRole()` narrows the
-   page to owners/admins where required.
+   page to admins where required.
 
 There is no external identity provider. That keeps the capstone runnable with
 one database, and it makes the tenancy rule visible in one file.
@@ -140,7 +154,7 @@ Rules:
 - Any field outside its envelope, a fraction in a whole-number field, or an
   impossible value rejects the **whole** object. The device never half-applies.
 - The last-good copy is stored in NVS (`cfg_json`, `cfg_rev`).
-- The device echoes `config_rev` in the heartbeat, so an operator can prove the
+- The device echoes `config_rev` in the heartbeat, so a responder can prove the
   unit applied the exact object.
 
 The server and firmware tables are kept in sync by

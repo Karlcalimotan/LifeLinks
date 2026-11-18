@@ -1,19 +1,31 @@
 "use client";
 
 import { Link, usePathname } from "@/i18n/routing";
+import { type MemberRoleName, canAdminister } from "@/lib/auth/roles";
 import { cn } from "@/lib/utils";
 import { Car, LayoutDashboard, Radio, Settings, TriangleAlert } from "lucide-react";
 
 const items = [
-	{ href: "/dashboard", key: "dashboard", icon: LayoutDashboard },
-	{ href: "/vehicles", key: "vehicles", icon: Car },
-	{ href: "/incidents", key: "incidents", icon: TriangleAlert },
-	{ href: "/devices", key: "devices", icon: Radio },
-	{ href: "/settings", key: "settings", icon: Settings },
+	{ href: "/dashboard", key: "dashboard", icon: LayoutDashboard, admin: false },
+	{ href: "/vehicles", key: "vehicles", icon: Car, admin: false },
+	{ href: "/incidents", key: "incidents", icon: TriangleAlert, admin: false },
+	{ href: "/devices", key: "devices", icon: Radio, admin: true },
+	{ href: "/settings", key: "settings", icon: Settings, admin: true },
 ] as const;
 
-export function Sidebar({ labels }: { labels: Record<string, string> }) {
+function visibleItems(role: MemberRoleName) {
+	return items.filter((item) => !item.admin || canAdminister(role));
+}
+
+export function Sidebar({
+	labels,
+	role,
+}: {
+	labels: Record<string, string>;
+	role: MemberRoleName;
+}) {
 	const pathname = usePathname();
+	const visible = visibleItems(role);
 
 	return (
 		<aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-slate-800/70 bg-slate-950/80 backdrop-blur lg:flex">
@@ -30,7 +42,7 @@ export function Sidebar({ labels }: { labels: Record<string, string> }) {
 			</Link>
 
 			<nav className="flex flex-1 flex-col gap-1 px-3">
-				{items.map((item) => {
+				{visible.map((item) => {
 					const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 					const Icon = item.icon;
 					return (
@@ -63,12 +75,19 @@ export function Sidebar({ labels }: { labels: Record<string, string> }) {
 	);
 }
 
-export function MobileNav({ labels }: { labels: Record<string, string> }) {
+export function MobileNav({
+	labels,
+	role,
+}: {
+	labels: Record<string, string>;
+	role: MemberRoleName;
+}) {
 	const pathname = usePathname();
+	const visible = visibleItems(role);
 
 	return (
 		<nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-slate-800/80 bg-slate-950/95 px-2 py-1 backdrop-blur lg:hidden">
-			{items.map((item) => {
+			{visible.map((item) => {
 				const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 				const Icon = item.icon;
 				return (

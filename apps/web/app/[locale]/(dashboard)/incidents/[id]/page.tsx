@@ -50,8 +50,10 @@ export default async function IncidentDetailPage({
 	const current = await requireUser();
 	const t = await getTranslations({ locale, namespace: "incidents" });
 
+	const ownership =
+		current.role === "USER" ? { vehicle: { is: { ownerId: current.user.id } } } : {};
 	const incident = await prisma.impactEvent.findFirst({
-		where: { id, orgId: current.org.id },
+		where: { id, orgId: current.org.id, ...ownership },
 		include: {
 			vehicle: true,
 			device: true,

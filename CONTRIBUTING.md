@@ -32,6 +32,7 @@ These paths need a second pair of eyes and a bench note:
 - `firmware/main/main.ino` (countdown, SMS, command handling)
 - `apps/web/lib/firmware/config.ts` and `firmware/main/config.h`
 - `apps/web/app/api/device/incident/route.ts` and the cancel route
+- `apps/web/lib/auth/roles.ts` and every query that scopes a vehicle owner
 
 Do not merge a change that makes an alert less likely to reach a human without
 explicit owner approval. Never add a code path that suppresses the SOS because a
