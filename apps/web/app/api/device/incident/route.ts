@@ -219,5 +219,5 @@ export const POST = withApi(
 			throw error;
 		}
 	},
-	{ route: "POST /api/device/incident", timeoutMs: 15_000 },
+	{ route: "POST /api/device/incident" },
 );

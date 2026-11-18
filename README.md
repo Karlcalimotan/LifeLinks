@@ -63,6 +63,7 @@ the `DIRECT_URL` used by migrations, and the seed guard.
 | `pnpm seed` | Demo fleet data |
 | `pnpm gen <command> <name>` | Generate a feature, device route, firmware module or model |
 | `pnpm stack:check` | Static template checks + contract drift |
+| `pnpm api:latency` | Warm-up + p95/max latency check for API endpoints |
 | `pnpm self-check` | Full local gate |
 
 ## Structure
@@ -89,7 +90,8 @@ stack/                    reusable scaffold + generators (not copied to new proj
 
 Start with [`docs/architecture.md`](docs/architecture.md), then
 [`docs/hardware.md`](docs/hardware.md), [`docs/safety.md`](docs/safety.md),
-[`docs/api.md`](docs/api.md) and the [`design system`](docs/design.md). If you need a database, see
+[`docs/api.md`](docs/api.md), the [`API regulation`](API_REGULATION.md) and the
+[`design system`](docs/design.md). If you need a database, see
 [`docs/local-database.md`](docs/local-database.md).
 
 ## Reusing the stack

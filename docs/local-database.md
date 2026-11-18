@@ -65,6 +65,25 @@ Supabase **Data API** for the project (Project Settings → API) unless you add
 explicit RLS policies; otherwise the `public` schema may be reachable through
 PostgREST with an anon key.
 
+### Vercel
+
+Set the same variables in **Vercel → Project → Settings → Environment
+Variables** for Production and Preview. The three Supabase API keys are not
+database credentials and do not connect Prisma.
+
+If the Supabase–Vercel integration is installed, it provides
+`POSTGRES_PRISMA_URL` (pooled) and `POSTGRES_URL_NON_POOLING` (session). The app
+aliases those to `DATABASE_URL` and `DIRECT_URL` at runtime, but you still need
+to set `AUTH_SECRET` and `CRON_SECRET` yourself. After redeploying, open
+`/api/health`: it reports whether the database URL, direct URL, auth secret and
+cron secret are present, plus whether the database is reachable. It never
+returns the values.
+
+Set the Vercel **Function Region** to Singapore (`sin1`), closest to the
+`ap-southeast-1` Supabase pooler. The repository also declares
+`"regions": ["sin1"]` in `vercel.json`; keep `Settings → Functions → Function
+Regions` aligned. Measure with `pnpm api:latency`.
+
 The **anon key** and **service-role key** are API keys, not database credentials.
 Prisma cannot connect with them. Keep the service-role key server-side only; it
 bypasses RLS. The optional `NEXT_PUBLIC_SUPABASE_*` variables exist only for a

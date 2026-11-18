@@ -109,7 +109,7 @@ export const POST = withApi(
 			heartbeat_interval_s: settings.heartbeatIntervalS,
 		});
 	},
-	{ route: "POST /api/device/ingest", timeoutMs: 15_000 },
+	{ route: "POST /api/device/ingest" },
 );
 
 export const GET = withApi(async () => {

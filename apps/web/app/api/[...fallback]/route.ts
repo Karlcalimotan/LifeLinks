@@ -1,9 +1,12 @@
-import { fail } from "@/lib/api/envelope";
 import { notFound } from "@/lib/api/errors";
+import { withApi } from "@/lib/api/instrumentation";
 
-function handler() {
-	return fail(notFound("Unknown API route."));
-}
+const handler = withApi(
+	async () => {
+		throw notFound("Unknown API route.");
+	},
+	{ route: "ANY /api/*" },
+);
 
 export const GET = handler;
 export const POST = handler;

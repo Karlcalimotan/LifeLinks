@@ -62,5 +62,5 @@ export const GET = withApi(
 			config,
 		});
 	},
-	{ route: "GET /api/device/command", timeoutMs: 10_000 },
+	{ route: "GET /api/device/command" },
 );

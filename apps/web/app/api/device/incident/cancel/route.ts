@@ -70,5 +70,5 @@ export const POST = withApi(
 
 		return ok({ received: true, status: updated.status, changed: true });
 	},
-	{ route: "POST /api/device/incident/cancel", timeoutMs: 10_000 },
+	{ route: "POST /api/device/incident/cancel" },
 );
