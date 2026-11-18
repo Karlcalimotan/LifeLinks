@@ -1,0 +1,128 @@
+import { IncidentStatusBadge, SeverityBadge } from "@/components/domain/badges";
+import { Card, CardContent } from "@/components/ui/card";
+import { EmptyState, PageHeader } from "@/components/ui/page-header";
+import {
+	Table,
+	TableBody,
+	TableCell,
+	TableHead,
+	TableHeader,
+	TableRow,
+} from "@/components/ui/table";
+import { Link } from "@/i18n/routing";
+import { requireUser } from "@/lib/auth/session";
+import prisma from "@/lib/prisma";
+import { formatDateTime } from "@/lib/utils";
+import type { ImpactStatus } from "@prisma/client";
+import { getTranslations } from "next-intl/server";
+
+export const dynamic = "force-dynamic";
+
+const FILTERS = [
+	"ALL",
+	"SUSPECTED",
+	"CONFIRMED",
+	"ACKNOWLEDGED",
+	"RESOLVED",
+	"CANCELLED",
+	"FALSE_ALARM",
+] as const;
+
+export default async function IncidentsPage({
+	params,
+	searchParams,
+}: {
+	params: Promise<{ locale: string }>;
+	searchParams: Promise<{ status?: string }>;
+}) {
+	const { locale } = await params;
+	const { status } = await searchParams;
+	const current = await requireUser();
+	const t = await getTranslations({ locale, namespace: "incidents" });
+
+	const filter = FILTERS.includes(status as (typeof FILTERS)[number])
+		? (status as (typeof FILTERS)[number])
+		: "ALL";
+
+	const incidents = await prisma.impactEvent.findMany({
+		where: {
+			orgId: current.org.id,
+			...(filter === "ALL" ? {} : { status: filter as ImpactStatus }),
+		},
+		orderBy: { detectedAt: "desc" },
+		take: 100,
+		include: { vehicle: true, alerts: true },
+	});
+
+	return (
+		<>
+			<PageHeader title={t("title")} subtitle={t("subtitle")} />
+
+			<div className="mb-4 flex flex-wrap gap-2">
+				{FILTERS.map((entry) => (
+					<Link
+						key={entry}
+						href={entry === "ALL" ? "/incidents" : `/incidents?status=${entry}`}
+						className={`rounded-full border px-3 py-1 text-[11px] transition-colors ${
+							filter === entry
+								? "border-brand-500/40 bg-brand-500/10 text-brand-300"
+								: "border-slate-800 text-slate-500 hover:border-slate-700 hover:text-slate-300"
+						}`}
+					>
+						{entry === "ALL" ? "All" : entry.replaceAll("_", " ").toLowerCase()}
+					</Link>
+				))}
+			</div>
+
+			<Card>
+				<CardContent className="pt-5">
+					{incidents.length === 0 ? (
+						<EmptyState title={t("empty")} />
+					) : (
+						<Table>
+							<TableHeader>
+								<TableRow>
+									<TableHead>{t("detected")}</TableHead>
+									<TableHead>{t("vehicle")}</TableHead>
+									<TableHead>{t("severity")}</TableHead>
+									<TableHead>{t("status")}</TableHead>
+									<TableHead>Location</TableHead>
+									<TableHead>{t("alerts")}</TableHead>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
+								{incidents.map((incident) => (
+									<TableRow key={incident.id}>
+										<TableCell>
+											<Link
+												href={`/incidents/${incident.id}`}
+												className="font-medium text-brand-400 hover:text-brand-300"
+											>
+												{formatDateTime(incident.detectedAt, locale)}
+											</Link>
+										</TableCell>
+										<TableCell className="text-slate-200">{incident.vehicle.plateNo}</TableCell>
+										<TableCell>
+											<SeverityBadge peakAccelG={incident.peakAccelG} tiltDeg={incident.tiltDeg} />
+										</TableCell>
+										<TableCell>
+											<IncidentStatusBadge status={incident.status} />
+										</TableCell>
+										<TableCell className="text-xs text-slate-400">
+											{incident.lat != null && incident.lng != null
+												? `${incident.lat.toFixed(4)}, ${incident.lng.toFixed(4)}`
+												: "—"}
+										</TableCell>
+										<TableCell className="text-xs text-slate-400">
+											{incident.alerts.length}
+										</TableCell>
+									</TableRow>
+								))}
+							</TableBody>
+						</Table>
+					)}
+				</CardContent>
+			</Card>
+		</>
+	);
+}

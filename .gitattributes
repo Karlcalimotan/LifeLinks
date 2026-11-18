@@ -1,0 +1,14 @@
+# Normalize text to LF in the repository; Windows checkouts still work.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.zip binary
+
+*.ino text
+*.h text
+*.cpp text
+*.ini text
