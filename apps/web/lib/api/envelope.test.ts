@@ -9,6 +9,7 @@ describe("API envelope", () => {
 		expect(response.status).toBe(200);
 		expect(body.data.hello).toBe("world");
 		expect(body.meta.requestId).toBeTruthy();
+		expect(body.meta.request_id).toBe(body.meta.requestId);
 		expect(response.headers.get("x-request-id")).toBe(body.meta.requestId);
 	});
 
@@ -18,6 +19,7 @@ describe("API envelope", () => {
 		expect(response.status).toBe(400);
 		expect(body.error.code).toBe("BAD_REQUEST");
 		expect(body.error.details).toEqual({ field: "x" });
+		expect(body.error.request_id).toBeTruthy();
 	});
 
 	it("does not leak an unknown error message as a stack trace", async () => {

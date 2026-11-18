@@ -23,6 +23,7 @@
 		"seed": "pnpm --filter web seed",
 		"gen": "node stack/generators/gen.mjs",
 		"stack:check": "node stack/src/verify.mjs --self",
+		"api:latency": "node scripts/api-latency.mjs",
 		"self-check": "node scripts/self-check.mjs"
 	},
 	"devDependencies": {

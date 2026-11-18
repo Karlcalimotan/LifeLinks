@@ -1,19 +1,30 @@
 # Device API
 
-Base path: `/api`. Every JSON response uses one envelope:
+Base path: `/api`. Every JSON response uses one envelope, following
+[`API_REGULATION.md`](../API_REGULATION.md):
 
 ```json
-{ "data": { }, "meta": { "requestId": "…", "generatedAt": "…" } }
+{ "data": { }, "meta": { "requestId": "…", "request_id": "…", "generatedAt": "…" } }
 ```
 
 Errors:
 
 ```json
-{ "error": { "code": "FORBIDDEN", "message": "Device is not approved." }, "meta": { "requestId": "…" } }
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Device is not approved.",
+    "request_id": "…"
+  },
+  "meta": { "requestId": "…", "request_id": "…" }
+}
 ```
 
-Every response carries `x-request-id` and `server-timing`. The device routes are
-`force-dynamic`; they are never cached.
+Every response carries `x-request-id`, `x-response-time`, `server-timing` and
+`cache-control: no-store`. Hot API routes have a **2 second** hard timeout and
+return `504 TIMEOUT` beyond it. Requests over 300 ms are logged as `SLOW`; over
+400 ms as `VIOLATION`. See [`api-regulation.md`](api-regulation.md) for the
+conformance table and latency check.
 
 ## Authentication
 

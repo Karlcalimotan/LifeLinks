@@ -7,6 +7,7 @@
 | [hardware.md](hardware.md) | Pin map, power chain, sensor notes, bench checklist |
 | [safety.md](safety.md) | State machine, false-positive matrix, cancel, retry, privacy |
 | [api.md](api.md) | Device endpoints, payloads, error codes, idempotency |
+| [api-regulation.md](api-regulation.md) | Envelope, latency budget, Singapore region, test recipe |
 | [local-database.md](local-database.md) | Supabase setup, pooled/direct URLs, migrations and seed |
 | [adr/](adr/) | Architecture decisions and the template |
 | [../stack/README.md](../stack/README.md) | Scaffold and generators |

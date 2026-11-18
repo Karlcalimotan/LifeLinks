@@ -43,5 +43,5 @@ export const POST = withApi(
 
 		return ok({ received: true, command_id: updated.id, status: updated.status });
 	},
-	{ route: "POST /api/device/command/ack", timeoutMs: 10_000 },
+	{ route: "POST /api/device/command/ack" },
 );

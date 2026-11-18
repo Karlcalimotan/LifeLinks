@@ -2,6 +2,7 @@ import "server-only";
 
 import { DEFAULT_FIRMWARE_CONFIG, type FirmwareConfigValues } from "@/lib/firmware/config";
 import prisma from "@/lib/prisma";
+import { unstable_cache } from "next/cache";
 
 export interface ResolvedOrgSettings {
 	id: string | null;
@@ -47,7 +48,7 @@ function asStringArray(value: unknown): string[] {
 		: [];
 }
 
-export async function getOrgSettings(orgId: string): Promise<ResolvedOrgSettings> {
+async function loadOrgSettings(orgId: string): Promise<ResolvedOrgSettings> {
 	const row = await prisma.orgSettings.findUnique({ where: { orgId } });
 	if (!row) return defaultSettings(orgId);
 
@@ -67,6 +68,16 @@ export async function getOrgSettings(orgId: string): Promise<ResolvedOrgSettings
 		parkedImpactAlerts: row.parkedImpactAlerts,
 	};
 }
+
+/**
+ * Settings are reference data (API regulation §8.2 rule 8). Cache for 60 s and
+ * invalidate explicitly after a settings write so the device command/ingest
+ * paths do not pay a database round-trip on every poll.
+ */
+export const getOrgSettings = unstable_cache(loadOrgSettings, ["org-settings"], {
+	revalidate: 60,
+	tags: ["org-settings"],
+});
 
 export function settingsToFirmwareValues(settings: ResolvedOrgSettings): FirmwareConfigValues {
 	return {

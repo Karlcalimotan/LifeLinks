@@ -32,31 +32,41 @@ export const GET = withApi(
 			take: 500,
 		});
 
-		let eventsCreated = 0;
-		for (const device of stale) {
-			const recent = await prisma.deviceStateEvent.findFirst({
-				where: {
-					deviceId: device.id,
-					type: "DEVICE_OFFLINE",
-					createdAt: { gte: new Date(now.getTime() - ONE_HOUR_MS) },
-				},
-				select: { id: true },
-			});
-			if (recent) continue;
-			await prisma.deviceStateEvent.create({
-				data: {
+		if (stale.length === 0) {
+			return ok({ checked: 0, offline: 0, events_created: 0 });
+		}
+
+		// One read and one batched insert instead of two queries per device.
+		const recentEvents = await prisma.deviceStateEvent.findMany({
+			where: {
+				deviceId: { in: stale.map((device) => device.id) },
+				type: "DEVICE_OFFLINE",
+				createdAt: { gte: new Date(now.getTime() - ONE_HOUR_MS) },
+			},
+			select: { deviceId: true },
+		});
+		const recentIds = new Set(recentEvents.map((event) => event.deviceId));
+		const toCreate = stale.filter((device) => !recentIds.has(device.id));
+
+		if (toCreate.length > 0) {
+			await prisma.deviceStateEvent.createMany({
+				data: toCreate.map((device) => ({
 					deviceId: device.id,
 					type: "DEVICE_OFFLINE",
 					metadata: {
 						lastSeenAt: device.lastSeenAt?.toISOString() ?? null,
 						offlineAfterMin: DEVICE_OFFLINE_AFTER_MIN,
 					},
-				},
+				})),
 			});
-			eventsCreated += 1;
 		}
 
-		return ok({ checked: stale.length, offline: stale.length, events_created: eventsCreated });
+		return ok({
+			checked: stale.length,
+			offline: stale.length,
+			events_created: toCreate.length,
+		});
 	},
+	// Background watch job, not a hot API path; the 2 s hot-path budget does not apply.
 	{ route: "GET /api/cron/device-watch", timeoutMs: 60_000 },
 );
