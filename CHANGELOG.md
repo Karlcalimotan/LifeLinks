@@ -29,6 +29,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Vercel builds use `pnpm build` so `prisma generate` runs before `next build`.
 - The runtime accepts the Supabase–Vercel integration names
   (`POSTGRES_PRISMA_URL` / `POSTGRES_URL_NON_POOLING`) as aliases for
   `DATABASE_URL` / `DIRECT_URL`, and `/api/health` reports which required
