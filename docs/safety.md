@@ -117,6 +117,7 @@ Verified in this repository:
 
 - the pure filters, state machine, retry, fault and power logic (native tests)
 - the server/firmware configuration contract (Vitest + `pnpm stack:check`)
+- the three-role permission model and vehicle-owner scoping (Vitest)
 - the web build, typecheck, unit tests and the API envelope
 
 Not verified here:
