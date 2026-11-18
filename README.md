@@ -1,5 +1,7 @@
 # LifeLink
 
+![LifeLink logo](apps/web/public/logo.svg)
+
 Crash detection and emergency response for every vehicle. LifeLink is a lean
 fleet console plus an ESP32 tracker: impact and tilt detection, a visible
 cancellation window, SMS alerts that survive a backend outage, and an incident
@@ -86,8 +88,8 @@ stack/                    reusable scaffold + generators (not copied to new proj
 ## Documentation
 
 Start with [`docs/architecture.md`](docs/architecture.md), then
-[`docs/hardware.md`](docs/hardware.md), [`docs/safety.md`](docs/safety.md) and
-[`docs/api.md`](docs/api.md). If you need a database, see
+[`docs/hardware.md`](docs/hardware.md), [`docs/safety.md`](docs/safety.md),
+[`docs/api.md`](docs/api.md) and the [`design system`](docs/design.md). If you need a database, see
 [`docs/local-database.md`](docs/local-database.md).
 
 ## Reusing the stack

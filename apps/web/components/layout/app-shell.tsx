@@ -1,3 +1,4 @@
+import { LogoMark } from "@/components/brand/logo";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { LogoutButton } from "@/components/layout/logout-button";
 import { MobileNav, Sidebar } from "@/components/layout/sidebar";
@@ -36,31 +37,46 @@ export function AppShell({
 }) {
 	const initials = user.name
 		.split(/\s+/)
-		.filter(Boolean)
+		.filter((part) => /^[A-Za-z]/.test(part))
 		.slice(0, 2)
 		.map((part) => part[0]?.toUpperCase())
 		.join("");
 
+	const roleBadge = <Badge tone={roleTone(role)}>{roleLabel}</Badge>;
+	const avatar = (
+		<span className="grid size-8 place-items-center rounded-[3px] border border-ink-600 bg-ink-800 font-display text-sm font-semibold text-fog-100">
+			{initials || "LL"}
+		</span>
+	);
+
 	return (
 		<div className="min-h-screen">
 			<Sidebar labels={navLabels} role={role} />
-			<div className="lg:pl-64">
-				<header className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-slate-800/70 bg-[#060b14]/80 px-4 py-3 backdrop-blur md:px-6">
-					<div className="min-w-0">
-						<p className="truncate text-[10px] uppercase tracking-[0.2em] text-slate-500">
-							{org.name}
-						</p>
-						<p className="truncate text-sm font-medium text-slate-200">{user.email}</p>
+			<div className="lg:pl-[248px]">
+				<header className="sticky top-0 z-20 border-b border-ink-700 bg-ink-950/85 px-4 py-3 backdrop-blur md:px-6">
+					<div className="flex items-center justify-between gap-3">
+						<div className="flex min-w-0 items-center gap-2.5">
+							<LogoMark className="size-7 shrink-0 sm:hidden" decorative />
+							<div className="min-w-0">
+								<p className="truncate text-[11px] text-fog-500">{org.name}</p>
+								<p className="truncate text-sm font-medium text-fog-100">{user.email}</p>
+							</div>
+						</div>
+						<div className="flex shrink-0 items-center gap-2">
+							<span className="hidden sm:inline-flex">{roleBadge}</span>
+							<div className="hidden items-center gap-2 sm:flex">
+								<LocaleSwitcher />
+								<LogoutButton locale={locale} label={signOutLabel} />
+							</div>
+							{avatar}
+						</div>
 					</div>
-					<div className="flex shrink-0 items-center gap-2">
-						<Badge tone={roleTone(role)}>{roleLabel}</Badge>
-						<div className="hidden items-center gap-2 sm:flex">
+					<div className="mt-2 flex items-center justify-between gap-2 border-t border-ink-700/70 pt-2 sm:hidden">
+						{roleBadge}
+						<div className="flex items-center gap-2">
 							<LocaleSwitcher />
 							<LogoutButton locale={locale} label={signOutLabel} />
 						</div>
-						<span className="grid size-8 place-items-center rounded-full border border-slate-700 bg-slate-900 text-xs font-semibold text-slate-300">
-							{initials || "LL"}
-						</span>
 					</div>
 				</header>
 				<main className="mx-auto w-full max-w-7xl px-4 pb-24 pt-6 md:px-6 lg:pb-10">

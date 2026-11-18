@@ -61,7 +61,7 @@ export default async function VehicleDetailPage({
 	return (
 		<>
 			<PageHeader
-				title={`${vehicle.plateNo} · ${vehicle.make} ${vehicle.model}`}
+				title={`${vehicle.plateNo} ${vehicle.make} ${vehicle.model}`}
 				subtitle={vehicle.driverName ? `${t("driver")}: ${vehicle.driverName}` : undefined}
 				actions={
 					hasFix ? (
@@ -69,7 +69,7 @@ export default async function VehicleDetailPage({
 							href={mapLink(device.lastLat as number, device.lastLng as number)}
 							target="_blank"
 							rel="noreferrer"
-							className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-700 px-3 text-xs text-slate-300 hover:border-slate-600 hover:text-white"
+							className="inline-flex h-8 items-center gap-1.5 rounded border border-ink-600 px-3 text-xs text-fog-300 hover:border-ink-600 hover:text-fog-50"
 						>
 							<ExternalLink className="size-3.5" />
 							{t("viewMap")}
@@ -91,15 +91,15 @@ export default async function VehicleDetailPage({
 					<CardContent>
 						{hasFix ? (
 							<div className="flex items-start gap-3">
-								<span className="mt-0.5 grid size-9 place-items-center rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-300">
+								<span className="mt-0.5 grid size-9 place-items-center rounded border border-rescue-500/30 bg-rescue-500/10 text-rescue-300">
 									<MapPin className="size-4" />
 								</span>
 								<div>
-									<p className="text-sm text-slate-200">
+									<p className="text-sm text-fog-100">
 										{formatCoord(device.lastLat)}, {formatCoord(device.lastLng)}
 									</p>
-									<p className="mt-1 text-[11px] text-slate-500">
-										GPS age: {gpsAgeSeconds(device.lastFixAt) ?? "unknown"}s · {t("lastSeen")}{" "}
+									<p className="mt-1 text-[11px] text-fog-500">
+										GPS age {gpsAgeSeconds(device.lastFixAt) ?? "unknown"}s / {t("lastSeen")}{" "}
 										{formatRelative(device.lastSeenAt)}
 									</p>
 								</div>
@@ -112,29 +112,25 @@ export default async function VehicleDetailPage({
 						)}
 
 						<div className="mt-5 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
-							<div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
-								<p className="text-[10px] uppercase tracking-wider text-slate-500">{t("speed")}</p>
-								<p className="mt-1 text-sm text-slate-200">
+							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
+								<p className="text-[11px] font-medium text-fog-500">{t("speed")}</p>
+								<p className="mt-1 text-sm text-fog-100">
 									{device?.lastSpeedKph != null ? `${Math.round(device.lastSpeedKph)} kph` : "—"}
 								</p>
 							</div>
-							<div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
-								<p className="text-[10px] uppercase tracking-wider text-slate-500">
-									{t("battery")}
-								</p>
-								<p className="mt-1 text-sm text-slate-200">
+							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
+								<p className="text-[11px] font-medium text-fog-500">{t("battery")}</p>
+								<p className="mt-1 text-sm text-fog-100">
 									{device?.batteryV != null ? `${device.batteryV.toFixed(1)} V` : "—"}
 								</p>
 							</div>
-							<div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
-								<p className="text-[10px] uppercase tracking-wider text-slate-500">Satellites</p>
-								<p className="mt-1 text-sm text-slate-200">{device?.satellites ?? "—"}</p>
+							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
+								<p className="text-[11px] font-medium text-fog-500">Satellites</p>
+								<p className="mt-1 text-sm text-fog-100">{device?.satellites ?? "—"}</p>
 							</div>
-							<div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
-								<p className="text-[10px] uppercase tracking-wider text-slate-500">
-									{t("ignition")}
-								</p>
-								<p className="mt-1 text-sm text-slate-200">
+							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
+								<p className="text-[11px] font-medium text-fog-500">{t("ignition")}</p>
+								<p className="mt-1 text-sm text-fog-100">
 									{device?.ignition == null ? "—" : device.ignition ? "On" : "Off"}
 								</p>
 							</div>
@@ -152,19 +148,19 @@ export default async function VehicleDetailPage({
 								{canAdminister(current.role) ? (
 									<Link
 										href={`/devices/${device.id}`}
-										className="text-brand-400 hover:text-brand-300"
+										className="text-signal-400 hover:text-signal-300"
 									>
 										{device.label}
 									</Link>
 								) : (
-									<span className="text-slate-200">{device.label}</span>
+									<span className="text-fog-100">{device.label}</span>
 								)}
-								<p className="text-xs text-slate-500">MAC {device.mac}</p>
-								<p className="text-xs text-slate-500">
-									Firmware {device.firmwareVersion ?? "unknown"} · config rev{" "}
+								<p className="text-xs text-fog-500">MAC {device.mac}</p>
+								<p className="text-xs text-fog-500">
+									Firmware {device.firmwareVersion ?? "unknown"} / config rev{" "}
 									{device.configRev ?? "—"}
 								</p>
-								<p className="text-xs text-slate-500">
+								<p className="text-xs text-fog-500">
 									Last seen {formatDateTime(device.lastSeenAt, locale)}
 								</p>
 							</div>
@@ -235,7 +231,7 @@ export default async function VehicleDetailPage({
 											<TableCell>
 												<Link
 													href={`/incidents/${incident.id}`}
-													className="text-brand-400 hover:text-brand-300"
+													className="text-signal-400 hover:text-signal-300"
 												>
 													{formatDateTime(incident.detectedAt, locale)}
 												</Link>
@@ -249,7 +245,7 @@ export default async function VehicleDetailPage({
 											<TableCell>
 												<IncidentStatusBadge status={incident.status} />
 											</TableCell>
-											<TableCell className="text-xs text-slate-400">
+											<TableCell className="text-xs text-fog-500">
 												{incident.alerts.length}
 											</TableCell>
 										</TableRow>

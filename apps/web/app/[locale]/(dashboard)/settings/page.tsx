@@ -33,12 +33,12 @@ export default async function SettingsPage({
 			<PageHeader title={t("title")} subtitle={t("subtitle")} />
 
 			{saved ? (
-				<p className="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
+				<p className="mb-4 rounded border border-clear-500/30 bg-clear-500/10 px-3 py-2 text-xs text-clear-300">
 					{t("saved")}
 				</p>
 			) : null}
 			{error ? (
-				<p className="mb-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+				<p className="mb-4 rounded border border-alarm-500/30 bg-alarm-500/10 px-3 py-2 text-xs text-alarm-300">
 					{error === "forbidden"
 						? t("adminOnly")
 						: "Check the values and try again. Thresholds must stay inside the safety envelope."}
@@ -72,7 +72,7 @@ export default async function SettingsPage({
 								placeholder={"+639171234567\n+639181234567"}
 								disabled={!editable}
 							/>
-							<p className="text-[11px] text-slate-500">{t("phonesHint")}</p>
+							<p className="text-[11px] text-fog-500">{t("phonesHint")}</p>
 						</Field>
 						<Field>
 							<Label htmlFor="emails">{t("emails")}</Label>
@@ -83,7 +83,7 @@ export default async function SettingsPage({
 								placeholder={"ops@example.com"}
 								disabled={!editable}
 							/>
-							<p className="text-[11px] text-slate-500">{t("emailsHint")}</p>
+							<p className="text-[11px] text-fog-500">{t("emailsHint")}</p>
 						</Field>
 					</CardContent>
 				</Card>
@@ -203,13 +203,13 @@ export default async function SettingsPage({
 								disabled={!editable}
 							/>
 						</Field>
-						<label className="col-span-2 flex items-center gap-2 text-xs text-slate-400">
+						<label className="col-span-2 flex items-center gap-2 text-xs text-fog-500">
 							<input
 								type="checkbox"
 								name="parkedImpactAlerts"
 								defaultChecked={settings.parkedImpactAlerts}
 								disabled={!editable}
-								className="size-4 rounded border-slate-700 bg-slate-950"
+								className="size-4 rounded border-ink-600 bg-ink-950 accent-signal-500"
 							/>
 							{t("parkedImpactAlerts")}
 						</label>
@@ -218,18 +218,18 @@ export default async function SettingsPage({
 
 				<Card className="flex flex-col justify-between">
 					<CardContent className="pt-5">
-						<p className="text-xs leading-relaxed text-slate-400">
+						<p className="text-xs leading-relaxed text-fog-500">
 							Thresholds are bounded by the firmware safety envelope. The device rejects the whole
 							config object if a single field is outside its range, so a bad save can never
 							half-apply.
 						</p>
 						{!editable ? (
-							<p className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+							<p className="mt-3 rounded border border-caution-500/30 bg-caution-500/10 px-3 py-2 text-xs text-caution-300">
 								{t("adminOnly")}
 							</p>
 						) : null}
 					</CardContent>
-					<div className="border-t border-slate-800/70 p-5">
+					<div className="border-t border-ink-700/70 p-5">
 						<Button type="submit" disabled={!editable}>
 							{t("saveSettings")}
 						</Button>

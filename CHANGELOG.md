@@ -11,7 +11,12 @@ All notable changes to this project are documented here. The format follows
 - Lean vehicle-alert console: dashboard, vehicles, incidents, trackers and settings.
 - Row-level security on every application table for the Supabase deployment.
 - Vercel deployment allowlist: automatic deployments are restricted to `main`
-  and `develop`; preview deployments from other branches are disabled.
+  and `develop`; preview deployments from other branches are disabled. The
+  allowlist is mirrored in `apps/web/vercel.json` for the monorepo root.
+- Night Highway Dispatch design system: emergency signal palette, Barlow
+  display/UI type, signal-plate logo, favicon and responsive console shell.
+- Redesigned login, dashboard, incident, vehicle, tracker, settings and public
+  pages; the evidence chart now renders immediately without animation.
 - Device API: ingest, incident, cancel, command poll, command acknowledgement and
   signed-release OTA check.
 - Prisma schema, initial migration and idempotent demo seed.

@@ -2,6 +2,11 @@ import { Badge } from "@/components/ui/badge";
 import { type DeviceConnectionState, connectionLabel } from "@/lib/device/status";
 import { severityFor, severityLabel } from "@/lib/incidents/severity";
 
+function sentence(value: string): string {
+	const words = value.replaceAll("_", " ").toLowerCase();
+	return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 const incidentTones: Record<string, "danger" | "warning" | "success" | "muted" | "info"> = {
 	SUSPECTED: "warning",
 	CONFIRMED: "danger",
@@ -12,11 +17,7 @@ const incidentTones: Record<string, "danger" | "warning" | "success" | "muted" |
 };
 
 export function IncidentStatusBadge({ status }: { status: string }) {
-	return (
-		<Badge tone={incidentTones[status] ?? "neutral"}>
-			{status.replaceAll("_", " ").toLowerCase()}
-		</Badge>
-	);
+	return <Badge tone={incidentTones[status] ?? "neutral"}>{sentence(status)}</Badge>;
 }
 
 export function SeverityBadge({
@@ -45,7 +46,7 @@ const vehicleTones: Record<string, "success" | "warning" | "muted"> = {
 };
 
 export function VehicleStatusBadge({ status }: { status: string }) {
-	return <Badge tone={vehicleTones[status] ?? "neutral"}>{status.toLowerCase()}</Badge>;
+	return <Badge tone={vehicleTones[status] ?? "neutral"}>{sentence(status)}</Badge>;
 }
 
 const connectionTones: Record<DeviceConnectionState, "success" | "warning" | "danger" | "muted"> = {
@@ -67,5 +68,5 @@ const approvalTones: Record<string, "success" | "warning" | "danger" | "muted"> 
 };
 
 export function ApprovalBadge({ status }: { status: string }) {
-	return <Badge tone={approvalTones[status] ?? "neutral"}>{status.toLowerCase()}</Badge>;
+	return <Badge tone={approvalTones[status] ?? "neutral"}>{sentence(status)}</Badge>;
 }

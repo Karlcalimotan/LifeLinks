@@ -4,27 +4,31 @@ import type { HTMLAttributes } from "react";
 type Tone = "neutral" | "success" | "warning" | "danger" | "info" | "muted";
 
 const tones: Record<Tone, string> = {
-	neutral: "border-slate-700 bg-slate-800/60 text-slate-200",
-	success: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
-	warning: "border-amber-500/30 bg-amber-500/10 text-amber-300",
-	danger: "border-rose-500/30 bg-rose-500/10 text-rose-300",
-	info: "border-cyan-500/30 bg-cyan-500/10 text-cyan-300",
-	muted: "border-slate-800 bg-slate-900/60 text-slate-400",
+	neutral: "border-ink-600 bg-ink-700/70 text-fog-100",
+	success: "border-clear-400/30 bg-clear-400/10 text-clear-300",
+	warning: "border-caution-400/30 bg-caution-400/10 text-caution-300",
+	danger: "border-alarm-400/30 bg-alarm-400/10 text-alarm-300",
+	info: "border-rescue-400/30 bg-rescue-400/10 text-rescue-300",
+	muted: "border-ink-700 bg-ink-900/70 text-fog-500",
 };
 
 export function Badge({
 	className,
 	tone = "neutral",
+	children,
 	...props
 }: HTMLAttributes<HTMLSpanElement> & { tone?: Tone }) {
 	return (
 		<span
 			className={cn(
-				"inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-medium",
+				"inline-flex w-fit items-center gap-1.5 rounded-[3px] border px-2 py-0.5 text-[11px] font-medium",
 				tones[tone],
 				className,
 			)}
 			{...props}
-		/>
+		>
+			<span className="size-1.5 shrink-0 rounded-[1px] bg-current" aria-hidden="true" />
+			{children}
+		</span>
 	);
 }

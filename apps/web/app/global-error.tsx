@@ -11,8 +11,8 @@ export default function GlobalError({
 		<html lang="en">
 			<body
 				style={{
-					background: "#060b14",
-					color: "#e2e8f0",
+					background: "#071013",
+					color: "#e8f1f2",
 					fontFamily: "ui-sans-serif, system-ui, sans-serif",
 					display: "grid",
 					minHeight: "100vh",
@@ -21,13 +21,28 @@ export default function GlobalError({
 				}}
 			>
 				<div style={{ maxWidth: 440, textAlign: "center" }}>
-					<p
-						style={{ fontSize: 11, letterSpacing: 3, textTransform: "uppercase", color: "#64748b" }}
-					>
+					<p style={{ fontSize: 12, color: "#ff5a1f" }}>
+						<span
+							style={{
+								display: "inline-block",
+								width: 10,
+								height: 10,
+								marginRight: 8,
+								background: "#ff5a1f",
+							}}
+						/>
 						LifeLink
 					</p>
-					<h1 style={{ fontSize: 28, margin: "12px 0" }}>Something went wrong</h1>
-					<p style={{ fontSize: 14, color: "#94a3b8" }}>
+					<h1
+						style={{
+							fontFamily: "'Barlow Condensed', 'Arial Narrow', sans-serif",
+							fontSize: 34,
+							margin: "12px 0",
+						}}
+					>
+						Something went wrong
+					</h1>
+					<p style={{ fontSize: 14, color: "#8fa3a6", lineHeight: 1.6 }}>
 						{error.message || "The console could not render this request."}
 					</p>
 					<button
@@ -35,10 +50,10 @@ export default function GlobalError({
 						onClick={reset}
 						style={{
 							marginTop: 20,
-							background: "#22d3ee",
-							color: "#020617",
+							background: "#ff5a1f",
+							color: "#071013",
 							border: 0,
-							borderRadius: 8,
+							borderRadius: 4,
 							padding: "10px 16px",
 							fontWeight: 600,
 							cursor: "pointer",

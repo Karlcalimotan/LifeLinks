@@ -65,21 +65,21 @@ export default async function DeviceDetailPage({
 	return (
 		<>
 			<PageHeader
-				title={`${device.label} · ${device.mac}`}
+				title={`${device.label} (${device.mac})`}
 				subtitle={
 					device.vehicle
-						? `${device.vehicle.plateNo} · ${device.vehicle.make} ${device.vehicle.model}`
+						? `${device.vehicle.plateNo}: ${device.vehicle.make} ${device.vehicle.model}`
 						: "Unassigned tracker"
 				}
 			/>
 
 			{command === "queued" ? (
-				<p className="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
+				<p className="mb-4 rounded border border-clear-500/30 bg-clear-500/10 px-3 py-2 text-xs text-clear-300">
 					Command queued. The tracker picks it up on its next poll.
 				</p>
 			) : null}
 			{error ? (
-				<p className="mb-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+				<p className="mb-4 rounded border border-alarm-500/30 bg-alarm-500/10 px-3 py-2 text-xs text-alarm-300">
 					{error === "forbidden"
 						? "Your role cannot send commands."
 						: "Command could not be queued."}
@@ -90,16 +90,16 @@ export default async function DeviceDetailPage({
 				<DeviceStatusBadge state={state} />
 				<ApprovalBadge status={device.approvalStatus} />
 				{device.vehicle ? (
-					<Link href={`/vehicles/${device.vehicle.id}`} className="text-xs text-brand-400">
+					<Link href={`/vehicles/${device.vehicle.id}`} className="text-xs text-signal-400">
 						{device.vehicle.plateNo}
 					</Link>
 				) : null}
 			</div>
 
 			{device.approvalStatus === "PENDING" && canAdminister(current.role) ? (
-				<Card className="mb-6 border-amber-500/30">
+				<Card className="mb-6 border-caution-500/30">
 					<CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5">
-						<p className="text-sm text-amber-200">
+						<p className="text-sm text-caution-200">
 							This tracker is waiting for approval. It cannot send data until approved.
 						</p>
 						<div className="flex gap-2">
@@ -128,44 +128,44 @@ export default async function DeviceDetailPage({
 						<CardTitle>Connectivity</CardTitle>
 					</CardHeader>
 					<CardContent className="grid grid-cols-2 gap-3 text-xs">
-						<div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
-							<p className="text-[10px] uppercase tracking-wider text-slate-500">Last seen</p>
-							<p className="mt-1 text-sm text-slate-200">
+						<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
+							<p className="text-[11px] font-medium text-fog-500">Last seen</p>
+							<p className="mt-1 text-sm text-fog-100">
 								{formatDateTime(device.lastSeenAt, locale)}
 							</p>
-							<p className="text-[10px] text-slate-500">{formatRelative(device.lastSeenAt)}</p>
+							<p className="text-[10px] text-fog-500">{formatRelative(device.lastSeenAt)}</p>
 						</div>
-						<div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
-							<p className="text-[10px] uppercase tracking-wider text-slate-500">Battery</p>
-							<p className="mt-1 text-sm text-slate-200">
+						<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
+							<p className="text-[11px] font-medium text-fog-500">Battery</p>
+							<p className="mt-1 text-sm text-fog-100">
 								{device.batteryV != null ? `${device.batteryV.toFixed(1)} V` : "—"}
 							</p>
 						</div>
-						<div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
-							<p className="text-[10px] uppercase tracking-wider text-slate-500">Signal</p>
-							<p className="mt-1 flex items-center gap-2 text-sm text-slate-200">
-								<Radio className="size-3.5 text-cyan-400" />
+						<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
+							<p className="text-[11px] font-medium text-fog-500">Signal</p>
+							<p className="mt-1 flex items-center gap-2 text-sm text-fog-100">
+								<Radio className="size-3.5 text-rescue-400" />
 								{device.rssiDbm != null ? `${device.rssiDbm} dBm` : "—"}
 							</p>
 						</div>
-						<div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
-							<p className="text-[10px] uppercase tracking-wider text-slate-500">Satellites</p>
-							<p className="mt-1 flex items-center gap-2 text-sm text-slate-200">
-								<Satellite className="size-3.5 text-cyan-400" />
+						<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
+							<p className="text-[11px] font-medium text-fog-500">Satellites</p>
+							<p className="mt-1 flex items-center gap-2 text-sm text-fog-100">
+								<Satellite className="size-3.5 text-rescue-400" />
 								{device.satellites ?? "—"}
 							</p>
 						</div>
-						<div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
-							<p className="text-[10px] uppercase tracking-wider text-slate-500">GPS age</p>
-							<p className="mt-1 text-sm text-slate-200">
+						<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
+							<p className="text-[11px] font-medium text-fog-500">GPS age</p>
+							<p className="mt-1 text-sm text-fog-100">
 								{gpsAgeSeconds(device.lastFixAt) != null
 									? `${gpsAgeSeconds(device.lastFixAt)}s`
 									: "—"}
 							</p>
 						</div>
-						<div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
-							<p className="text-[10px] uppercase tracking-wider text-slate-500">Config revision</p>
-							<p className="mt-1 text-sm text-slate-200">{device.configRev ?? "—"}</p>
+						<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
+							<p className="text-[11px] font-medium text-fog-500">Config revision</p>
+							<p className="mt-1 text-sm text-fog-100">{device.configRev ?? "—"}</p>
 						</div>
 					</CardContent>
 				</Card>
@@ -176,9 +176,9 @@ export default async function DeviceDetailPage({
 						<RotateTokenButton deviceId={device.id} locale={locale} />
 					</CardHeader>
 					<CardContent>
-						<p className="text-xs leading-relaxed text-slate-400">{t("tokenDescription")}</p>
-						<p className="mt-3 text-[11px] text-slate-500">
-							Firmware {device.firmwareVersion ?? "unknown"} · variant{" "}
+						<p className="text-xs leading-relaxed text-fog-500">{t("tokenDescription")}</p>
+						<p className="mt-3 text-[11px] text-fog-500">
+							Firmware {device.firmwareVersion ?? "unknown"} / variant{" "}
 							{device.hwVariant ?? "unknown"}
 						</p>
 					</CardContent>
@@ -205,7 +205,7 @@ export default async function DeviceDetailPage({
 								))}
 							</div>
 						) : (
-							<p className="text-xs text-slate-500">Your role cannot send commands.</p>
+							<p className="text-xs text-fog-500">Your role cannot send commands.</p>
 						)}
 
 						{device.commands.length === 0 ? (
@@ -223,10 +223,10 @@ export default async function DeviceDetailPage({
 									{device.commands.map((command) => (
 										<TableRow key={command.id}>
 											<TableCell>{command.kind}</TableCell>
-											<TableCell className="text-xs text-slate-400">
+											<TableCell className="text-xs text-fog-500">
 												{command.status.toLowerCase()}
 											</TableCell>
-											<TableCell className="text-xs text-slate-400">
+											<TableCell className="text-xs text-fog-500">
 												{formatRelative(command.createdAt)}
 											</TableCell>
 										</TableRow>
@@ -248,15 +248,15 @@ export default async function DeviceDetailPage({
 								.map(([key, value]) => (
 									<div
 										key={key}
-										className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2"
+										className="flex items-center justify-between rounded border border-ink-700 bg-ink-950/40 px-3 py-2"
 									>
-										<span className="text-slate-500">{key}</span>
-										<span className="font-mono text-slate-200">{String(value)}</span>
+										<span className="text-fog-500">{key}</span>
+										<span className="font-mono text-fog-100">{String(value)}</span>
 									</div>
 								))}
 						</div>
-						<p className="mt-3 text-[11px] text-slate-500">
-							Config rev {config.rev} · version {config.version}
+						<p className="mt-3 text-[11px] text-fog-500">
+							Config rev {config.rev} / version {config.version}
 						</p>
 					</CardContent>
 				</Card>
@@ -274,14 +274,14 @@ export default async function DeviceDetailPage({
 							{device.events.map((event) => (
 								<div
 									key={event.id}
-									className="flex items-start gap-3 rounded-lg border border-slate-800/70 bg-slate-950/30 px-3 py-2"
+									className="flex items-start gap-3 rounded border border-ink-700/70 bg-ink-950/30 px-3 py-2"
 								>
-									<Terminal className="mt-0.5 size-3.5 text-slate-500" />
+									<Terminal className="mt-0.5 size-3.5 text-fog-500" />
 									<div className="min-w-0">
-										<p className="text-xs font-medium text-slate-300">
+										<p className="text-xs font-medium text-fog-300">
 											{event.type.replaceAll("_", " ").toLowerCase()}
 										</p>
-										<p className="text-[10px] text-slate-500">
+										<p className="text-[10px] text-fog-500">
 											{formatDateTime(event.createdAt, locale)}
 										</p>
 									</div>

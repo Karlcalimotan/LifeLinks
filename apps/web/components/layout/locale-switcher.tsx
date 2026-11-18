@@ -16,7 +16,7 @@ export function LocaleSwitcher() {
 			onChange={(event) => {
 				router.replace(pathname, { locale: event.target.value as Locale });
 			}}
-			className="h-8 rounded-lg border border-slate-700/80 bg-slate-950/60 px-2 text-xs text-slate-300 focus:border-brand-500 focus:outline-none"
+			className="h-8 rounded border border-ink-600/80 bg-ink-950/60 px-2 text-xs text-fog-300 focus:border-signal-500 focus:outline-none"
 		>
 			{locales.map((entry) => (
 				<option key={entry} value={entry}>

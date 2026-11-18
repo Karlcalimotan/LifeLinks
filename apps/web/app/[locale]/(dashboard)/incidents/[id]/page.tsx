@@ -80,7 +80,7 @@ export default async function IncidentDetailPage({
 	return (
 		<>
 			<PageHeader
-				title={`${t("detailTitle")} · ${incident.vehicle.plateNo}`}
+				title={`${t("detailTitle")} ${incident.vehicle.plateNo}`}
 				subtitle={formatDateTime(incident.detectedAt, locale)}
 				actions={
 					hasFix ? (
@@ -88,7 +88,7 @@ export default async function IncidentDetailPage({
 							href={mapLink(incident.lat as number, incident.lng as number)}
 							target="_blank"
 							rel="noreferrer"
-							className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-700 px-3 text-xs text-slate-300 hover:border-slate-600 hover:text-white"
+							className="inline-flex h-8 items-center gap-1.5 rounded border border-ink-600 px-3 text-xs text-fog-300 hover:border-ink-600 hover:text-fog-50"
 						>
 							<ExternalLink className="size-3.5" />
 							Open map
@@ -98,12 +98,12 @@ export default async function IncidentDetailPage({
 			/>
 
 			{updated ? (
-				<p className="mb-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
+				<p className="mb-4 rounded border border-clear-500/30 bg-clear-500/10 px-3 py-2 text-xs text-clear-300">
 					{t("statusUpdated")}
 				</p>
 			) : null}
 			{error ? (
-				<p className="mb-4 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
+				<p className="mb-4 rounded border border-alarm-500/30 bg-alarm-500/10 px-3 py-2 text-xs text-alarm-300">
 					{error === "forbidden"
 						? "Your role cannot change incidents."
 						: "That status transition is not allowed."}
@@ -115,13 +115,13 @@ export default async function IncidentDetailPage({
 				<SeverityBadge peakAccelG={incident.peakAccelG} tiltDeg={incident.tiltDeg} />
 				<Link
 					href={`/vehicles/${incident.vehicleId}`}
-					className="text-xs text-brand-400 hover:text-brand-300"
+					className="text-xs text-signal-400 hover:text-signal-300"
 				>
 					{incident.vehicle.plateNo}
 				</Link>
 				<Link
 					href={`/devices/${incident.deviceId}`}
-					className="text-xs text-slate-400 hover:text-slate-200"
+					className="text-xs text-fog-500 hover:text-fog-100"
 				>
 					{incident.device.label}
 				</Link>
@@ -135,41 +135,37 @@ export default async function IncidentDetailPage({
 					<CardContent className="flex flex-col gap-4">
 						<EvidenceChart points={points} />
 						<div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
-							<div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
-								<p className="text-[10px] uppercase tracking-wider text-slate-500">
-									{t("peakAccel")}
-								</p>
-								<p className="mt-1 text-sm text-slate-200">{incident.peakAccelG.toFixed(2)} g</p>
+							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
+								<p className="text-[11px] font-medium text-fog-500">{t("peakAccel")}</p>
+								<p className="mt-1 text-sm text-fog-100">{incident.peakAccelG.toFixed(2)} g</p>
 							</div>
-							<div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
-								<p className="text-[10px] uppercase tracking-wider text-slate-500">{t("tilt")}</p>
-								<p className="mt-1 text-sm text-slate-200">{Math.round(incident.tiltDeg)}°</p>
+							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
+								<p className="text-[11px] font-medium text-fog-500">{t("tilt")}</p>
+								<p className="mt-1 text-sm text-fog-100">{Math.round(incident.tiltDeg)}°</p>
 							</div>
-							<div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
-								<p className="text-[10px] uppercase tracking-wider text-slate-500">
-									{t("vibration")}
-								</p>
-								<p className="mt-1 text-sm text-slate-200">{incident.vibrationCount}</p>
+							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
+								<p className="text-[11px] font-medium text-fog-500">{t("vibration")}</p>
+								<p className="mt-1 text-sm text-fog-100">{incident.vibrationCount}</p>
 							</div>
-							<div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
-								<p className="text-[10px] uppercase tracking-wider text-slate-500">{t("speed")}</p>
-								<p className="mt-1 text-sm text-slate-200">
+							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
+								<p className="text-[11px] font-medium text-fog-500">{t("speed")}</p>
+								<p className="mt-1 text-sm text-fog-100">
 									{incident.speedKph != null ? `${Math.round(incident.speedKph)} kph` : "—"}
 								</p>
 							</div>
 						</div>
 
-						<div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
+						<div className="flex flex-wrap items-center gap-3 text-xs text-fog-500">
 							{hasFix ? (
 								<span className="inline-flex items-center gap-1.5">
-									<MapPin className="size-3.5 text-cyan-400" />
+									<MapPin className="size-3.5 text-rescue-400" />
 									{incident.lat?.toFixed(5)}, {incident.lng?.toFixed(5)}
-									{incident.gpsAgeS != null ? ` · fix ${incident.gpsAgeS}s old` : ""}
+									{incident.gpsAgeS != null ? ` / fix ${incident.gpsAgeS}s old` : ""}
 								</span>
 							) : (
 								<span>No GPS fix in the incident payload.</span>
 							)}
-							<span>·</span>
+							<span className="text-fog-500">/</span>
 							<span>
 								{t("incidentId")}: {incident.id}
 							</span>
@@ -182,39 +178,39 @@ export default async function IncidentDetailPage({
 						<CardTitle>{t("timeline")}</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<ol className="relative flex flex-col gap-4 border-l border-slate-800 pl-4">
+						<ol className="relative flex flex-col gap-4 border-l border-ink-700 pl-4">
 							<li className="relative">
-								<span className="absolute -left-[21px] top-1 size-2 rounded-full bg-rose-400" />
-								<p className="text-xs font-medium text-slate-200">Incident detected</p>
-								<p className="text-[11px] text-slate-500">
+								<span className="absolute -left-[21px] top-1 size-2 rounded-full bg-alarm-400" />
+								<p className="text-xs font-medium text-fog-100">Incident detected</p>
+								<p className="text-[11px] text-fog-500">
 									{formatDateTime(incident.detectedAt, locale)}
 								</p>
 							</li>
 							{incident.cancelDeadline ? (
 								<li className="relative">
-									<span className="absolute -left-[21px] top-1 size-2 rounded-full bg-amber-400" />
-									<p className="text-xs font-medium text-slate-200">Driver cancel window closes</p>
-									<p className="text-[11px] text-slate-500">
+									<span className="absolute -left-[21px] top-1 size-2 rounded-full bg-caution-400" />
+									<p className="text-xs font-medium text-fog-100">Driver cancel window closes</p>
+									<p className="text-[11px] text-fog-500">
 										{formatDateTime(incident.cancelDeadline, locale)}
 									</p>
 								</li>
 							) : null}
 							{incident.cancelledAt ? (
 								<li className="relative">
-									<span className="absolute -left-[21px] top-1 size-2 rounded-full bg-slate-400" />
-									<p className="text-xs font-medium text-slate-200">Cancelled by driver</p>
-									<p className="text-[11px] text-slate-500">
+									<span className="absolute -left-[21px] top-1 size-2 rounded-full bg-fog-500" />
+									<p className="text-xs font-medium text-fog-100">Cancelled by driver</p>
+									<p className="text-[11px] text-fog-500">
 										{formatDateTime(incident.cancelledAt, locale)}
 									</p>
 								</li>
 							) : null}
 							{events.map((event) => (
 								<li key={event.id} className="relative">
-									<span className="absolute -left-[21px] top-1 size-2 rounded-full bg-cyan-400" />
-									<p className="text-xs font-medium text-slate-200">
+									<span className="absolute -left-[21px] top-1 size-2 rounded-full bg-rescue-400" />
+									<p className="text-xs font-medium text-fog-100">
 										{event.type.replaceAll("_", " ").toLowerCase()}
 									</p>
-									<p className="text-[11px] text-slate-500">
+									<p className="text-[11px] text-fog-500">
 										{formatDateTime(event.createdAt, locale)}
 									</p>
 								</li>
@@ -246,11 +242,11 @@ export default async function IncidentDetailPage({
 									{incident.alerts.map((alert) => (
 										<TableRow key={alert.id}>
 											<TableCell>{alert.channel}</TableCell>
-											<TableCell className="text-slate-200">{alert.target}</TableCell>
-											<TableCell className="text-xs text-slate-400">
+											<TableCell className="text-fog-100">{alert.target}</TableCell>
+											<TableCell className="text-xs capitalize text-fog-500">
 												{alert.status.toLowerCase()}
 											</TableCell>
-											<TableCell className="text-xs text-slate-400">{alert.attempts}</TableCell>
+											<TableCell className="text-xs text-fog-500">{alert.attempts}</TableCell>
 										</TableRow>
 									))}
 								</TableBody>
@@ -265,11 +261,9 @@ export default async function IncidentDetailPage({
 					</CardHeader>
 					<CardContent className="flex flex-col gap-4">
 						{incident.resolution ? (
-							<div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
-								<p className="text-[10px] uppercase tracking-wider text-slate-500">
-									{t("resolution")}
-								</p>
-								<p className="mt-1 text-xs text-slate-300">{incident.resolution}</p>
+							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
+								<p className="text-[11px] font-medium text-fog-500">{t("resolution")}</p>
+								<p className="mt-1 text-xs text-fog-300">{incident.resolution}</p>
 							</div>
 						) : null}
 						<IncidentActions

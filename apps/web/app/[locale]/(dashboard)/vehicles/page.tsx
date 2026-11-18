@@ -64,19 +64,19 @@ export default async function VehiclesPage({ params }: { params: Promise<{ local
 											<TableCell>
 												<Link
 													href={`/vehicles/${vehicle.id}`}
-													className="font-medium text-brand-400 hover:text-brand-300"
+													className="font-medium text-signal-400 hover:text-signal-300"
 												>
 													{vehicle.plateNo}
 												</Link>
 											</TableCell>
-											<TableCell className="text-slate-200">
+											<TableCell className="text-fog-100">
 												{vehicle.make} {vehicle.model}
-												{vehicle.year ? ` · ${vehicle.year}` : ""}
+												{vehicle.year ? ` (${vehicle.year})` : ""}
 											</TableCell>
 											<TableCell>
 												{vehicle.driverName ?? "—"}
 												{vehicle.driverPhone ? (
-													<span className="block text-[11px] text-slate-500">
+													<span className="block text-[11px] text-fog-500">
 														{vehicle.driverPhone}
 													</span>
 												) : null}
@@ -84,20 +84,20 @@ export default async function VehiclesPage({ params }: { params: Promise<{ local
 											<TableCell>
 												{device ? (
 													<span className="flex flex-col gap-1">
-														<span className="text-xs text-slate-300">{device.label}</span>
+														<span className="text-xs text-fog-300">{device.label}</span>
 														<DeviceStatusBadge state={deviceConnectionState(device.lastSeenAt)} />
 													</span>
 												) : (
-													<span className="text-xs text-slate-500">No tracker</span>
+													<span className="text-xs text-fog-500">No tracker</span>
 												)}
 											</TableCell>
-											<TableCell className="text-xs text-slate-400">
+											<TableCell className="text-xs text-fog-500">
 												{formatRelative(device?.lastSeenAt)}
 											</TableCell>
 											<TableCell>
 												<VehicleStatusBadge status={vehicle.status} />
 											</TableCell>
-											<TableCell className="text-slate-300">{vehicle._count.impacts}</TableCell>
+											<TableCell className="text-fog-300">{vehicle._count.impacts}</TableCell>
 										</TableRow>
 									);
 								})}

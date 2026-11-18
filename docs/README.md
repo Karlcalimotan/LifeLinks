@@ -3,6 +3,7 @@
 | Document | What it covers |
 | --- | --- |
 | [architecture.md](architecture.md) | Layers, data model, auth, device contract, extension points |
+| [design.md](design.md) | Night Highway Dispatch palette, type, logo, layout and accessibility |
 | [hardware.md](hardware.md) | Pin map, power chain, sensor notes, bench checklist |
 | [safety.md](safety.md) | State machine, false-positive matrix, cancel, retry, privacy |
 | [api.md](api.md) | Device endpoints, payloads, error codes, idempotency |

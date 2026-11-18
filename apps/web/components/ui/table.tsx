@@ -10,22 +10,18 @@ export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>)
 }
 
 export function TableHeader({ className, ...props }: HTMLAttributes<HTMLTableSectionElement>) {
-	return <thead className={cn("border-b border-slate-800/80", className)} {...props} />;
+	return <thead className={cn("border-b border-ink-700", className)} {...props} />;
 }
 
 export function TableBody({ className, ...props }: HTMLAttributes<HTMLTableSectionElement>) {
-	return <tbody className={cn("divide-y divide-slate-800/60", className)} {...props} />;
+	return <tbody className={cn("divide-y divide-ink-700/70", className)} {...props} />;
 }
 
 export function TableRow({ className, ...props }: HTMLAttributes<HTMLTableRowElement>) {
-	return <tr className={cn("transition-colors hover:bg-slate-900/40", className)} {...props} />;
-}
-
-export function TableHead({ className, ...props }: ThHTMLAttributes<HTMLTableCellElement>) {
 	return (
-		<th
+		<tr
 			className={cn(
-				"px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500",
+				"border-l-2 border-transparent transition-colors hover:border-signal-500/70 hover:bg-ink-700/40",
 				className,
 			)}
 			{...props}
@@ -33,6 +29,17 @@ export function TableHead({ className, ...props }: ThHTMLAttributes<HTMLTableCel
 	);
 }
 
+export function TableHead({ className, ...props }: ThHTMLAttributes<HTMLTableCellElement>) {
+	return (
+		<th
+			className={cn("px-4 py-2.5 text-left text-[11px] font-medium text-fog-500", className)}
+			{...props}
+		/>
+	);
+}
+
 export function TableCell({ className, ...props }: TdHTMLAttributes<HTMLTableCellElement>) {
-	return <td className={cn("px-4 py-3 align-middle text-slate-300", className)} {...props} />;
+	return (
+		<td className={cn("px-4 py-3 align-middle text-fog-300 tabular-nums", className)} {...props} />
+	);
 }
