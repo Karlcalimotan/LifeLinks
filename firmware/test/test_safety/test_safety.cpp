@@ -117,11 +117,47 @@ void test_sms_body_is_safe_and_bounded(void) {
 	TEST_ASSERT_NOT_NULL(strstr(body, "ABC 1234"));
 }
 
+void test_remote_cancel_during_countdown_wins(void) {
+	CrashSafety safety;
+	DeviceConfig config = defaultConfig();
+	safety.startCountdown(0, config);
+	TEST_ASSERT_TRUE(safety.cancelFromRemote());
+	TEST_ASSERT_EQUAL(static_cast<int>(AlertState::Cancelled),
+	                  static_cast<int>(safety.state()));
+}
+
+void test_remote_cancel_after_dispatch_stops_retries(void) {
+	CrashSafety safety;
+	DeviceConfig config = defaultConfig();
+	safety.startCountdown(0, config);
+	safety.update(15000, false);
+	TEST_ASSERT_EQUAL(static_cast<int>(AlertState::Alerting),
+	                  static_cast<int>(safety.state()));
+	TEST_ASSERT_TRUE(safety.cancelFromRemote());
+	TEST_ASSERT_EQUAL(static_cast<int>(AlertState::PostAlert),
+	                  static_cast<int>(safety.state()));
+	TEST_ASSERT_FALSE(safety.shouldRetry(16000));
+}
+
+void test_remote_cancel_is_ignored_when_idle_or_acknowledged(void) {
+	CrashSafety safety;
+	TEST_ASSERT_FALSE(safety.cancelFromRemote());
+
+	DeviceConfig config = defaultConfig();
+	safety.startCountdown(0, config);
+	safety.update(15000, false);
+	safety.markAcknowledged();
+	TEST_ASSERT_FALSE(safety.cancelFromRemote());
+}
+
 int main(int, char**) {
 	UNITY_BEGIN();
 	RUN_TEST(test_countdown_expires_into_alerting);
 	RUN_TEST(test_cancel_inside_the_window_wins);
 	RUN_TEST(test_retry_becomes_due_after_the_interval);
+	RUN_TEST(test_remote_cancel_during_countdown_wins);
+	RUN_TEST(test_remote_cancel_after_dispatch_stops_retries);
+	RUN_TEST(test_remote_cancel_is_ignored_when_idle_or_acknowledged);
 	RUN_TEST(test_safe_mode_never_blocks_alerting);
 	RUN_TEST(test_faults_latch_until_acknowledged);
 	RUN_TEST(test_three_abnormal_resets_enter_safe_mode);

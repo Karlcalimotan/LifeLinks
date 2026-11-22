@@ -3,54 +3,13 @@
 Board: **ESP32 DevKit V1 (30-pin, DOIT layout)**. Check the silkscreen on your
 board; clones differ.
 
-## Pin map
-
-| Signal | ESP32 pin | Notes |
-| --- | --- | --- |
-| MPU-6050 SDA | GPIO 21 | I2C |
-| MPU-6050 SCL | GPIO 22 | I2C |
-| MPU-6050 INT | GPIO 23 | Optional; the sketch polls, so it works without it |
-| SW-420 DO | GPIO 32 | Digital input; LOW on vibration on the common module |
-| Cancel button | GPIO 33 | `INPUT_PULLUP`, active LOW, momentary to GND |
-| NEO-6M TX | GPIO 26 | ESP32 RX1 (`Serial1`) |
-| NEO-6M RX | GPIO 27 | ESP32 TX1 |
-| A7670E TX | GPIO 17 | ESP32 TX2 (`Serial2`) |
-| A7670E RX | GPIO 16 | ESP32 RX2 |
-| A7670E PWRKEY | GPIO 4 | Active LOW; the sketch pulses it low for 1.2 s, then releases it HIGH |
-| Buzzer NPN base | GPIO 25 | 1 kΩ to the base; active HIGH |
-| Battery sense | GPIO 34 | Optional; input-only, needs a divider. Disabled by default |
-| Ignition sense | GPIO 35 | Optional; input-only, needs a divider. Disabled by default |
+The canonical pin map, power chain and pre-power checklist live in
+[`wiring.md`](wiring.md). The code source of truth is
+[`firmware/include/pins.h`](../firmware/include/pins.h). Do not duplicate pin
+numbers here.
 
 The GPS and modem UARTs are **remapped** UART1/UART2, not the USB serial pins.
 GPIO 1/3 stay free for the USB monitor.
-
-## Power chain
-
-```
-Vehicle 12 V
-  └─ 2–3 A fuse + rocker switch
-       └─ LM2596S buck, set to 5.0–5.1 V with a meter BEFORE connecting the shield
-            └─ 18650 shield V8 (5V IN)
-                 └─ 5V OUT ── 1000 µF / 16 V ── GND
-                      ├─ ESP32 VIN (5 V)
-                      ├─ A7670E VIN (5 V)
-                      └─ 3.3 V regulator on the DevKit
-                           ├─ MPU-6050 VCC
-                           ├─ SW-420 VCC
-                           └─ NEO-6M VCC
-```
-
-- The 1000 µF capacitor is not decoration. The A7670E can pull amp-scale
-  bursts during registration and transmission. Mount it close to the modem,
-  stripe to GND.
-- The buck output must be set **before** the shield is connected. The shield's
-  switch must be ON for the backup path to work.
-- The buzzer is a 5 V load switched by an NPN (2N2222/S8050). The ESP32 pin
-  drives the base through 1 kΩ; the emitter goes to GND; the buzzer negative
-  goes to the collector; the buzzer positive goes to 5 V. Add a flyback diode
-  across the buzzer if it is magnetic.
-- All grounds are common. The buck, shield, ESP32, sensors and modem must share
-  GND.
 
 ## Sensor notes
 
@@ -71,6 +30,42 @@ Vehicle 12 V
 - **Battery/ignition sense**: the wiring diagram does not include the dividers,
   so `hw::kHasPowerSense` is `false` and the firmware omits those fields. Fit the
   dividers first, then enable the flag in `firmware/main/hardware.h`.
+
+## WiFi commissioning and the reset gesture
+
+The ESP32's 2.4 GHz radio is **commissioning-only**; the A7670E remains the
+telemetry, command and SOS uplink. The firmware starts a setup access point only
+when the unit has no verified provisioned network, or when three consecutive
+joins of the stored network fail. The AP is named `LifeLink-` plus the last four
+hex digits of the eFuse MAC (uppercase, zero padded, for example
+`LifeLink-EEFF`). Join it and open `http://192.168.4.1`; the DNS catch-all also
+opens the page from a captive-portal prompt.
+
+The page scans 2.4 GHz networks asynchronously and also accepts a manual SSID.
+It tests the submitted network for up to 20 s (6 s quick-fail) and writes NVS
+only after the station has an IP. A wrong password leaves the stored credentials
+alone and the portal stays open with the reason. The portal closes about 2 s
+after a verified save or after 10 minutes, then the radio is switched off.
+
+The existing cancel button (GPIO 33, INPUT_PULLUP, active LOW) is also the
+boot-time reset:
+
+| Gesture | Result |
+| --- | --- |
+| power on with the button released, wait 5 s | listener arms (50 ms debounce) |
+| hold 5 s | clears WiFi, keeps device identity; reboots on release |
+| hold 10 s | clears WiFi, `device_id`, `device_token`, `provisioned`; reboots |
+| button held from power-on | no reset (stuck-button guard) |
+| any alert leaves `Idle` | reset is disabled for the rest of the boot |
+
+The listener accepts a new hold only in the first 60 s after boot; a hold that
+started inside the window may finish after it. The 5 s grace and the
+clean-release requirement are deliberate: a shorted or stuck button must never
+erase a working unit. A 5 s hold does not reboot immediately, so continuing to
+10 s can still reach the factory clear.
+
+WiFi does not change the A7670E wiring, the SOS path or the alert state machine.
+The modem is still the only uplink.
 
 ## Bench checklist
 
@@ -97,6 +92,32 @@ the result.
    fault is visible in the event log on the next successful heartbeat.
 10. **Range**: repeat the SMS test at the edge of coverage; confirm the retry
     behavior.
+11. **Portal boot**: factory-reset the unit (10 s hold, see above), reboot, and
+    confirm the AP `LifeLink-XXXX` matches the last four hex digits of the
+    eFuse MAC printed at boot. Join from a phone; confirm `192.168.4.1` loads
+    and the captive-portal prompt works on both iOS and Android.
+12. **Scan and manual entry**: confirm the page lists nearby 2.4 GHz networks
+    with plausible signal strength, and that a manually typed SSID also works.
+    The ESP32 is 2.4 GHz only; 5 GHz networks must not appear.
+13. **Wrong password**: with the stored router switched off, boot until the
+    portal opens (three failed joins). Submit a deliberately wrong password.
+    Confirm the portal stays open with a readable reason. Switch the router back
+    on and reboot; the unit must rejoin the previously stored network, proving
+    the wrong password did not overwrite it.
+14. **Correct password**: submit the real SSID and password. Confirm the status
+    page shows the IP, the AP closes within a few seconds, and the next boot
+    does not reopen the portal. Confirm the Device ID/Token stored are the ones
+    the dashboard expects.
+15. **Reset timing**: release after 4 s (nothing), hold 5 s and release (WiFi
+    only; identity survives), hold 10 s (identity and `provisioned` also gone).
+    Hold the button from power-on: nothing must be erased. Start a countdown and
+    hold the button: the boot reset must be disabled and the alert must continue.
+16. **Radio current**: with the portal open, watch the 5 V rail while the modem
+    transmits. WiFi association and an AP scan add current spikes; the ESP32
+    must not brown out.
+17. **Portal lifetime**: leave the portal open without saving. Confirm it closes
+    after 10 minutes and the tracker returns to normal monitoring and modem
+    operation without a reboot.
 
 ## Bill of materials
 

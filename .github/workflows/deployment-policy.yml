@@ -1,0 +1,33 @@
+name: deployment-policy
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop, staging]
+
+permissions:
+  contents: read
+
+jobs:
+  policy:
+    name: Deployment policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Version consistency
+        env:
+          REQUIRE_RELEASE: ${{ (github.ref == 'refs/heads/main' || github.base_ref == 'main') && '1' || '0' }}
+        run: |
+          if [ "$REQUIRE_RELEASE" = "1" ]; then
+            node scripts/release-check.mjs --require-release
+          else
+            node scripts/release-check.mjs
+          fi
+      - name: Deployment policy
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/deployment-check.mjs

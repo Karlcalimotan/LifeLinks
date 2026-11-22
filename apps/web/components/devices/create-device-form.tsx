@@ -4,9 +4,18 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, Label, Select } from "@/components/ui/field";
 import { type DeviceTokenState, createDeviceAction } from "@/lib/actions/devices";
 import { Check, Copy } from "lucide-react";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 
 const initial: DeviceTokenState = { ok: false };
+
+function FieldError({ id, message }: { id: string; message?: string }) {
+	if (!message) return null;
+	return (
+		<p id={id} role="alert" className="text-xs text-alarm-300">
+			{message}
+		</p>
+	);
+}
 
 export function CreateDeviceForm({
 	locale,
@@ -17,6 +26,28 @@ export function CreateDeviceForm({
 }) {
 	const [state, formAction, pending] = useActionState(createDeviceAction, initial);
 	const [copied, setCopied] = useState(false);
+	const [label, setLabel] = useState("");
+	const [mac, setMac] = useState("");
+	const [vehicleId, setVehicleId] = useState("");
+	const errors = state.fieldErrors ?? {};
+
+	// A failed registration returns the submitted values; re-assert them so the
+	// admin never loses input to React's automatic form reset.
+	useEffect(() => {
+		if (!state.values) return;
+		setLabel(state.values.label);
+		setMac(state.values.mac);
+		setVehicleId(state.values.vehicleId);
+	}, [state.values]);
+
+	// A successful registration shows a one-time token; clear the form so the
+	// admin can register the next tracker without stale values.
+	useEffect(() => {
+		if (!state.ok || !state.token) return;
+		setLabel("");
+		setMac("");
+		setVehicleId("");
+	}, [state.ok, state.token]);
 
 	async function copyToken() {
 		if (!state.token) return;
@@ -31,15 +62,42 @@ export function CreateDeviceForm({
 				<input type="hidden" name="locale" value={locale} />
 				<Field>
 					<Label htmlFor="device-label">Label</Label>
-					<Input id="device-label" name="label" placeholder="Navara tracker" required />
+					<Input
+						id="device-label"
+						name="label"
+						placeholder="Hilux engine bay"
+						value={label}
+						onChange={(event) => setLabel(event.target.value)}
+						aria-invalid={errors.label ? true : undefined}
+						aria-describedby={errors.label ? "device-label-error" : undefined}
+						required
+					/>
+					<FieldError id="device-label-error" message={errors.label} />
 				</Field>
 				<Field>
 					<Label htmlFor="device-mac">MAC address</Label>
-					<Input id="device-mac" name="mac" placeholder="AA:BB:CC:DD:EE:01" required />
+					<Input
+						id="device-mac"
+						name="mac"
+						placeholder="24:0A:C4:9F:2A:71"
+						value={mac}
+						onChange={(event) => setMac(event.target.value)}
+						aria-invalid={errors.mac ? true : undefined}
+						aria-describedby={errors.mac ? "device-mac-error" : undefined}
+						required
+					/>
+					<FieldError id="device-mac-error" message={errors.mac} />
 				</Field>
 				<Field className="sm:col-span-2">
 					<Label htmlFor="device-vehicle">Assign to vehicle (optional)</Label>
-					<Select id="device-vehicle" name="vehicleId" defaultValue="">
+					<Select
+						id="device-vehicle"
+						name="vehicleId"
+						value={vehicleId}
+						onChange={(event) => setVehicleId(event.target.value)}
+						aria-invalid={errors.vehicleId ? true : undefined}
+						aria-describedby={errors.vehicleId ? "device-vehicle-error" : undefined}
+					>
 						<option value="">Unassigned</option>
 						{vehicles.map((vehicle) => (
 							<option key={vehicle.id} value={vehicle.id}>
@@ -47,6 +105,7 @@ export function CreateDeviceForm({
 							</option>
 						))}
 					</Select>
+					<FieldError id="device-vehicle-error" message={errors.vehicleId} />
 				</Field>
 				<div className="sm:col-span-2">
 					<Button type="submit" size="sm" disabled={pending}>
@@ -56,7 +115,10 @@ export function CreateDeviceForm({
 			</form>
 
 			{state.error ? (
-				<p className="rounded border border-alarm-500/30 bg-alarm-500/10 px-3 py-2 text-xs text-alarm-300">
+				<p
+					role="alert"
+					className="rounded border border-alarm-500/30 bg-alarm-500/10 px-3 py-2 text-xs text-alarm-300"
+				>
 					{state.error}
 				</p>
 			) : null}

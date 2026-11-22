@@ -2,7 +2,7 @@ name: ci
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, develop, staging]
   pull_request:
 
 permissions:
@@ -12,9 +12,25 @@ jobs:
   web:
     name: Web (lint, types, tests, build)
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: lifelink
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d lifelink"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/lifelink?schema=public
       DIRECT_URL: postgresql://ci:ci@localhost:5432/lifelink?schema=public
+      RLS_TEST_DATABASE_URL: postgresql://ci:ci@localhost:5432/lifelink?schema=public
+      RLS_TEST_ALLOW: "1"
       AUTH_SECRET: ci-only-secret-0123456789abcdef
       NEXT_PUBLIC_BASE_URL: http://localhost:3000
       NEXT_PUBLIC_SITE_URL: http://localhost:3000
@@ -29,14 +45,17 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm stack:check
+      - run: pnpm prisma:deploy
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      - run: node --test scripts/merge-pr.test.mjs
       - run: pnpm build
 
   firmware:
-    name: Firmware (native tests + ESP32 build)
+    name: Firmware (build, tests, analysis, format)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -46,6 +65,5 @@ jobs:
         with:
           path: ~/.platformio
           key: platformio-${{ hashFiles('firmware/platformio.ini') }}
-      - run: pip install platformio
-      - run: pio test -d firmware -e native
-      - run: pio run -d firmware
+      - run: pip install platformio clang-format==18.1.8
+      - run: bash scripts/verify.sh

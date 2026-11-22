@@ -10,7 +10,8 @@ enum class PowerState {
 	Critical,
 };
 
-inline float adcToVoltage(uint16_t raw, float dividerRatio, float vref = 3.3f, uint16_t maxAdc = 4095) {
+inline float adcToVoltage(uint16_t raw, float dividerRatio, float vref = 3.3f,
+						  uint16_t maxAdc = 4095) {
 	if (maxAdc == 0) return 0.0f;
 	return (static_cast<float>(raw) / static_cast<float>(maxAdc)) * vref * dividerRatio;
 }
