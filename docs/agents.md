@@ -31,7 +31,14 @@ The issue is the durable task record. A conversation is not a task record.
 
 ## Overlap check
 
-Before creating an issue or starting work, check J-Akiru5's open work:
+Before creating an issue or starting work, run the read-only preflight:
+
+```bash
+pnpm overlap:check
+```
+
+It lists J-Akiru5's open issues and pull requests. The raw commands are also
+available if the script cannot run:
 
 ```bash
 gh issue list --state open --author J-Akiru5

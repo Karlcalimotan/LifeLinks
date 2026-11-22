@@ -42,16 +42,12 @@ grade.
 
 ## Issue-first workflow
 
-1. Before creating an issue or starting work, check J-Akiru5's open issues and
-   pull requests for overlap:
-   `gh issue list --state open --author J-Akiru5`,
-   `gh issue list --state open --assignee J-Akiru5`, and
-   `gh pr list --state open --author J-Akiru5`.
-   If an item already covers the task, coordinate on it instead of creating a
-   duplicate. Do not take over an issue assigned to someone else. If there is an
-   overlap decision, J-Akiru5's decision takes priority: pause the conflicting
-   work, comment on his issue or PR, and align with his design instead of
-   merging a competing one.
+1. Before creating an issue or starting work, run `pnpm overlap:check` to list
+   J-Akiru5's open issues and pull requests. If an item already covers the task,
+   coordinate on it instead of creating a duplicate. Do not take over an issue
+   assigned to someone else. If there is an overlap decision, J-Akiru5's
+   decision takes priority: pause the conflicting work, comment on his issue or
+   PR, and align with his design instead of merging a competing one.
 2. Create a GitHub issue from `.github/ISSUE_TEMPLATE/`.
 3. Put the objective, scope, acceptance criteria and test plan in the issue.
 4. Open the PR against `develop` and link the issue with `Closes #N`,

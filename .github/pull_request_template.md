@@ -12,7 +12,7 @@ Closes #
 
 ## Checklist
 
-- [ ] Checked J-Akiru5's open issues/PRs for overlap
+- [ ] Ran `pnpm overlap:check` and checked open issues/PRs
 - [ ] If overlapping, J-Akiru5's decision takes priority and is linked here
 - [ ] Issue created before the work
 - [ ] Tests added or updated
