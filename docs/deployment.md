@@ -133,6 +133,10 @@ firmware tag. A tag, once pushed, is immutable: never move, delete or replace it
     commit.
 11. Run `node scripts/release-check.mjs --tag vX.Y.Z` against the tag before or
     during release verification.
+12. Back-merge after release: merge `main` back into `develop` and `staging`
+    through a pull request. This keeps the histories aligned so the next
+    promotion is not reported as `BEHIND`. `main` is never force-pushed or
+    rewritten.
 
 ### Firmware
 

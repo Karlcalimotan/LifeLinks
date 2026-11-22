@@ -30,7 +30,8 @@ All notable changes to this project are documented here. The format follows
 - Lean vehicle-alert console: dashboard, vehicles, incidents, trackers and settings.
 - Row-level security on every application table for the Supabase deployment.
 - Vercel deployment allowlist: automatic deployments are restricted to `main`
-  and `develop`; preview deployments from other branches are disabled. The
+  (production) and `staging` (preview); `develop` is integration only and does
+  not deploy. Preview deployments from every other branch are disabled. The
   allowlist is mirrored in `apps/web/vercel.json` for the monorepo root.
 - Night Highway Dispatch design system: emergency signal palette, Barlow
   display/UI type, signal-plate logo, favicon and responsive console shell.
@@ -87,8 +88,8 @@ All notable changes to this project are documented here. The format follows
   (`POSTGRES_PRISMA_URL` / `POSTGRES_URL_NON_POOLING`) as aliases for
   `DATABASE_URL` / `DIRECT_URL`, and `/api/health` reports which required
   environment variables are present without returning their values.
-- CI runs on pushes to `main`/`develop` and on pull requests, instead of every
-  branch push and the matching pull request.
+- CI runs on pushes to `main`, `develop` and `staging`, and on pull requests,
+  instead of every branch push and the matching pull request.
 - Access model reduced to three roles: `USER` (vehicle owner, scoped to their own
   vehicles), `RESPONDER` (CDRRMO / Pulis, whole-fleet incident response) and
   `ADMIN` (members, trackers and settings). Vehicles now carry an optional
