@@ -19,7 +19,7 @@ Production: unchanged. The staging preview is merged; `main` is not promoted.
   policy tests, Biome, TypeScript, **266 unit tests** and the production build
   all pass.
 - `pnpm self-check` in the main checkout trips the stack contract on the
-  template's `OptiFeed` attribution inside stale `.worktrees/` copies. CI runs
+  template's `the template product name` attribution inside stale `.worktrees/` copies. CI runs
   from a clean clone and passes; this is a local-worktree artifact, not a code
   failure.
 
