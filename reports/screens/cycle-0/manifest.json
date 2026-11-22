@@ -1,0 +1,37 @@
+{
+	"generatedAt": "2026-11-22T08:26:12.848Z",
+	"baseURL": "http://localhost:3000",
+	"locale": "en",
+	"cycle": "cycle-0",
+	"screens": [
+		{
+			"page": "devices",
+			"viewport": "desktop",
+			"url": "http://localhost:3000/en/devices",
+			"title": "LifeLink — Crash detection and emergency response for every vehicle.",
+			"file": "../../.worktrees/cycle-0/reports/screens/cycle-0/desktop/devices.png"
+		},
+		{
+			"page": "devices-drawer",
+			"viewport": "desktop",
+			"url": "http://localhost:3000/en/devices",
+			"title": "LifeLink — Crash detection and emergency response for every vehicle.",
+			"file": "../../.worktrees/cycle-0/reports/screens/cycle-0/desktop/devices-drawer.png"
+		},
+		{
+			"page": "devices",
+			"viewport": "mobile",
+			"url": "http://localhost:3000/en/devices",
+			"title": "LifeLink — Crash detection and emergency response for every vehicle.",
+			"file": "../../.worktrees/cycle-0/reports/screens/cycle-0/mobile/devices.png"
+		},
+		{
+			"page": "devices-drawer",
+			"viewport": "mobile",
+			"url": "http://localhost:3000/en/devices",
+			"title": "LifeLink — Crash detection and emergency response for every vehicle.",
+			"file": "../../.worktrees/cycle-0/reports/screens/cycle-0/mobile/devices-drawer.png"
+		}
+	],
+	"consoleErrors": []
+}

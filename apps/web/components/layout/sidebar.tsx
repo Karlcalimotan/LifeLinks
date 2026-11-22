@@ -31,7 +31,7 @@ export function Sidebar({
 	const visible = visibleItems(role);
 
 	return (
-		<aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] flex-col border-r border-ink-700 bg-ink-950/95 backdrop-blur lg:flex">
+		<aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] flex-col border-r border-ink-700 bg-ink-950 lg:flex">
 			<div className="h-1 hazard-stripe" aria-hidden="true" />
 			<Link href="/dashboard" className="flex items-center px-5 py-5">
 				<Logo />
@@ -46,7 +46,7 @@ export function Sidebar({
 							key={item.href}
 							href={item.href}
 							className={cn(
-								"flex items-center gap-3 border-l-2 px-3 py-2.5 text-sm transition-colors",
+								"flex items-center gap-3 border-l-2 px-3 py-2.5 text-body transition-colors",
 								active
 									? "border-signal-500 bg-signal-500/10 text-signal-300"
 									: "border-transparent text-fog-500 hover:bg-ink-800 hover:text-fog-100",
@@ -60,10 +60,10 @@ export function Sidebar({
 			</nav>
 
 			<div className="m-3 border border-ink-700 bg-ink-900/60 p-3">
-				<p className="text-[11px] font-medium text-fog-400">Crash path</p>
+				<p className="text-meta font-medium text-fog-400">Crash path</p>
 				<ol className="mt-2 flex flex-col gap-1.5">
 					{safetyPath.map((step, index) => (
-						<li key={step} className="flex items-baseline gap-2 text-[11px] text-fog-500">
+						<li key={step} className="flex items-baseline gap-2 text-meta text-fog-500">
 							<span className="w-4 shrink-0 font-display text-signal-500">{`0${index + 1}`}</span>
 							{step}
 						</li>
@@ -85,7 +85,7 @@ export function MobileNav({
 	const visible = visibleItems(role);
 
 	return (
-		<nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-ink-700 bg-ink-950/95 px-2 py-1 backdrop-blur lg:hidden">
+		<nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-ink-700 bg-ink-950 px-2 py-1 lg:hidden">
 			{visible.map((item) => {
 				const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 				const Icon = item.icon;
@@ -94,7 +94,7 @@ export function MobileNav({
 						key={item.href}
 						href={item.href}
 						className={cn(
-							"flex flex-1 flex-col items-center gap-1 rounded-[3px] px-1 py-2 text-[10px]",
+							"flex flex-1 flex-col items-center gap-1 rounded-control px-1 py-2 text-meta",
 							active ? "text-signal-300" : "text-fog-500",
 						)}
 					>

@@ -44,7 +44,7 @@ export function AppShell({
 
 	const roleBadge = <Badge tone={roleTone(role)}>{roleLabel}</Badge>;
 	const avatar = (
-		<span className="grid size-8 place-items-center rounded-[3px] border border-ink-600 bg-ink-800 font-display text-sm font-semibold text-fog-100">
+		<span className="grid size-8 place-items-center rounded-control border border-ink-600 bg-ink-800 font-display text-body font-semibold text-fog-100">
 			{initials || "LL"}
 		</span>
 	);
@@ -53,13 +53,13 @@ export function AppShell({
 		<div className="min-h-screen">
 			<Sidebar labels={navLabels} role={role} />
 			<div className="lg:pl-[248px]">
-				<header className="sticky top-0 z-20 border-b border-ink-700 bg-ink-950/85 px-4 py-3 backdrop-blur md:px-6">
+				<header className="sticky top-0 z-20 border-b border-ink-700 bg-ink-950 px-4 py-3 md:px-6">
 					<div className="flex items-center justify-between gap-3">
 						<div className="flex min-w-0 items-center gap-2.5">
 							<LogoMark className="size-7 shrink-0 sm:hidden" decorative />
 							<div className="min-w-0">
-								<p className="truncate text-[11px] text-fog-500">{org.name}</p>
-								<p className="truncate text-sm font-medium text-fog-100">{user.email}</p>
+								<p className="truncate text-meta text-fog-500">{org.name}</p>
+								<p className="truncate text-body font-medium text-fog-100">{user.email}</p>
 							</div>
 						</div>
 						<div className="flex shrink-0 items-center gap-2">
