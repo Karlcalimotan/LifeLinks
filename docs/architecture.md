@@ -74,7 +74,8 @@ they can be compiled and tested on the host:
 | `power.h` | ADC scaling, main/backup/critical classification |
 | `status.h` | Buzzer patterns |
 | `modem.h` | SOS SMS body (bounded, ASCII) |
-| `hardware.h` | DevKit V1 pin map |
+| `../include/pins.h` | Canonical DevKit V1 pin map |
+| `hardware.h` | `hw::` aliases over `pins.h` |
 
 `main.ino` does the I/O: I2C IMU, SW-420 digital input, NEO-6M UART,
 A7670E AT transport, buzzer NPN output, battery/ignition ADC.

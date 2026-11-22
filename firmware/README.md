@@ -5,8 +5,11 @@ PlatformIO project for the ESP32 DevKit V1 (30-pin) tracker.
 ## Layout
 
 ```
+include/
+  pins.h              canonical GPIO map, mirrored in docs/wiring.md
+  secrets.example.h   optional compile-time overrides; copy to secrets.h
 main/
-  main.ino   orchestration: sensors, UARTs, modem, buzzer
+  main.ino            orchestration: sensors, UARTs, modem, buzzer
   config.h            class A envelope + class B defaults (Arduino-free)
   filters.h           impact/tilt/vibration fusion (Arduino-free)
   safety.h            countdown, cancel, retry, faults (Arduino-free)
@@ -14,12 +17,15 @@ main/
   power.h             ADC scaling and power bands (Arduino-free)
   status.h            buzzer patterns (Arduino-free)
   modem.h             SOS SMS body (Arduino-free)
-  hardware.h          pin map
+  hardware.h          hw:: aliases over pins.h
 test/
   test_config/        envelope and defaults
   test_filters/       pothole, crash, rollover, door slam, debounce
   test_safety/        countdown, cancel, retry, faults, power, GPS, SMS
 ```
+
+The PlatformIO project root is `firmware/`, not the repository root. Run the
+commands below from the repository root with `-d firmware`.
 
 The pure headers are compiled on the host by the `native` environment. Keep them
 free of Arduino includes so the tests stay fast and deterministic.
@@ -27,9 +33,10 @@ free of Arduino includes so the tests stay fast and deterministic.
 ## Build and flash
 
 ```bash
-pip install platformio
+python -m pip install platformio clang-format
+bash scripts/verify.sh
 pio run -d firmware
-pio run -d firmware -t upload
+pio run -d firmware -t upload     # human owner only
 pio device monitor -b 115200
 ```
 
@@ -43,7 +50,9 @@ pio test -d firmware -e native
 ```
 
 The sketch needs the ESP32 core and is excluded from the native build; the tests
-include the headers directly.
+include the headers directly. The `native` environment needs a host C/C++
+compiler (gcc/g++ on Linux, MinGW-w64 on Windows). `scripts/verify.sh` adds the
+ESP32 build, static analysis and the clang-format check.
 
 ## Provisioning
 
