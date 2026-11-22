@@ -52,8 +52,8 @@ status and may update their own branch copy.
       on server AND database level.
 - [ ] **T13 TODO** — Settings: crash thresholds, countdown time, notification
       contacts, organization info.
-- [ ] **T14 CLAIMED:builder** — Loading, empty and error states on every page; mobile
-      responsive layout. Dashboard slice: issue #55.
+- [ ] **T14 IN REVIEW** — Loading, empty and error states on every page; mobile
+      responsive layout. Dashboard slice: issue #55; PR #62.
 
 ## P2: Hardening (only after P0 is done)
 
