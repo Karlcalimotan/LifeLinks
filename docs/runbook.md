@@ -57,7 +57,15 @@ The agent permission configuration denies upload targets.
 
 ## 4. Provisioning
 
-At boot the sketch prints its identity and accepts serial commands:
+The preferred path is the WiFi commissioning portal. On an unprovisioned unit,
+or after three failed joins of the stored network, join the `LifeLink-XXXX`
+access point (last four hex digits of the eFuse MAC) and open
+`http://192.168.4.1`. The page scans 2.4 GHz networks, accepts a manual SSID and
+tests the network before saving. See
+[`hardware.md`](hardware.md#wifi-commissioning-and-the-reset-gesture) for the
+portal and the GPIO 33 reset gesture.
+
+Serial commands remain available for bench work:
 
 ```text
 SET_ID AA:BB:CC:DD:EE:01
@@ -75,9 +83,10 @@ shown once by the console's tracker registration form.
 Expected boot lines:
 
 ```text
-[FIRMWARE] LifeLink 0.1.0
+[FIRMWARE] LifeLink 0.2.0
 [WIRING] MPU 21/22, SW-420 32, cancel 33, GPS 26/27, modem 16/17, buzzer 25
 [IMU] MPU-6050 ready
+[WIFI] ...
 [READY] LifeLink tracker online
 ```
 
