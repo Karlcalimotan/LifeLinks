@@ -55,10 +55,16 @@ $env:SEED_DEMO="yes"; pnpm seed
 
 `prisma:deploy` applies `prisma/migrations` through `DIRECT_URL`. The seed is
 idempotent, prints the demo login and the device tokens, and refuses a remote
-database unless `SEED_DEMO=yes` acknowledges the target.
+database unless both `SEED_DEMO=yes` and `SEED_ALLOW_REMOTE=yes` acknowledge the
+target. The local path (a loopback host or the Docker service name `db`) is
+allowed without the remote acknowledgement.
 
-Use a dedicated development Supabase project for the seed. Do not point
-`SEED_DEMO=yes` at production.
+Use a dedicated development Supabase project for the seed. Do not point the seed
+at production or any shared database: the demo users have known passwords. Demo
+credentials must never be seeded into a shared or production database.
+
+The login page shows the demo account panel only when `DEMO_MODE="true"` is set
+in `apps/web/.env`. Keep it false outside a local demo machine.
 
 This app reaches Postgres through Prisma, not the Supabase client. Disable the
 Supabase **Data API** for the project (Project Settings → API) unless you add
@@ -75,9 +81,9 @@ If the Supabase–Vercel integration is installed, it provides
 `POSTGRES_PRISMA_URL` (pooled) and `POSTGRES_URL_NON_POOLING` (session). The app
 aliases those to `DATABASE_URL` and `DIRECT_URL` at runtime, but you still need
 to set `AUTH_SECRET` and `CRON_SECRET` yourself. After redeploying, open
-`/api/health`: it reports whether the database URL, direct URL, auth secret and
-cron secret are present, plus whether the database is reachable. It never
-returns the values.
+`/api/health`: it reports whether the database is reachable. It does not expose
+which environment variables or secrets are configured, caches the database check
+for five seconds, and rate-limits repeated callers. It never returns the values.
 
 Set the Vercel **Function Region** to Singapore (`sin1`), closest to the
 `ap-southeast-1` Supabase pooler. The repository also declares

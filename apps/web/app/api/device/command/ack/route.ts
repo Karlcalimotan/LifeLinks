@@ -1,9 +1,10 @@
 import { ok } from "@/lib/api/envelope";
-import { badRequest, forbidden, notFound } from "@/lib/api/errors";
+import { badRequest, forbidden, notFound, rateLimited } from "@/lib/api/errors";
 import { withApi } from "@/lib/api/instrumentation";
 import { isDeviceApproved, requireDevice } from "@/lib/device/auth";
 import { commandAckSchema } from "@/lib/device/schema";
 import prisma from "@/lib/prisma";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,13 @@ export const POST = withApi(
 	async (request) => {
 		const device = await requireDevice(request);
 		if (!isDeviceApproved(device)) throw forbidden("Device is not approved.");
+
+		const limit = rateLimit(`device:${device.id}:command-ack`, 60, 60_000);
+		if (!limit.allowed) {
+			throw rateLimited(
+				`Too many command acknowledgements. Retry in ${limit.retryAfterSeconds} seconds.`,
+			);
+		}
 
 		const parsed = commandAckSchema.safeParse(await request.json().catch(() => null));
 		if (!parsed.success)

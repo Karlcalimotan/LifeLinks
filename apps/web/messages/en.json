@@ -82,8 +82,7 @@
 		"pathCancel": "Driver cancel",
 		"pathAlert": "SMS and console",
 		"prototypeNote": "Prototype. Call local emergency services first.",
-		"demoAccess": "Demo access",
-		"demoHint": "Demo: admin@lifelink.local / Admin123! · owner@lifelink.local / Owner123! · responder@lifelink.local / Responder123!"
+		"demoAccess": "Demo access"
 	},
 	"dashboard": {
 		"title": "Fleet overview",
@@ -621,8 +620,8 @@
 	},
 	"privacy": {
 		"title": "Privacy notice",
-		"body": "LifeLink stores vehicle location and crash telemetry to deliver emergency alerts. Location data is available only to members of your organization and is retained for the period configured in Settings.",
-		"extra": "Telemetry is retained for the period configured in Settings. Incident evidence is retained separately because it may be needed for insurance or legal review. Members of other organizations cannot query your vehicles or incidents."
+		"body": "LifeLink stores vehicle location and crash telemetry to deliver emergency alerts. Location data is available only to members of your organization. Retention periods are configurable in Settings, but automatic deletion is not yet enabled, so data remains until the service operator removes it.",
+		"extra": "Telemetry and incident evidence have separate retention settings. Those periods are not yet enforced by an automatic cleanup job. Incident evidence is kept because it may be needed for insurance or legal review. Members of other organizations cannot query your vehicles or incidents."
 	},
 	"terms": {
 		"title": "Terms of use",

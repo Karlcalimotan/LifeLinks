@@ -39,9 +39,11 @@ is registered or rotated. A `PENDING`, `REJECTED` or `SUSPENDED` device is
 authenticated but returns `403`; an unknown token returns `401`.
 
 Device routes are rate-limited per device: heartbeat **60/min**, ingest
-**120/min**, incident **30/min**. Exceeding a limit returns `429 RATE_LIMITED`
-with a retry hint. The limiter is in-process; a multi-instance deployment should
-replace it with a shared store.
+**120/min**, incident **30/min**, cancel **20/min**, command poll **120/min** and
+command acknowledgement **60/min**. Application search is **60/min** per
+signed-in user and health checks are **60/min** per IP. Exceeding a limit returns
+`429 RATE_LIMITED` with a retry hint. The limiter is in-process; a multi-instance
+deployment should replace it with a shared store.
 
 ## Endpoints
 
@@ -166,6 +168,8 @@ in the past is ignored and the receipt time is used.
 - A duplicate `CONFIRMED` returns `duplicate: true` and does not create a second
   alert storm.
 - A cancelled incident is never resurrected.
+- `evidence` and event `meta` are capped at 32 top-level keys and 8 KiB when
+  serialized. Larger payloads return `400 BAD_REQUEST`.
 
 Response:
 
@@ -180,7 +184,12 @@ Response:
 ```
 
 Moves the incident to `CANCELLED`, writes a `DeviceStateEvent` and resolves the
-driver's false alarm visibly.
+driver's false alarm visibly. The incident must still be `SUSPECTED` or
+`CONFIRMED`, and the server clock must be no later than the stored
+`cancelDeadline` plus 30 seconds of clock-skew tolerance. A late or
+already-handled attempt returns `409 CONFLICT` without changing the incident and
+is recorded in the audit log. Repeating a cancel for an already `CANCELLED`
+incident is idempotent.
 
 ### `GET /api/device/command?device_id=<mac>`
 
@@ -237,7 +246,10 @@ offline window. It never changes an incident.
 
 ### `GET /api/health`
 
-Returns `200` when PostgreSQL answers `SELECT 1`, `503` otherwise. No auth.
+Returns `200` when PostgreSQL answers `SELECT 1`, `503` otherwise. No auth. The
+database check is cached for five seconds and callers are rate-limited per IP.
+The response reports status and database reachability only; it never lists which
+environment variables or secrets are configured.
 
 ## Error codes
 
@@ -247,8 +259,8 @@ Returns `200` when PostgreSQL answers `SELECT 1`, `503` otherwise. No auth.
 | `UNAUTHORIZED` | 401 | Missing or unknown device token |
 | `FORBIDDEN` | 403 | Device not approved, or `device_id` mismatch |
 | `NOT_FOUND` | 404 | Unknown command or incident |
-| `CONFLICT` | 409 | Device has no vehicle assigned |
-| `RATE_LIMITED` | 429 | Login rate limit |
+| `CONFLICT` | 409 | No vehicle assigned, or the cancel window closed / incident no longer cancellable |
+| `RATE_LIMITED` | 429 | Login, search, health or device rate limit |
 | `INTERNAL` | 500/504 | Unexpected failure or timeout |
 
 ## Try it locally

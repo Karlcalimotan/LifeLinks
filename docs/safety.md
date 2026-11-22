@@ -105,11 +105,15 @@ recovered on boot: the incident id is persisted before the countdown starts.
 
 - Location is personal data. Access is scoped to the organization that owns the
   vehicle.
-- Telemetry and incident retention are configurable in Settings.
+- Telemetry and incident retention are configurable in Settings. The configured
+  periods are not yet enforced by an automatic deletion job; data remains until
+  an operator removes it.
 - The SMS contains coordinates and a callback number; only configured contacts
   receive it.
 - The server never logs device tokens. The database stores only the hash.
-- The demo seed refuses a non-local database unless `SEED_DEMO=yes` is set.
+- The demo seed refuses a non-local database unless both `SEED_DEMO=yes` and
+  `SEED_ALLOW_REMOTE=yes` are set. Demo credentials must never be seeded into a
+  shared or production database.
 
 ## What is verified, and what is not
 
