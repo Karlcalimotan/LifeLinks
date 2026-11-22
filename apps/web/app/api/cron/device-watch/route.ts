@@ -3,6 +3,7 @@ import { ApiError, unauthorized } from "@/lib/api/errors";
 import { withApi } from "@/lib/api/instrumentation";
 import { DEVICE_OFFLINE_AFTER_MIN } from "@/lib/constants";
 import prisma from "@/lib/prisma";
+import { safeEqualText } from "@/lib/security/constant-time";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,9 @@ export const GET = withApi(
 		const secret = process.env.CRON_SECRET?.trim();
 		if (!secret) throw new ApiError(503, "INTERNAL", "CRON_SECRET is not configured.");
 		const authorization = request.headers.get("authorization") ?? "";
-		if (authorization !== `Bearer ${secret}`) throw unauthorized("Invalid cron secret.");
+		if (!safeEqualText(authorization, `Bearer ${secret}`)) {
+			throw unauthorized("Invalid cron secret.");
+		}
 
 		const now = new Date();
 		const cutoff = new Date(now.getTime() - DEVICE_OFFLINE_AFTER_MIN * 60 * 1000);

@@ -60,6 +60,8 @@ All notable changes to this project are documented here. The format follows
   dashboard or the filtered incident list returns the operator to that view.
 - The tracker signal bands are named Strong, Good, Fair and Poor, so they no
   longer collide with the heartbeat connection state "Weak signal".
+- The header search trigger shows the word Search; the Ctrl/Cmd+K hint moves to
+  the palette and the button's `aria-keyshortcuts`.
 
 ### Fixed
 
@@ -72,6 +74,13 @@ All notable changes to this project are documented here. The format follows
   were no longer pending, instead of counting both as skipped.
 - Copy MAC controls and route error copy are translated and distinguish each
   row.
+- Primary buttons keep the dark ink text colour at the design-system contrast
+  ratio. Custom type-scale utilities are now classified as font sizes by
+  `tailwind-merge`, so a colour such as `text-ink-950` is no longer dropped when
+  combined with `text-body` or `text-meta`.
+- Destructive buttons use dark ink text on the lighter alarm fill, raising the
+  contrast from 4.12:1 to 6.89:1.
+- The command-palette trigger's accessible name matches its visible label.
 
 
 ## [0.2.0] - 2026-11-22

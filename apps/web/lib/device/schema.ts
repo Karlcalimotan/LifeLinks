@@ -3,6 +3,30 @@ import { z } from "zod";
 const lat = z.number().min(-90).max(90);
 const lng = z.number().min(-180).max(180);
 
+/** A crash payload is a small summary, not an arbitrary JSON upload. */
+export const MAX_DEVICE_JSON_KEYS = 32;
+export const MAX_DEVICE_JSON_BYTES = 8 * 1024;
+
+const encoder = new TextEncoder();
+
+function jsonRecord(label: string) {
+	return z
+		.record(z.string(), z.unknown())
+		.refine((value) => Object.keys(value).length <= MAX_DEVICE_JSON_KEYS, {
+			message: `${label} can contain at most ${MAX_DEVICE_JSON_KEYS} keys.`,
+		})
+		.refine(
+			(value) => {
+				try {
+					return encoder.encode(JSON.stringify(value) ?? "").length <= MAX_DEVICE_JSON_BYTES;
+				} catch {
+					return false;
+				}
+			},
+			{ message: `${label} must be at most ${MAX_DEVICE_JSON_BYTES} bytes when serialized.` },
+		);
+}
+
 export const heartbeatSchema = z.object({
 	battery_v: z.number().min(0).max(30).optional(),
 	ignition: z.boolean().optional(),
@@ -50,7 +74,7 @@ export const deviceEventSchema = z.object({
 		"SAFE_MODE_ENTERED",
 	]),
 	t: z.number().int(),
-	meta: z.record(z.string(), z.unknown()).optional(),
+	meta: jsonRecord("Event meta").optional(),
 });
 
 export const ingestSchema = z.object({
@@ -81,7 +105,7 @@ export const incidentSchema = z.object({
 	gps_age_s: z.number().int().min(0).max(86_400).optional(),
 	status: z.enum(["SUSPECTED", "CONFIRMED", "CANCELLED"]).default("CONFIRMED"),
 	cancelled: z.boolean().default(false),
-	evidence: z.record(z.string(), z.unknown()).optional(),
+	evidence: jsonRecord("Incident evidence").optional(),
 });
 
 export const commandAckSchema = z.object({

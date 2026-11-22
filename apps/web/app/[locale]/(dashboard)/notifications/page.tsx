@@ -24,13 +24,25 @@ import {
 	notificationsWhere,
 	parseNotificationsQuery,
 } from "@/lib/notifications/query";
+import { metadataForPage } from "@/lib/page-metadata";
 import prisma from "@/lib/prisma";
 import { getOrgSettings } from "@/lib/settings/org";
 import { formatDateTime } from "@/lib/utils";
 import type { AlertChannel, AlertStatus } from "@prisma/client";
+import { TriangleAlert } from "lucide-react";
+import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+	params,
+}: {
+	params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+	const { locale } = await params;
+	return metadataForPage(locale, "notifications");
+}
 
 const STATUS_LABELS: Record<AlertStatus, string> = {
 	QUEUED: "statusQueued",
@@ -117,6 +129,16 @@ export default async function NotificationsPage({
 	return (
 		<>
 			<PageHeader title={t("title")} subtitle={t("subtitle")} />
+
+			<output className="mb-6 flex items-start gap-2.5 rounded-panel border border-caution-400/30 bg-caution-400/10 px-3 py-2.5">
+				<TriangleAlert className="mt-0.5 size-4 shrink-0 text-caution-300" aria-hidden="true" />
+				<span>
+					<span className="block text-body font-medium text-caution-300">{t("senderTitle")}</span>
+					<span className="mt-0.5 block text-meta leading-relaxed text-fog-300">
+						{t("senderBody")}
+					</span>
+				</span>
+			</output>
 
 			<div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
 				<Card>

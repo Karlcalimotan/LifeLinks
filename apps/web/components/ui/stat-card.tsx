@@ -30,7 +30,7 @@ export function StatCard({
 					<p className="mt-1.5 font-display text-title leading-none tracking-tight text-fog-50 tabular-nums">
 						{value}
 					</p>
-					{hint ? <p className="mt-1 truncate text-meta text-fog-500">{hint}</p> : null}
+					{hint ? <p className="mt-1 text-meta leading-relaxed text-fog-500">{hint}</p> : null}
 				</div>
 				<span
 					className={cn(

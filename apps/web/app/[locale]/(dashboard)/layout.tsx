@@ -14,6 +14,7 @@ export default async function DashboardLayout({
 	const current = await requireUser();
 	const t = await getTranslations({ locale, namespace: "nav" });
 	const roles = await getTranslations({ locale, namespace: "roles" });
+	const common = await getTranslations({ locale, namespace: "common" });
 
 	const labels = {
 		dashboard: t("dashboard"),
@@ -35,6 +36,7 @@ export default async function DashboardLayout({
 			roleLabel={roles(roleLabelKey(current.role))}
 			navLabels={labels}
 			signOutLabel={t("signOut")}
+			skipLabel={common("skipToContent")}
 		>
 			{children}
 		</AppShell>

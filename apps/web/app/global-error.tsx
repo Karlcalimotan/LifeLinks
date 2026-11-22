@@ -43,8 +43,14 @@ export default function GlobalError({
 						Something went wrong
 					</h1>
 					<p style={{ fontSize: 14, color: "#8fa3a6", lineHeight: 1.6 }}>
-						{error.message || "The console could not render this request."}
+						The console could not render this request. Try again. If it keeps happening, send
+						support the reference below.
 					</p>
+					{error.digest ? (
+						<p style={{ fontSize: 12, color: "#8fa3a6", marginTop: 8 }}>
+							Reference: <code style={{ color: "#e8f1f2" }}>{error.digest}</code>
+						</p>
+					) : null}
 					<button
 						type="button"
 						onClick={reset}

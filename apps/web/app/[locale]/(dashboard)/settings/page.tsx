@@ -15,6 +15,7 @@ import { Link } from "@/i18n/routing";
 import { updateSettingsAction } from "@/lib/actions/settings";
 import { canAdminister, requireRole, roleLabelKey } from "@/lib/auth/session";
 import { DEVICE_OFFLINE_AFTER_MIN, DEVICE_WEAK_AFTER_MIN } from "@/lib/constants";
+import { metadataForPage } from "@/lib/page-metadata";
 import prisma from "@/lib/prisma";
 import { type ResolvedOrgSettings, getOrgSettings } from "@/lib/settings/org";
 import {
@@ -31,9 +32,19 @@ import {
 } from "@/lib/settings/workspace";
 import { formatDateTime } from "@/lib/utils";
 import type { Prisma } from "@prisma/client";
+import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+	params,
+}: {
+	params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+	const { locale } = await params;
+	return metadataForPage(locale, "settings");
+}
 
 const roleTones = {
 	ADMIN: "success",
