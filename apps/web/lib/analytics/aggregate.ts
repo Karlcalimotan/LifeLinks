@@ -327,5 +327,7 @@ export function formatDuration(ms: number | null | undefined): string {
 	const minutes = Math.floor(totalSeconds / 60);
 	const seconds = totalSeconds % 60;
 	if (minutes < 60) return `${minutes}m ${seconds}s`;
-	return `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+	const hours = Math.floor(minutes / 60);
+	if (hours < 24) return `${hours}h ${minutes % 60}m`;
+	return `${Math.floor(hours / 24)}d ${hours % 24}h`;
 }

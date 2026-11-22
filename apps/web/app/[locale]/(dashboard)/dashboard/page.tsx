@@ -1,276 +1,454 @@
+import { BarChart, type BarChartDatum } from "@/components/analytics/bar-chart";
+import { AcknowledgeButton } from "@/components/dashboard/acknowledge-button";
+import { ElapsedTime } from "@/components/dashboard/elapsed-time";
 import { DeviceStatusBadge, IncidentStatusBadge, SeverityBadge } from "@/components/domain/badges";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { FleetMap, type FleetMapLegendItem, type FleetMapMarker } from "@/components/map/fleet-map";
+import { Badge } from "@/components/ui/badge";
+import { buttonClasses } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState, PageHeader } from "@/components/ui/page-header";
-import { StatCard } from "@/components/ui/stat-card";
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/components/ui/table";
 import { Link } from "@/i18n/routing";
-import { vehicleScope } from "@/lib/auth/roles";
+import { acknowledgeIncidentAction } from "@/lib/actions/incidents";
+import { formatDuration } from "@/lib/analytics/aggregate";
+import { canManageIncidents } from "@/lib/auth/roles";
 import { requireUser } from "@/lib/auth/session";
 import { DEVICE_OFFLINE_AFTER_MIN } from "@/lib/constants";
-import { deviceConnectionState } from "@/lib/device/status";
-import prisma from "@/lib/prisma";
-import { getOrgSettings } from "@/lib/settings/org";
-import { minutesAgo } from "@/lib/time";
+import { loadDashboardData } from "@/lib/dashboard/data";
+import { type FleetMarkerState, fleetMarkerState } from "@/lib/dashboard/metrics";
+import { LOW_BATTERY_V } from "@/lib/device/query";
+import { deviceConnectionState, isGpsStale } from "@/lib/device/status";
 import { formatDateTime, formatRelative } from "@/lib/utils";
-import { ArrowUpRight, Car, Radio, ShieldAlert, TriangleAlert } from "lucide-react";
+import {
+	ArrowUpRight,
+	BatteryLow,
+	CheckCheck,
+	CheckCircle2,
+	Clock,
+	Download,
+	Gauge,
+	type LucideIcon,
+	MapPin,
+	Power,
+	ShieldAlert,
+	SlidersHorizontal,
+	TriangleAlert,
+	WifiOff,
+	XCircle,
+} from "lucide-react";
 import { getTranslations } from "next-intl/server";
+import type { ReactNode } from "react";
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage({ params }: { params: Promise<{ locale: string }> }) {
+function incidentActivityIcon(action: string): LucideIcon {
+	switch (action) {
+		case "incident.acknowledged":
+			return CheckCheck;
+		case "incident.resolved":
+			return CheckCircle2;
+		case "incident.false_alarm":
+		case "incident.cancelled":
+			return XCircle;
+		case "incident.suspected":
+			return TriangleAlert;
+		default:
+			return ShieldAlert;
+	}
+}
+
+function deviceActivityIcon(type: string): LucideIcon {
+	switch (type) {
+		case "POWER_LOST":
+			return BatteryLow;
+		case "POWER_RESTORED":
+			return Power;
+		case "GPS_FIX_LOST":
+			return MapPin;
+		case "MODEM_FAULT":
+		case "DEVICE_OFFLINE":
+			return WifiOff;
+		case "SENSOR_FAULT":
+			return Gauge;
+		case "CONFIG_APPLIED":
+			return SlidersHorizontal;
+		case "OTA_INSTALLED":
+		case "OTA_ROLLED_BACK":
+			return Download;
+		case "INCIDENT_CANCELLED":
+			return XCircle;
+		case "INCIDENT_CONFIRMED":
+			return ShieldAlert;
+		default:
+			return TriangleAlert;
+	}
+}
+
+export default async function DashboardPage({
+	params,
+	searchParams,
+}: {
+	params: Promise<{ locale: string }>;
+	searchParams: Promise<{ updated?: string; error?: string }>;
+}) {
 	const { locale } = await params;
+	const { updated, error } = await searchParams;
 	const current = await requireUser();
 	const t = await getTranslations({ locale, namespace: "dashboard" });
 	const v = await getTranslations({ locale, namespace: "vehicles" });
-	const inc = await getTranslations({ locale, namespace: "incidents" });
 
 	const now = new Date();
-	const onlineCutoff = minutesAgo(DEVICE_OFFLINE_AFTER_MIN, now);
-	const scope = vehicleScope(current.role, current.org.id, current.user.id);
-	const ownedRelation =
-		current.role === "USER" ? { vehicle: { is: { ownerId: current.user.id } } } : {};
-	const incidentWhere = { orgId: current.org.id, ...ownedRelation };
-	const today = new Date(
-		`${new Intl.DateTimeFormat("en-CA", {
-			timeZone: "Asia/Manila",
-			year: "numeric",
-			month: "2-digit",
-			day: "2-digit",
-		}).format(now)}T00:00:00+08:00`,
+	const data = await loadDashboardData(
+		{ role: current.role, orgId: current.org.id, userId: current.user.id },
+		now,
 	);
 
-	const [
-		vehicleCount,
-		onlineCount,
-		openIncidents,
-		alertsToday,
-		resolvedToday,
-		recentIncidents,
-		vehicles,
-		settings,
-	] = await Promise.all([
-		prisma.vehicle.count({ where: scope }),
-		prisma.trackerDevice.count({
-			where: { orgId: current.org.id, ...ownedRelation, lastSeenAt: { gte: onlineCutoff } },
-		}),
-		prisma.impactEvent.count({
-			where: {
-				...incidentWhere,
-				status: { in: ["SUSPECTED", "CONFIRMED", "ACKNOWLEDGED"] },
-			},
-		}),
-		prisma.impactEvent.count({
-			where: { ...incidentWhere, detectedAt: { gte: today } },
-		}),
-		prisma.impactEvent.count({
-			where: { ...incidentWhere, status: "RESOLVED", resolvedAt: { gte: today } },
-		}),
-		prisma.impactEvent.findMany({
-			where: incidentWhere,
-			orderBy: { detectedAt: "desc" },
-			take: 5,
-			include: { vehicle: true, alerts: true },
-		}),
-		prisma.vehicle.findMany({
-			where: scope,
-			orderBy: { plateNo: "asc" },
-			take: 8,
-			include: { devices: true },
-		}),
-		getOrgSettings(current.org.id),
-	]);
+	function incidentActivityLabel(action: string): string {
+		switch (action) {
+			case "incident.suspected":
+				return t("activityIncidentSuspected");
+			case "incident.confirmed":
+				return t("activityIncidentConfirmed");
+			case "incident.acknowledged":
+				return t("activityIncidentAcknowledged");
+			case "incident.resolved":
+				return t("activityIncidentResolved");
+			case "incident.false_alarm":
+				return t("activityIncidentFalseAlarm");
+			case "incident.cancelled":
+				return t("activityIncidentCancelled");
+			default:
+				return t("activityUnknown");
+		}
+	}
 
-	const openTone = openIncidents > 0 ? "bg-alarm-500" : "bg-clear-400";
+	function deviceActivityLabel(type: string): string {
+		switch (type) {
+			case "POWER_LOST":
+				return t("activityDevicePowerLost");
+			case "POWER_RESTORED":
+				return t("activityDevicePowerRestored");
+			case "GPS_FIX_LOST":
+				return t("activityDeviceGpsLost");
+			case "MODEM_FAULT":
+				return t("activityDeviceModemFault");
+			case "SENSOR_FAULT":
+				return t("activityDeviceSensorFault");
+			case "CONFIG_APPLIED":
+				return t("activityDeviceConfigApplied");
+			case "INCIDENT_CANCELLED":
+				return t("activityDeviceIncidentCancelled");
+			case "INCIDENT_CONFIRMED":
+				return t("activityDeviceIncidentConfirmed");
+			case "OTA_INSTALLED":
+				return t("activityDeviceOtaInstalled");
+			case "OTA_ROLLED_BACK":
+				return t("activityDeviceOtaRolledBack");
+			case "SAFE_MODE_ENTERED":
+				return t("activityDeviceSafeMode");
+			case "DEVICE_OFFLINE":
+				return t("activityDeviceOffline");
+			default:
+				return t("activityDeviceUnknown");
+		}
+	}
+
+	const notice =
+		updated === "acknowledged"
+			? { tone: "success" as const, text: t("acknowledgedNotice") }
+			: error === "forbidden"
+				? { tone: "error" as const, text: t("errorForbidden") }
+				: error === "transition"
+					? { tone: "error" as const, text: t("errorTransition") }
+					: error === "notfound"
+						? { tone: "error" as const, text: t("errorNotFound") }
+						: null;
+
+	const stateLabels: Record<FleetMarkerState, string> = {
+		incident: t("legendIncident"),
+		online: t("legendOnline"),
+		weak: t("legendWeak"),
+		offline: t("legendOffline"),
+		stale: t("legendStale"),
+	};
+
+	const markers: FleetMapMarker[] = data.map.map((vehicle) => {
+		const connection = deviceConnectionState(vehicle.lastSeenAt, now);
+		const staleFix = vehicle.lastFixAt == null || isGpsStale(vehicle.lastFixAt, now);
+		const state = fleetMarkerState({
+			connection,
+			hasOpenIncident: vehicle.hasOpenIncident,
+			staleFix,
+		});
+		const fixText = vehicle.lastFixAt ? formatRelative(vehicle.lastFixAt) : t("noFixRecorded");
+		return {
+			id: vehicle.deviceId,
+			href: `/vehicles/${vehicle.vehicleId}`,
+			plateNo: vehicle.plateNo,
+			state,
+			stateLabel: stateLabels[state],
+			detail: `${t("lastFix")}: ${fixText}`,
+			lat: vehicle.lat,
+			lng: vehicle.lng,
+		};
+	});
+
+	const legend: FleetMapLegendItem[] = (
+		["incident", "online", "weak", "offline", "stale"] as const
+	).map((state) => ({ state, label: stateLabels[state] }));
+
+	const oldest = data.kpis.oldestAwaitingAt;
+	const averageAcknowledgement = data.kpis.averageAcknowledgementMs;
+
+	const kpis: Array<{
+		key: string;
+		label: string;
+		value: ReactNode;
+		hint: ReactNode;
+		tone?: "danger" | "caution";
+	}> = [
+		{
+			key: "open",
+			label: t("kpiOpenIncidents"),
+			value: data.kpis.openIncidents,
+			hint: t("kpiOpenHint"),
+		},
+		{
+			key: "awaiting",
+			label: t("kpiAwaitingAck"),
+			value: data.kpis.awaitingAcknowledgement,
+			hint: oldest ? (
+				<>
+					{t("kpiOldestWait")}{" "}
+					<ElapsedTime
+						since={oldest.toISOString()}
+						initialMs={now.getTime() - oldest.getTime()}
+						title={formatDateTime(oldest, locale)}
+						className="tabular-nums text-fog-300"
+					/>
+				</>
+			) : (
+				t("kpiNothingWaiting")
+			),
+			tone: data.kpis.awaitingAcknowledgement > 0 ? "danger" : undefined,
+		},
+		{
+			key: "online",
+			label: t("kpiOnlineTrackers"),
+			value: `${data.kpis.onlineTrackers} / ${data.kpis.approvedTrackers}`,
+			hint: t("kpiOnlineHint", { minutes: DEVICE_OFFLINE_AFTER_MIN }),
+		},
+		{
+			key: "battery",
+			label: t("kpiLowBattery"),
+			value: data.kpis.lowBattery,
+			hint: t("kpiLowBatteryHint", { volts: LOW_BATTERY_V.toFixed(1) }),
+			tone: data.kpis.lowBattery > 0 ? "caution" : undefined,
+		},
+		{
+			key: "alerts",
+			label: t("kpiAlerts24h"),
+			value: data.kpis.alerts24h,
+			hint: t("kpiAlerts24hHint"),
+		},
+		{
+			key: "average",
+			label: t("kpiAvgAck"),
+			value: formatDuration(averageAcknowledgement),
+			hint: averageAcknowledgement == null ? t("kpiNoAckSamples") : t("kpiAvgAckHint"),
+		},
+	];
+
+	const dayLabel = new Intl.DateTimeFormat(locale === "tl" ? "fil-PH" : "en-PH", {
+		month: "short",
+		day: "numeric",
+		timeZone: "Asia/Manila",
+	});
+	const trendBars: BarChartDatum[] = data.trend.days.map((day) => {
+		const label = dayLabel.format(day.date);
+		return {
+			key: day.key,
+			label,
+			value: day.count,
+			description: t("incidentTrendDayAria", { day: label, count: day.count }),
+		};
+	});
 
 	return (
 		<>
 			<PageHeader
 				title={current.role === "USER" ? t("ownerTitle") : t("title")}
 				subtitle={current.role === "USER" ? t("ownerSubtitle") : t("subtitle")}
+				actions={
+					<Link href="/incidents" className={buttonClasses({ size: "md" })}>
+						{t("openBoard")}
+						<ArrowUpRight className="size-4" aria-hidden="true" />
+					</Link>
+				}
 			/>
 
-			<div className="grid gap-4 xl:grid-cols-[1.55fr_1fr]">
-				<Card className="cut-corner relative flex flex-col overflow-hidden border-ink-700 bg-ink-800">
-					<span className={`absolute inset-y-0 left-0 w-1 ${openTone}`} aria-hidden="true" />
-					<div
-						className="pointer-events-none absolute inset-y-0 right-0 w-1/3 console-grid opacity-50"
-						style={{ maskImage: "linear-gradient(to left, black, transparent)" }}
-					/>
-					<div className="relative flex flex-1 flex-col p-6">
-						<div className="flex items-center gap-2 text-meta font-medium text-fog-500">
-							<span className={`size-1.5 ${openTone}`} aria-hidden="true" />
-							{t("liveBoard")}
-						</div>
-						<div className="mt-3">
-							<p className="text-body font-medium text-fog-100">
-								{openIncidents > 0 ? t("attention") : t("allClear")}
-							</p>
-							<p className="mt-1 font-display text-display leading-none tracking-tight text-fog-50 tabular-nums">
-								{openIncidents}
-							</p>
-							<p className="mt-2 max-w-md text-meta leading-relaxed text-fog-500">
-								{t("incidentBoardHint")}
-							</p>
-						</div>
-						<div className="mt-6">
-							<Link
-								href="/incidents"
-								className="inline-flex h-9 items-center gap-2 rounded bg-signal-500 px-4 text-body font-medium text-ink-950 transition-colors hover:bg-signal-400"
-							>
-								{t("openBoard")}
-								<ArrowUpRight className="size-4" aria-hidden="true" />
-							</Link>
-						</div>
-						<div className="mt-auto grid grid-cols-2 gap-4 border-t border-ink-700 pt-4">
-							<div>
-								<p className="font-display text-section leading-none text-fog-50 tabular-nums">
-									{settings.cancelWindowS}s
-								</p>
-								<p className="mt-1 text-meta text-fog-500">{t("cancelWindow")}</p>
-							</div>
-							<div>
-								<p className="font-display text-section leading-none text-fog-50 tabular-nums">
-									{settings.sosRetryS}s
-								</p>
-								<p className="mt-1 text-meta text-fog-500">{t("sosRetry")}</p>
-							</div>
-						</div>
-					</div>
-				</Card>
-
-				<div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-					<StatCard label={t("totalVehicles")} value={vehicleCount} icon={Car} />
-					<StatCard
-						label={t("onlineTrackers")}
-						value={onlineCount}
-						icon={Radio}
-						tone={onlineCount > 0 ? "success" : "default"}
-						hint={`${DEVICE_OFFLINE_AFTER_MIN} min window`}
-					/>
-					<StatCard
-						label={t("alertsToday")}
-						value={alertsToday}
-						icon={ShieldAlert}
-						tone={alertsToday > 0 ? "danger" : "default"}
-						hint="Asia/Manila"
-					/>
+			{notice ? (
+				<div
+					role={notice.tone === "success" ? "status" : "alert"}
+					className={`mb-6 flex items-center gap-2 rounded-panel border px-3 py-2 text-body ${
+						notice.tone === "success"
+							? "border-clear-400/30 bg-clear-400/10 text-clear-300"
+							: "border-alarm-400/30 bg-alarm-400/10 text-alarm-300"
+					}`}
+				>
+					{notice.tone === "success" ? (
+						<CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
+					) : (
+						<ShieldAlert className="size-4 shrink-0" aria-hidden="true" />
+					)}
+					{notice.text}
 				</div>
-			</div>
+			) : null}
 
-			<div className="mt-6 grid gap-6 xl:grid-cols-[1.55fr_1fr]">
+			<Card className="overflow-hidden">
+				<div className="grid grid-cols-2 gap-px bg-ink-700 sm:grid-cols-3 xl:grid-cols-6">
+					{kpis.map((kpi) => (
+						<div key={kpi.key} className="bg-ink-800 p-4">
+							<p className="text-meta font-medium text-fog-500">{kpi.label}</p>
+							<p
+								className={`mt-1.5 font-display text-title leading-none tracking-tight tabular-nums ${
+									kpi.tone === "danger"
+										? "text-alarm-300"
+										: kpi.tone === "caution"
+											? "text-caution-300"
+											: "text-fog-50"
+								}`}
+							>
+								{kpi.value}
+							</p>
+							<p className="mt-1 text-meta leading-relaxed text-fog-500">{kpi.hint}</p>
+						</div>
+					))}
+				</div>
+			</Card>
+
+			<div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
 				<Card className="flex flex-col">
-					<CardHeader className="flex-row items-center justify-between gap-3">
-						<CardTitle>{t("recentIncidents")}</CardTitle>
-						<Link href="/incidents" className="text-meta text-fog-300 underline hover:text-fog-100">
-							{t("viewAll")}
-						</Link>
+					<CardHeader className="flex-row items-start justify-between gap-3">
+						<div className="min-w-0">
+							<CardTitle>{t("livePositions")}</CardTitle>
+							<CardDescription>{t("livePositionsHint")}</CardDescription>
+						</div>
+						<Badge tone="muted" className="shrink-0">
+							{t("plotted", { count: markers.length })}
+						</Badge>
 					</CardHeader>
 					<CardContent className="flex flex-1 flex-col">
-						{recentIncidents.length === 0 ? (
-							<div>
-								<EmptyState title={t("noIncidents")} />
-								<div className="mt-3 text-center">
-									<Link
-										href="/incidents"
-										className="text-meta text-fog-300 underline hover:text-fog-100"
-									>
-										{t("viewAll")}
-									</Link>
-								</div>
-							</div>
+						{markers.length === 0 ? (
+							<EmptyState title={t("emptyMap")} body={t("emptyMapBody")} />
 						) : (
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead>{inc("detected")}</TableHead>
-										<TableHead>{inc("vehicle")}</TableHead>
-										<TableHead className="hidden sm:table-cell">{inc("severity")}</TableHead>
-										<TableHead>{inc("status")}</TableHead>
-										<TableHead className="hidden md:table-cell">{inc("alerts")}</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{recentIncidents.map((incident) => (
-										<TableRow key={incident.id}>
-											<TableCell className="whitespace-nowrap">
+							<FleetMap markers={markers} legend={legend} ariaLabel={t("mapAria")} />
+						)}
+					</CardContent>
+				</Card>
+
+				<Card className="flex flex-col">
+					<CardHeader className="flex-row items-start justify-between gap-3">
+						<div className="min-w-0">
+							<CardTitle>{t("needsAttention")}</CardTitle>
+							<CardDescription>{t("needsAttentionHint")}</CardDescription>
+						</div>
+						<Badge tone={data.queueTotal > 0 ? "danger" : "success"} className="shrink-0">
+							{data.queueTotal > 0 ? t("queueOpen", { count: data.queueTotal }) : t("queueClear")}
+						</Badge>
+					</CardHeader>
+					<CardContent className="flex flex-1 flex-col">
+						{data.queue.length === 0 ? (
+							<EmptyState title={t("needsAttentionClear")} body={t("needsAttentionClearBody")} />
+						) : (
+							<ul className="divide-y divide-ink-700">
+								{data.queue.map((incident) => (
+									<li key={incident.id} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
+										<div className="flex items-start justify-between gap-3">
+											<div className="min-w-0">
 												<Link
 													href={`/incidents/${incident.id}`}
 													className="font-medium text-fog-100 hover:underline"
 												>
-													{formatDateTime(incident.detectedAt, locale)}
+													{incident.vehicle.plateNo}
 												</Link>
-											</TableCell>
-											<TableCell className="whitespace-nowrap text-fog-100">
-												{incident.vehicle.plateNo}
-											</TableCell>
-											<TableCell className="hidden sm:table-cell">
+												<p className="truncate text-meta text-fog-500">
+													{incident.vehicle.driverName ?? t("driverUnknown")} ·{" "}
+													{formatDateTime(incident.detectedAt, locale)}
+												</p>
+											</div>
+											<div className="flex shrink-0 items-center gap-1.5">
 												<SeverityBadge
 													peakAccelG={incident.peakAccelG}
 													tiltDeg={incident.tiltDeg}
 												/>
-											</TableCell>
-											<TableCell className="whitespace-nowrap">
 												<IncidentStatusBadge status={incident.status} />
-											</TableCell>
-											<TableCell className="hidden text-meta text-fog-500 md:table-cell">
-												{incident.alerts.length}
-											</TableCell>
-										</TableRow>
-									))}
-								</TableBody>
-							</Table>
+											</div>
+										</div>
+										<div className="flex flex-wrap items-center justify-between gap-2">
+											<span className="inline-flex items-center gap-1.5 text-meta text-fog-500">
+												<Clock className="size-4" aria-hidden="true" />
+												{t("elapsed")}{" "}
+												<ElapsedTime
+													since={incident.detectedAt.toISOString()}
+													initialMs={now.getTime() - incident.detectedAt.getTime()}
+													title={formatDateTime(incident.detectedAt, locale)}
+													className="tabular-nums text-fog-300"
+												/>
+											</span>
+											<div className="flex items-center gap-2">
+												{canManageIncidents(current.role) ? (
+													<form action={acknowledgeIncidentAction}>
+														<input type="hidden" name="locale" value={locale} />
+														<input type="hidden" name="incidentId" value={incident.id} />
+														<input type="hidden" name="returnTo" value="dashboard" />
+														<AcknowledgeButton />
+													</form>
+												) : null}
+												<Link
+													href={`/incidents/${incident.id}`}
+													className="text-meta text-fog-300 underline hover:text-fog-100"
+												>
+													{t("openIncident")}
+												</Link>
+											</div>
+										</div>
+									</li>
+								))}
+							</ul>
 						)}
-						<div className="mt-4 grid grid-cols-3 gap-3 border-t border-ink-700 pt-4 xl:mt-auto">
-							<div>
-								<p className="font-display text-section leading-none text-fog-50 tabular-nums">
-									{openIncidents}
-								</p>
-								<p className="mt-1 text-meta text-fog-500">{t("open")}</p>
-							</div>
-							<div>
-								<p className="font-display text-section leading-none text-fog-50 tabular-nums">
-									{resolvedToday}
-								</p>
-								<p className="mt-1 text-meta text-fog-500">{t("resolvedToday")}</p>
-							</div>
-							<div>
-								<p className="font-display text-section leading-none text-fog-50 tabular-nums">
-									{alertsToday}
-								</p>
-								<p className="mt-1 text-meta text-fog-500">{t("alertsToday")}</p>
-							</div>
-						</div>
+						{data.queueTotal > data.queue.length ? (
+							<Link
+								href="/incidents"
+								className="mt-3 inline-flex items-center gap-1.5 text-meta text-fog-300 underline hover:text-fog-100"
+							>
+								{t("queueMore")}
+								<ArrowUpRight className="size-4" aria-hidden="true" />
+							</Link>
+						) : null}
 					</CardContent>
 				</Card>
+			</div>
 
-				<Card>
-					<CardHeader>
-						<CardTitle>{t("fleetStatus")}</CardTitle>
+			<div className="mt-4 grid gap-4 lg:grid-cols-3">
+				<Card className="flex flex-col">
+					<CardHeader className="flex-row items-center justify-between gap-3">
+						<div className="min-w-0">
+							<CardTitle>{t("fleetStatus")}</CardTitle>
+							<CardDescription>{t("fleetHint")}</CardDescription>
+						</div>
+						<Link
+							href="/vehicles"
+							className="shrink-0 text-meta text-fog-300 underline hover:text-fog-100"
+						>
+							{t("viewAll")}
+						</Link>
 					</CardHeader>
 					<CardContent className="flex flex-col gap-2">
-						{vehicles.length === 0 ? (
-							<div>
-								<EmptyState title={v("empty")} />
-								<div className="mt-3 text-center">
-									<Link
-										href="/vehicles"
-										className="text-meta text-fog-300 underline hover:text-fog-100"
-									>
-										{t("viewAll")}
-									</Link>
-								</div>
-							</div>
+						{data.fleet.length === 0 ? (
+							<EmptyState title={v("empty")} />
 						) : (
-							vehicles.map((vehicle) => {
-								const device = vehicle.devices[0];
-								const state = deviceConnectionState(device?.lastSeenAt, now);
+							data.fleet.map((vehicle) => {
+								const state = deviceConnectionState(vehicle.device?.lastSeenAt, now);
 								const rail =
 									state === "online"
 										? "border-clear-400"
@@ -283,7 +461,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ loca
 									<Link
 										key={vehicle.id}
 										href={`/vehicles/${vehicle.id}`}
-										className={`flex items-center justify-between gap-3 rounded-[3px] border border-l-2 border-ink-700 bg-ink-900/40 px-3 py-2.5 transition-colors hover:border-ink-600 hover:bg-ink-700/40 ${rail}`}
+										className={`flex items-center justify-between gap-3 rounded-control border border-l-2 border-ink-700 bg-ink-900/40 px-3 py-2.5 transition-colors hover:border-ink-600 hover:bg-ink-700/40 ${rail}`}
 									>
 										<div className="min-w-0">
 											<p className="truncate text-body font-medium text-fog-100">
@@ -293,18 +471,108 @@ export default async function DashboardPage({ params }: { params: Promise<{ loca
 												{vehicle.make} {vehicle.model}
 											</p>
 											<p className="truncate text-meta text-fog-500">
-												{device ? device.label : "No tracker assigned"}
+												{vehicle.device?.label ?? t("noTracker")}
 											</p>
 										</div>
 										<div className="flex shrink-0 flex-col items-end gap-1">
 											<DeviceStatusBadge state={state} />
 											<span className="text-meta text-fog-500">
-												{formatRelative(device?.lastSeenAt)}
+												{formatRelative(vehicle.device?.lastSeenAt)}
 											</span>
 										</div>
 									</Link>
 								);
 							})
+						)}
+					</CardContent>
+				</Card>
+
+				<Card className="flex flex-col">
+					<CardHeader>
+						<CardTitle>{t("recentActivity")}</CardTitle>
+						<CardDescription>{t("activityHint")}</CardDescription>
+					</CardHeader>
+					<CardContent className="flex flex-1 flex-col">
+						{data.activity.length === 0 ? (
+							<EmptyState title={t("activityEmpty")} body={t("activityEmptyBody")} />
+						) : (
+							<ul className="flex flex-col gap-3">
+								{data.activity.map((entry) => {
+									const label =
+										entry.kind === "incident"
+											? incidentActivityLabel(entry.action)
+											: deviceActivityLabel(entry.type);
+									const Icon =
+										entry.kind === "incident"
+											? incidentActivityIcon(entry.action)
+											: deviceActivityIcon(entry.type);
+									const plate =
+										entry.kind === "device" ? (entry.plateNo ?? entry.deviceLabel) : entry.plateNo;
+									const href =
+										entry.kind === "incident"
+											? `/incidents/${entry.incidentId}`
+											: entry.vehicleId
+												? `/vehicles/${entry.vehicleId}`
+												: null;
+									const body = (
+										<>
+											<p className="text-body text-fog-300 group-hover:text-fog-100">
+												{label}
+												{plate ? <span className="text-fog-500"> · {plate}</span> : null}
+											</p>
+											<time
+												dateTime={entry.at.toISOString()}
+												title={formatDateTime(entry.at, locale)}
+												className="text-meta text-fog-500"
+											>
+												{formatRelative(entry.at)}
+											</time>
+										</>
+									);
+									return (
+										<li key={entry.key} className="flex gap-2.5">
+											<Icon className="mt-0.5 size-4 shrink-0 text-fog-500" aria-hidden="true" />
+											<div className="min-w-0">
+												{href ? (
+													<Link href={href} className="group block">
+														{body}
+													</Link>
+												) : (
+													body
+												)}
+											</div>
+										</li>
+									);
+								})}
+							</ul>
+						)}
+					</CardContent>
+				</Card>
+
+				<Card className="flex flex-col">
+					<CardHeader>
+						<CardTitle>{t("incidentTrend")}</CardTitle>
+						<CardDescription>{t("incidentTrendHint")}</CardDescription>
+					</CardHeader>
+					<CardContent className="flex flex-1 flex-col">
+						{data.trend.total === 0 ? (
+							<EmptyState title={t("incidentTrendEmpty")} body={t("incidentTrendEmptyBody")} />
+						) : (
+							<>
+								<div className="flex items-baseline justify-between gap-3">
+									<p className="font-display text-title leading-none text-fog-50 tabular-nums">
+										{data.trend.total}
+									</p>
+									<p className="text-meta text-fog-500">{t("incidentTrendTotalLabel")}</p>
+								</div>
+								<div className="mt-4">
+									<BarChart title={t("incidentTrendAria")} data={trendBars} tickEvery={2} />
+								</div>
+								<div className="mt-auto flex flex-wrap gap-x-4 gap-y-1 border-t border-ink-700 pt-3 text-meta text-fog-500">
+									<span>{t("trendFalseAlarms", { count: data.trend.falseAlarms })}</span>
+									<span>{t("trendCancelled", { count: data.trend.cancelled })}</span>
+								</div>
+							</>
 						)}
 					</CardContent>
 				</Card>

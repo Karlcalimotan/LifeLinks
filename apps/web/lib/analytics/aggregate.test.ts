@@ -170,6 +170,7 @@ describe("response durations", () => {
 		expect(formatDuration(4_000)).toBe("4s");
 		expect(formatDuration(65_000)).toBe("1m 5s");
 		expect(formatDuration(3_725_000)).toBe("1h 2m");
+		expect(formatDuration(194_400_000)).toBe("2d 6h");
 	});
 });
 

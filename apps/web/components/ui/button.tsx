@@ -25,16 +25,22 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 	size?: Size;
 }
 
+const base =
+	"inline-flex items-center justify-center gap-2 rounded-panel font-medium transition-colors disabled:pointer-events-none disabled:opacity-45";
+
+/** Shared button styling for links that must look and size like a button. */
+export function buttonClasses({
+	variant = "primary",
+	size = "md",
+	className,
+}: {
+	variant?: Variant;
+	size?: Size;
+	className?: string;
+} = {}): string {
+	return cn(base, variants[variant], sizes[size], className);
+}
+
 export function Button({ className, variant = "primary", size = "md", ...props }: ButtonProps) {
-	return (
-		<button
-			className={cn(
-				"inline-flex items-center justify-center gap-2 rounded-panel font-medium transition-colors disabled:pointer-events-none disabled:opacity-45",
-				variants[variant],
-				sizes[size],
-				className,
-			)}
-			{...props}
-		/>
-	);
+	return <button className={buttonClasses({ variant, size, className })} {...props} />;
 }
