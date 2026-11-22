@@ -65,6 +65,7 @@ All notable changes to this project are documented here. The format follows
 - Battery and ignition sensing are disabled by default because the wiring
   diagram does not include the dividers; enable `hw::kHasPowerSense` after
   fitting them.
+- `pnpm self-check` now includes the release and deployment policy checks.
 
 ### Removed
 

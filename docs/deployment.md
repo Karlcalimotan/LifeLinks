@@ -9,6 +9,7 @@ node scripts/release-check.mjs                 # development consistency
 node scripts/release-check.mjs --require-release
 node scripts/release-check.mjs --tag v0.2.0
 node scripts/deployment-check.mjs
+pnpm self-check                                # includes both policy checks
 ```
 
 ## Deployment allowlist
