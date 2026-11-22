@@ -32,6 +32,7 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      - run: node --test scripts/merge-pr.test.mjs
       - run: pnpm build
 
   firmware:

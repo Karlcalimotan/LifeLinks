@@ -10,6 +10,7 @@
  */
 import { spawnSync } from "node:child_process";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 const ALLOWED_BASES = new Set(["develop", "staging"]);
@@ -97,8 +98,8 @@ function resolveRepo() {
 	return result.stdout.split(/\r?\n/)[0].trim();
 }
 
-function fetchPr(repo, number) {
-	const result = gh(["pr", "view", String(number), "--repo", repo, "--json", PR_FIELDS]);
+function fetchPr(repo, number, ghImpl = gh) {
+	const result = ghImpl(["pr", "view", String(number), "--repo", repo, "--json", PR_FIELDS]);
 	if (!result.ok) return { ok: false, error: shortError(result) };
 
 	try {
@@ -112,12 +113,15 @@ function fetchPr(repo, number) {
 	}
 }
 
-function requiredChecksFor(repo, base) {
+function requiredChecksFor(repo, base, ghImpl = gh) {
 	if (!ALLOWED_BASES.has(base)) {
 		return { ok: false, error: `base ${base} is not allowed` };
 	}
 
-	const result = gh(["api", `repos/${repo}/branches/${base}/protection/required_status_checks`]);
+	const result = ghImpl([
+		"api",
+		`repos/${repo}/branches/${base}/protection/required_status_checks`,
+	]);
 	if (!result.ok) {
 		return {
 			ok: false,
@@ -229,7 +233,7 @@ function labelNames(labels) {
 		.map((label) => label.trim().toLowerCase());
 }
 
-function evaluatePr(pr, repo) {
+function evaluatePr(pr, repo, ghImpl = gh) {
 	const reasons = [];
 	const labels = labelNames(pr.labels);
 
@@ -256,7 +260,7 @@ function evaluatePr(pr, repo) {
 	let checkError = null;
 
 	if (ALLOWED_BASES.has(pr.baseRefName)) {
-		const requiredResult = requiredChecksFor(repo, pr.baseRefName);
+		const requiredResult = requiredChecksFor(repo, pr.baseRefName, ghImpl);
 		if (!requiredResult.ok) {
 			checkError = requiredResult.error;
 			reasons.push(requiredResult.error);
@@ -309,11 +313,11 @@ function printEvaluation(pr, evaluation, dryRun) {
 	}
 }
 
-function mergeOne(pr, repo) {
+function mergeOne(pr, repo, ghImpl = gh) {
 	// Re-fetch immediately before merging. A PR can be retargeted from
 	// develop/staging to main between evaluation and merge; the base and head
 	// must still be the ones that were evaluated.
-	const fresh = fetchPr(repo, pr.number);
+	const fresh = fetchPr(repo, pr.number, ghImpl);
 	if (!fresh.ok) return { ok: false, error: `re-fetch failed: ${fresh.error}` };
 
 	const current = fresh.pr;
@@ -337,12 +341,12 @@ function mergeOne(pr, repo) {
 		};
 	}
 
-	const recheck = evaluatePr(current, repo);
+	const recheck = evaluatePr(current, repo, ghImpl);
 	if (!recheck.eligible) {
 		return { ok: false, error: `re-evaluation failed: ${recheck.reasons.join("; ")}` };
 	}
 
-	const result = gh([
+	const result = ghImpl([
 		"pr",
 		"merge",
 		String(current.number),
@@ -354,7 +358,7 @@ function mergeOne(pr, repo) {
 	]);
 	if (!result.ok) return { ok: false, error: shortError(result) };
 
-	const verification = gh([
+	const verification = ghImpl([
 		"pr",
 		"view",
 		String(current.number),
@@ -389,15 +393,15 @@ function mergeOne(pr, repo) {
 	return { ok: true, commit };
 }
 
-function runSingle(repo, number, dryRun) {
-	const fetched = fetchPr(repo, number);
+function runSingle(repo, number, dryRun, ghImpl = gh) {
+	const fetched = fetchPr(repo, number, ghImpl);
 	if (!fetched.ok) {
 		console.error(`merge-pr: FAIL PR #${number}: ${fetched.error}`);
 		return false;
 	}
 
 	const pr = fetched.pr;
-	const evaluation = evaluatePr(pr, repo);
+	const evaluation = evaluatePr(pr, repo, ghImpl);
 	printEvaluation(pr, evaluation, dryRun);
 
 	if (!evaluation.eligible) {
@@ -410,7 +414,7 @@ function runSingle(repo, number, dryRun) {
 	}
 
 	console.log("  merging...");
-	const merged = mergeOne(pr, repo);
+	const merged = mergeOne(pr, repo, ghImpl);
 	if (!merged.ok) {
 		console.error(`merge-pr: FAIL PR #${number}: ${merged.error}`);
 		return false;
@@ -419,8 +423,8 @@ function runSingle(repo, number, dryRun) {
 	return true;
 }
 
-function listOpenPrs(repo, base) {
-	const result = gh([
+function listOpenPrs(repo, base, ghImpl = gh) {
+	const result = ghImpl([
 		"pr",
 		"list",
 		"--repo",
@@ -448,7 +452,7 @@ function listOpenPrs(repo, base) {
 	}
 }
 
-function runAll(repo, dryRun) {
+function runAll(repo, dryRun, ghImpl = gh) {
 	let hadFailure = false;
 	let eligible = 0;
 	let skipped = 0;
@@ -457,7 +461,7 @@ function runAll(repo, dryRun) {
 
 	for (const base of ["develop", "staging"]) {
 		console.log(`Open pull requests targeting ${base}:`);
-		const listed = listOpenPrs(repo, base);
+		const listed = listOpenPrs(repo, base, ghImpl);
 		if (!listed.ok) {
 			hadFailure = true;
 			continue;
@@ -472,7 +476,7 @@ function runAll(repo, dryRun) {
 			if (!Number.isInteger(number) || seen.has(number)) continue;
 			seen.add(number);
 
-			const fetched = fetchPr(repo, number);
+			const fetched = fetchPr(repo, number, ghImpl);
 			if (!fetched.ok) {
 				console.error(`merge-pr: FAIL PR #${number}: ${fetched.error}`);
 				hadFailure = true;
@@ -480,7 +484,7 @@ function runAll(repo, dryRun) {
 			}
 
 			const pr = fetched.pr;
-			const evaluation = evaluatePr(pr, repo);
+			const evaluation = evaluatePr(pr, repo, ghImpl);
 			printEvaluation(pr, evaluation, dryRun);
 
 			// A missing or unreadable branch-protection check list is a
@@ -503,7 +507,7 @@ function runAll(repo, dryRun) {
 			}
 
 			console.log("  merging...");
-			const result = mergeOne(pr, repo);
+			const result = mergeOne(pr, repo, ghImpl);
 			if (!result.ok) {
 				console.error(`merge-pr: FAIL PR #${number}: ${result.error}`);
 				hadFailure = true;
@@ -520,6 +524,8 @@ function runAll(repo, dryRun) {
 	return !hadFailure;
 }
 
+export { evaluateChecks, evaluatePr, mergeOne, runAll, runSingle };
+
 function main() {
 	const parsed = parseArgs(process.argv.slice(2));
 	if (!parsed) return true;
@@ -527,10 +533,15 @@ function main() {
 	return parsed.all ? runAll(repo, parsed.dryRun) : runSingle(repo, parsed.number, parsed.dryRun);
 }
 
-try {
-	const ok = main();
-	process.exitCode = ok ? 0 : 1;
-} catch (error) {
-	console.error(`merge-pr: ${error instanceof Error ? error.message : String(error)}`);
-	process.exitCode = 1;
+const isDirectRun =
+	process.argv[1] !== undefined && pathToFileURL(process.argv[1]).href === import.meta.url;
+
+if (isDirectRun) {
+	try {
+		const ok = main();
+		process.exitCode = ok ? 0 : 1;
+	} catch (error) {
+		console.error(`merge-pr: ${error instanceof Error ? error.message : String(error)}`);
+		process.exitCode = 1;
+	}
 }
