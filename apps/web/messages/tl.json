@@ -21,7 +21,6 @@
 	"search": {
 		"title": "Maghanap sa console",
 		"open": "Maghanap",
-		"openAria": "Buksan ang paghahanap",
 		"placeholder": "Maghanap ng plaka, driver, insidente at tracker",
 		"shortcut": "Ctrl K",
 		"loading": "Naghahanap…",

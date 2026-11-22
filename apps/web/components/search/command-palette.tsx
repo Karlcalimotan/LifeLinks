@@ -269,16 +269,13 @@ export function CommandPalette({ role }: { role: MemberRoleName }) {
 				ref={triggerRef}
 				type="button"
 				onClick={() => setOpen(true)}
-				aria-label={t("openAria")}
+				aria-label={t("open")}
 				aria-haspopup="dialog"
 				aria-keyshortcuts="Control+K Meta+K"
 				className="inline-flex h-8 items-center gap-1.5 rounded-control border border-ink-600 bg-ink-800 px-2 text-meta text-fog-300 transition-colors hover:bg-ink-700 hover:text-fog-100"
 			>
 				<Search className="size-4" aria-hidden="true" />
 				<span className="hidden md:inline">{t("open")}</span>
-				<kbd className="hidden rounded-control border border-ink-600 px-1 font-mono text-meta text-fog-500 lg:inline">
-					{t("shortcut")}
-				</kbd>
 			</button>
 
 			{mounted && open

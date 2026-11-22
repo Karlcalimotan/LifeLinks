@@ -21,7 +21,6 @@
 	"search": {
 		"title": "Search the console",
 		"open": "Search",
-		"openAria": "Open search",
 		"placeholder": "Search plates, drivers, incidents and trackers",
 		"shortcut": "Ctrl K",
 		"loading": "Searching…",
