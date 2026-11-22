@@ -2,14 +2,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const COLUMNS = [
+	"select",
 	"label",
 	"mac",
 	"vehicle",
 	"approval",
-	"status",
-	"firmware",
-	"last-seen",
+	"connection",
+	"signal",
 	"battery",
+	"firmware",
 	"actions",
 ];
 const ROWS = ["row-a", "row-b", "row-c", "row-d", "row-e", "row-f"];
@@ -38,7 +39,7 @@ export default function DevicesLoading() {
 						<Skeleton className="h-8 w-16" />
 					</div>
 
-					<div className="grid grid-cols-3 gap-3 border-b border-ink-700 pb-3 sm:grid-cols-5 lg:grid-cols-9">
+					<div className="grid grid-cols-3 gap-3 border-b border-ink-700 pb-3 sm:grid-cols-5 lg:grid-cols-10">
 						{COLUMNS.map((column) => (
 							<Skeleton key={column} className="h-3 w-14" />
 						))}

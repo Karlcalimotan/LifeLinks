@@ -103,7 +103,7 @@ export function parseSearchResults(value: unknown): SearchResult[] {
 		const row = entry as Record<string, unknown>;
 		if (!validType(row.type)) continue;
 		if (typeof row.id !== "string" || typeof row.title !== "string") continue;
-		if (typeof row.href !== "string") continue;
+		if (typeof row.href !== "string" || !row.href.startsWith("/")) continue;
 		parsed.push({
 			type: row.type,
 			id: row.id,

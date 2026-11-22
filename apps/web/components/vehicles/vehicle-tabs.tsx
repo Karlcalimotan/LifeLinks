@@ -24,7 +24,7 @@ export function VehicleTabs({
 								href={buildVehicleHref(vehicleId, tab)}
 								aria-current={isActive ? "page" : undefined}
 								className={cn(
-									"flex h-10 items-center whitespace-nowrap border-b-2 px-3 text-body transition-colors",
+									"flex h-11 items-center whitespace-nowrap border-b-2 px-3 text-body transition-colors lg:h-10",
 									isActive
 										? "border-signal-500 text-fog-50"
 										: "border-transparent text-fog-500 hover:text-fog-100",

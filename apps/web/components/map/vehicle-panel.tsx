@@ -142,11 +142,11 @@ export function VehiclePanel({
 					<Detail
 						label={labels.speed}
 						value={
-							vehicle.position && device?.lastSpeedKph != null
+							device?.lastSpeedKph != null
 								? device.lastSpeedKph > 0
 									? `${Math.round(device.lastSpeedKph)} kph`
 									: labels.stopped
-								: "—"
+								: "-"
 						}
 					/>
 					<Detail

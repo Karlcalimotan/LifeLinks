@@ -19,7 +19,7 @@ export default function MapError({
 					<Button type="button" size="sm" onClick={reset}>
 						{t("tryAgain")}
 					</Button>
-					<Link href="/" className="text-meta text-fog-300 underline hover:text-fog-100">
+					<Link href="/dashboard" className="text-meta text-fog-300 underline hover:text-fog-100">
 						{t("back")}
 					</Link>
 				</div>

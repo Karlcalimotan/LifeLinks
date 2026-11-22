@@ -52,7 +52,7 @@ export async function MaintenanceControl({
 								<input type="hidden" name="locale" value={locale} />
 								<input type="hidden" name="vehicleId" value={vehicleId} />
 								<input type="hidden" name="action" value={action} />
-								<ConfirmSubmit message={message} confirmLabel={label}>
+								<ConfirmSubmit message={message} confirmLabel={label} cancelLabel={t("cancel")}>
 									{label}
 								</ConfirmSubmit>
 							</form>

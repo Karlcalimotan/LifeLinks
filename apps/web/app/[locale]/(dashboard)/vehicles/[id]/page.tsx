@@ -103,7 +103,7 @@ export default async function VehicleDetailPage({
 							href={mapHref}
 							target="_blank"
 							rel="noreferrer"
-							className="inline-flex h-8 items-center gap-1.5 rounded-panel border border-ink-600 px-3 text-meta text-fog-100 hover:border-signal-500/60 hover:bg-ink-700/60"
+							className="inline-flex h-8 items-center gap-1.5 rounded-panel border border-ink-600 px-3 text-meta text-fog-100 hover:border-ink-600 hover:bg-ink-700/60"
 						>
 							<ExternalLink className="size-4" aria-hidden="true" />
 							{t("viewMap")}
@@ -113,7 +113,10 @@ export default async function VehicleDetailPage({
 			/>
 
 			{tab === "settings" && updated ? (
-				<p className="mb-4 rounded-panel border border-clear-400/30 bg-clear-400/10 px-3 py-2 text-meta text-clear-300">
+				<p
+					aria-live="polite"
+					className="mb-4 rounded-panel border border-clear-400/30 bg-clear-400/10 px-3 py-2 text-meta text-clear-300"
+				>
 					{t("maintenanceUpdated")}
 				</p>
 			) : null}

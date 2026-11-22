@@ -1,9 +1,18 @@
-export type PageKey = "dashboard" | "vehicles" | "incidents" | "devices" | "settings";
+export type PageKey =
+	| "dashboard"
+	| "map"
+	| "vehicles"
+	| "incidents"
+	| "analytics"
+	| "notifications"
+	| "devices"
+	| "settings";
 
 export interface PageDefinition {
 	key: PageKey;
 	href: string;
 	adminOnly: boolean;
+	hiddenForUser?: boolean;
 	keywords: readonly string[];
 }
 
@@ -16,6 +25,12 @@ export const SEARCH_PAGES: readonly PageDefinition[] = [
 		keywords: ["overview", "home", "fleet", "kpi"],
 	},
 	{
+		key: "map",
+		href: "/map",
+		adminOnly: false,
+		keywords: ["live", "positions", "fleet", "gps"],
+	},
+	{
 		key: "vehicles",
 		href: "/vehicles",
 		adminOnly: false,
@@ -26,6 +41,19 @@ export const SEARCH_PAGES: readonly PageDefinition[] = [
 		href: "/incidents",
 		adminOnly: false,
 		keywords: ["alerts", "crashes", "response"],
+	},
+	{
+		key: "analytics",
+		href: "/analytics",
+		adminOnly: false,
+		keywords: ["charts", "reports", "response", "trends"],
+	},
+	{
+		key: "notifications",
+		href: "/notifications",
+		adminOnly: false,
+		hiddenForUser: true,
+		keywords: ["alerts", "delivery", "contacts", "sms"],
 	},
 	{
 		key: "devices",
@@ -45,11 +73,20 @@ export interface PageCandidate extends PageDefinition {
 	label: string;
 }
 
+export interface PageAccess {
+	canAdminister: boolean;
+	isUser: boolean;
+}
+
 export function visiblePages(
 	pages: readonly PageDefinition[],
-	canAdminister: boolean,
+	access: PageAccess,
 ): PageDefinition[] {
-	return pages.filter((page) => !page.adminOnly || canAdminister);
+	return pages.filter((page) => {
+		if (page.adminOnly && !access.canAdminister) return false;
+		if (page.hiddenForUser && access.isUser) return false;
+		return true;
+	});
 }
 
 /** An empty query shows every visible page; a typed query matches label or keyword. */

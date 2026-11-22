@@ -1,6 +1,6 @@
-import { LOW_BATTERY_V } from "@/lib/device/query";
 import {
 	type DeviceConnectionState,
+	batteryBand,
 	deviceConnectionState,
 	gpsAgeSeconds,
 	isGpsStale,
@@ -130,7 +130,8 @@ export function buildFleetVehicles(
 	return vehicles.map((vehicle) => {
 		const device = vehicle.device;
 		const connectionState = deviceConnectionState(device?.lastSeenAt, now);
-		const lowBattery = device?.batteryV != null && device.batteryV < LOW_BATTERY_V;
+		const band = batteryBand(device?.batteryV);
+		const lowBattery = band === "low" || band === "critical";
 		const incident = openIncidents.get(vehicle.id) ?? null;
 		const position =
 			device &&

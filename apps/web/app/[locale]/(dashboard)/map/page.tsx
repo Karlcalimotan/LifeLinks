@@ -60,10 +60,7 @@ export default async function MapPage({
 
 	const fleet = buildFleetVehicles(
 		vehicles.map((vehicle) => {
-			const device =
-				vehicle.devices.find((item) => item.approvalStatus === "APPROVED") ??
-				vehicle.devices[0] ??
-				null;
+			const device = vehicle.devices.find((item) => item.approvalStatus === "APPROVED") ?? null;
 
 			return {
 				id: vehicle.id,
@@ -95,11 +92,12 @@ export default async function MapPage({
 	);
 
 	const filtered = filterFleetVehicles(fleet, query);
-	const positions = vehiclesWithPosition(fleet);
+	const positions = vehiclesWithPosition(filtered);
 	const selected = query.vehicle
 		? (fleet.find((vehicle) => vehicle.id === query.vehicle) ?? null)
 		: null;
-	const fitAllHref = buildMapHref(query, { q: "", filter: "all", vehicle: null });
+	const fitAllHref = buildMapHref(query, { vehicle: null });
+	const clearFiltersHref = buildMapHref(query, { q: "", filter: "all", vehicle: null });
 	const hasFilters = hasActiveMapFilters(query);
 
 	const stateLabels: Record<MarkerState, string> = {
@@ -159,7 +157,7 @@ export default async function MapPage({
 							{hasFilters ? (
 								<div className="mt-3 text-center">
 									<Link
-										href={fitAllHref}
+										href={clearFiltersHref}
 										className="text-meta text-fog-300 underline underline-offset-2 hover:text-fog-100"
 									>
 										{t("empty.clearFilters")}
@@ -239,7 +237,7 @@ export default async function MapPage({
 							<p className="mt-0.5 text-meta text-fog-500">
 								{t("positionsSummary", {
 									positions: positions.length,
-									total: fleet.length,
+									total: filtered.length,
 								})}
 							</p>
 						</div>

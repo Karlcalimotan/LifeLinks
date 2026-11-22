@@ -12,10 +12,13 @@ import { SEARCH_RESULT_LIMIT, parseSearchQuery } from "@/lib/search/query";
 import { type SearchResult, parseSearchResults } from "@/lib/search/shape";
 import { cn, formatDateTime, formatRelative } from "@/lib/utils";
 import {
+	Bell,
 	Car,
+	ChartColumn,
 	ChevronRight,
 	LayoutDashboard,
 	type LucideIcon,
+	Map as MapIcon,
 	Radio,
 	Search,
 	Settings,
@@ -35,8 +38,11 @@ const RESULT_TYPES = {
 
 const pageIcons: Record<PageCandidate["key"], LucideIcon> = {
 	dashboard: LayoutDashboard,
+	map: MapIcon,
 	vehicles: Car,
 	incidents: TriangleAlert,
+	analytics: ChartColumn,
+	notifications: Bell,
 	devices: Radio,
 	settings: Settings,
 };
@@ -135,7 +141,10 @@ export function CommandPalette({ role }: { role: MemberRoleName }) {
 		};
 	}, [open, query, retryNonce]);
 
-	const pages: PageCandidate[] = visiblePages(SEARCH_PAGES, canAdminister(role)).map((page) => ({
+	const pages: PageCandidate[] = visiblePages(SEARCH_PAGES, {
+		canAdminister: canAdminister(role),
+		isUser: role === "USER",
+	}).map((page) => ({
 		...page,
 		label: nav(page.key),
 	}));
@@ -160,6 +169,13 @@ export function CommandPalette({ role }: { role: MemberRoleName }) {
 		const element = listRef.current?.querySelector<HTMLElement>('[data-active="true"]');
 		element?.scrollIntoView({ block: "nearest" });
 	}, [open, activeIndex]);
+
+	useEffect(() => {
+		if (!open) return;
+		const dialog = dialogRef.current;
+		if (dialog && !dialog.open) dialog.showModal();
+		inputRef.current?.focus();
+	}, [open]);
 
 	function close() {
 		setOpen(false);
@@ -268,7 +284,6 @@ export function CommandPalette({ role }: { role: MemberRoleName }) {
 			{mounted && open
 				? createPortal(
 						<dialog
-							open
 							ref={dialogRef}
 							aria-modal="true"
 							aria-labelledby="command-palette-title"

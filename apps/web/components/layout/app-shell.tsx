@@ -38,11 +38,19 @@ export async function AppShell({
 	signOutLabel: string;
 	children: React.ReactNode;
 }) {
-	const awaiting = await loadAwaitingIncidents({
-		role,
-		orgId: org.id,
-		userId: user.id,
-	});
+	const awaiting: Awaited<ReturnType<typeof loadAwaitingIncidents>> = { count: 0, items: [] };
+	try {
+		Object.assign(
+			awaiting,
+			await loadAwaitingIncidents({
+				role,
+				orgId: org.id,
+				userId: user.id,
+			}),
+		);
+	} catch {
+		// The bell is secondary: a failed count must not take down every page.
+	}
 
 	const initials = user.name
 		.split(/\s+/)

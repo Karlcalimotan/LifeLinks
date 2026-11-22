@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/field";
+import { Input, Label } from "@/components/ui/field";
 import { Link, useRouter } from "@/i18n/routing";
 import { MAP_FILTERS, type MapFilter, type MapQuery, buildMapHref } from "@/lib/map/query";
 import { useEffect, useState } from "react";
@@ -20,19 +20,6 @@ export function MapToolbar({ query, labels }: { query: MapQuery; labels: MapTool
 
 	useEffect(() => setValue(query.q), [query.q]);
 
-	useEffect(() => {
-		function onKeyDown(event: KeyboardEvent) {
-			if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return;
-			const target = event.target as HTMLElement | null;
-			if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
-			event.preventDefault();
-			document.getElementById("map-search")?.focus();
-		}
-
-		window.addEventListener("keydown", onKeyDown);
-		return () => window.removeEventListener("keydown", onKeyDown);
-	}, []);
-
 	function submit(event: React.FormEvent<HTMLFormElement>) {
 		event.preventDefault();
 		router.push(buildMapHref(query, { q: value.trim(), vehicle: null }));
@@ -40,21 +27,23 @@ export function MapToolbar({ query, labels }: { query: MapQuery; labels: MapTool
 
 	return (
 		<div className="flex flex-col gap-2.5">
-			<form onSubmit={submit} className="flex items-center gap-2">
-				<Input
-					id="map-search"
-					type="search"
-					name="q"
-					value={value}
-					onChange={(event) => setValue(event.target.value)}
-					placeholder={labels.searchPlaceholder}
-					aria-label={labels.searchLabel}
-					className="min-w-0 flex-1"
-				/>
-				<Button type="submit" variant="outline" className="shrink-0 px-3">
-					{labels.searchSubmit}
-				</Button>
-			</form>
+			<div className="flex flex-col gap-1.5">
+				<Label htmlFor="map-search">{labels.searchLabel}</Label>
+				<form onSubmit={submit} className="flex items-center gap-2">
+					<Input
+						id="map-search"
+						type="search"
+						name="q"
+						value={value}
+						onChange={(event) => setValue(event.target.value)}
+						placeholder={labels.searchPlaceholder}
+						className="min-w-0 flex-1"
+					/>
+					<Button type="submit" variant="outline" className="shrink-0 px-3">
+						{labels.searchSubmit}
+					</Button>
+				</form>
+			</div>
 
 			<fieldset className="flex min-w-0 flex-wrap gap-1.5 border-0 p-0">
 				<legend className="sr-only">{labels.filterLabel}</legend>

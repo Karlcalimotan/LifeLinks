@@ -129,20 +129,26 @@ describe("buildFleetVehicles", () => {
 		expect(stale?.lastFixAgeSeconds).toBe(300);
 	});
 
-	it("flags low battery only below the shared threshold", () => {
-		const low = buildFleetVehicles(
+	it("flags low battery on the same bands as the tracker list", () => {
+		const critical = buildFleetVehicles(
 			[makeVehicle({ device: makeDevice({ batteryV: 11.4 }) })],
 			[],
 			NOW,
 		)[0];
-		const healthy = buildFleetVehicles(
+		const low = buildFleetVehicles(
 			[makeVehicle({ device: makeDevice({ batteryV: 11.5 }) })],
 			[],
 			NOW,
 		)[0];
+		const healthy = buildFleetVehicles(
+			[makeVehicle({ device: makeDevice({ batteryV: 12.0 }) })],
+			[],
+			NOW,
+		)[0];
 
+		expect(critical?.lowBattery).toBe(true);
+		expect(critical?.markerState).toBe("low-battery");
 		expect(low?.lowBattery).toBe(true);
-		expect(low?.markerState).toBe("low-battery");
 		expect(healthy?.lowBattery).toBe(false);
 	});
 

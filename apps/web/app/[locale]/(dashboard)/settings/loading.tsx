@@ -14,7 +14,7 @@ export default function SettingsLoading() {
 			<div className="lg:flex lg:items-start lg:gap-6">
 				<div className="mb-4 flex flex-wrap gap-2 lg:mb-0 lg:w-52 lg:shrink-0 lg:flex-col">
 					{TABS.map((tab) => (
-						<Skeleton key={tab} className="h-9 w-24 lg:w-full" />
+						<Skeleton key={tab} className="h-11 w-24 lg:h-9 lg:w-full" />
 					))}
 				</div>
 

@@ -101,7 +101,7 @@ export function MobileNav({
 	const visible = visibleItems(role);
 
 	return (
-		<nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-ink-700 bg-ink-950 px-2 py-1 lg:hidden">
+		<nav className="fixed inset-x-0 bottom-0 z-30 flex overflow-x-auto border-t border-ink-700 bg-ink-950 px-2 py-1 lg:hidden">
 			{visible.map((item) => {
 				const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 				const Icon = item.icon;
@@ -110,7 +110,7 @@ export function MobileNav({
 						key={item.href}
 						href={item.href}
 						className={cn(
-							"flex min-w-0 flex-1 flex-col items-center gap-1 rounded-control px-1 py-2 text-meta",
+							"flex min-w-[72px] flex-none flex-col items-center gap-1 rounded-control px-1 py-2 text-meta",
 							active ? "text-signal-300" : "text-fog-500",
 						)}
 					>
