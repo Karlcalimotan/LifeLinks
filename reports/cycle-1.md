@@ -50,7 +50,7 @@ Commands run on `develop@d1f8f6d`:
 | `node scripts/snapshot.mjs` | 20 screenshots, 0 console errors |
 
 The local `pnpm self-check` stack-contract step scans stale `.worktrees` copies
-and finds the template's `the template product name` attribution. CI runs from a clean clone and
+and finds the template's old product attribution. CI runs from a clean clone and
 passes; the failure is local-worktree pollution, not a code defect.
 
 ## Review
