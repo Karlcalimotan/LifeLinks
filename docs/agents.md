@@ -11,7 +11,7 @@ independent check.
 | parent / orchestrator | primary | Owns the issue, scope, worktree, verification and final report | Does not bypass checks or merge `main` |
 | `reviewer` | subagent | Read-only review for correctness, safety, regressions and missing tests | Cannot edit, push or merge |
 | `release-manager` | subagent | Version bumps, changelog sections and release checks | Cannot push, tag, merge, deploy or touch `main` |
-| `integrator` | subagent | Merges PRs into `develop` and `stage` after every required check passes | Cannot merge `main` or bypass protection |
+| `integrator` | subagent | Merges PRs into `develop` and `staging` after every required check passes | Cannot merge `main` or bypass protection |
 
 The definitions live in `.opencode/agents/`. OpenCode discovers them from the
 project. If a newly added agent does not appear, run `opencode reload` or restart
@@ -68,10 +68,10 @@ while his is open.
 ## Merge policy
 
 - `integrator` runs `node scripts/merge-pr.mjs`.
-- The helper allows only `develop` and `stage` as bases, requires every
+- The helper allows only `develop` and `staging` as bases, requires every
   required check to be `SUCCESS`, and refuses drafts, conflicts, behind
   branches, `do-not-merge`/`wip`/`blocked` labels and any PR targeting `main`.
-- `develop` and `stage` require zero approvals so the integrator can promote
+- `develop` and `staging` require zero approvals so the integrator can promote
   them after checks. `main` requires one approval and is human-only.
 - Never use `--admin`, `--auto`, force-push or branch deletion to get around a
   refusal.
@@ -81,7 +81,7 @@ while his is open.
 ```text
 Use the reviewer subagent to review PR #42. Do not edit anything.
 Use the release-manager subagent to prepare v0.3.0 from develop.
-Use the integrator subagent to merge all green PRs into develop and stage.
+Use the integrator subagent to merge all green PRs into develop and staging.
 ```
 
 ## Handoff report

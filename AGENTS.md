@@ -34,7 +34,7 @@ grade.
 - Crash logic must be pure functions (no hardware calls) so it can be unit
   tested.
 - Never flash hardware, never push to main, never change CI secrets.
-- `develop` and `stage` are PR-only protected branches. Do not push directly to
+- `develop` and `staging` are PR-only protected branches. Do not push directly to
   them.
 - Hardware bring-up and bench tests belong to the human hardware owner (Jeff).
   The agent may write and test code, but must not power, wire or flash the
@@ -56,22 +56,26 @@ grade.
 
 ## Workflow
 
-1. Work on a new feature branch; never work directly on `main`, `stage` or
+1. Work on a new feature branch; never work directly on `main`, `staging` or
    `develop`.
 2. Small changes, one concern per PR.
 3. Open feature PRs against `develop`.
-4. Promote `develop` to `stage` through a PR after the checks pass.
-5. Promote `stage` to `main` through a versioned release PR. Only the human
+4. Promote `develop` to `staging` through a PR after the checks pass. `staging`
+   is the preview deployment; `develop` is the reconciliation gate and does not
+   deploy.
+5. Promote `staging` to `main` through a versioned release PR. Only the human
    owner merges `main`.
 6. Run `bash scripts/verify.sh` before finishing.
 7. Commit often.
+8. The firmware version is independent of the application/PWA version. Bump
+   `FW_VERSION` only when the firmware changes.
 
 ## Agent collaboration
 
 - `reviewer` is a read-only reviewer. It cannot edit, push or merge.
 - `release-manager` prepares version bumps and changelog sections. It cannot
   push, tag, merge, deploy or touch `main`.
-- `integrator` merges PRs into `develop` and `stage` only after every required
+- `integrator` merges PRs into `develop` and `staging` only after every required
   check passes. It uses `node scripts/merge-pr.mjs` and cannot merge `main`.
 - The parent agent owns the issue, worktree, scope, verification and final
   report. It verifies subagent work instead of trusting a report.

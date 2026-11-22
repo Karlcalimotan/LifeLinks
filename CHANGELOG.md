@@ -18,7 +18,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
-- `develop` and `stage` merges are handled by the `integrator` subagent through
+- `develop` and `staging` merges are handled by the `integrator` subagent through
   `scripts/merge-pr.mjs`, which refuses `main` and unfinished checks; `main`
   remains human-merged.
 - `pnpm self-check` now includes the issue-policy tests.
@@ -55,15 +55,25 @@ All notable changes to this project are documented here. The format follows
 - Deployment policy: version-consistency and Vercel-allowlist checks, a
   `Deployment policy` workflow, and `docs/deployment.md` with the release
   process and manual dashboard checklist.
-- Branch protection on `main` and `develop`: pull requests, required CI
-  checks, conversation resolution, no force pushes and no branch deletion.
+- Branch protection on `main`, `staging` and `develop`: pull requests, required
+  CI checks, conversation resolution, no force pushes and no branch deletion.
   `main` additionally requires one approval and linear history.
-- Immutable `v*` release tags via a repository ruleset.
-- `stage` promotion branch: feature PRs go to `develop`, `develop` promotes to
-  `stage`, and `stage` promotes a versioned release to `main`. `stage` is
-  protected but is not a Vercel deployment target.
+- Immutable application (`v*`) and firmware (`fw-v*`) release tags via a
+  repository ruleset.
+- Staging promotion: feature PRs go to `develop` (the reconciliation gate),
+  `develop` promotes to `staging` (the preview deployment), and `staging`
+  promotes a versioned release to `main`. `develop` is protected but is not a
+  Vercel deployment target.
 
 ### Changed
+
+- Deployment role swap: `staging` is the preview deployment and `develop` is the
+  reconciliation gate. `develop` no longer deploys, and the earlier `stage`
+  branch is retired.
+- Firmware versioning is independent of the application and PWA version.
+  `release-check.mjs` validates the two firmware sources against each other but
+  no longer against `package.json`; an application release does not force a
+  firmware bump.
 
 - Adopt the global API regulation: matching request IDs, `error.request_id`,
   `X-Response-Time`, 2 s hot-route timeouts, SLOW/VIOLATION logs and no-store
@@ -97,8 +107,6 @@ All notable changes to this project are documented here. The format follows
 - The native PlatformIO environment includes `firmware/include`, and cppcheck
   suppresses its known ArduinoJson preprocessor false positive.
 - `pnpm self-check` now includes the release and deployment policy checks.
-- Release promotion now runs `develop` -> `stage` -> versioned `main`; CI and
-  the deployment-policy workflow also run on `stage` pushes.
 
 ### Removed
 

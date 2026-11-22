@@ -2,7 +2,7 @@
 /**
  * Constrained PR merge helper for the integrator subagent.
  *
- * Only `develop` and `stage` are mergeable. `main` is never allowed.
+ * Only `develop` and `staging` are mergeable. `main` is never allowed.
  * Every required branch-protection check must be present and successful.
  *
  *   node scripts/merge-pr.mjs <number> [--dry-run]
@@ -12,7 +12,7 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
-const ALLOWED_BASES = new Set(["develop", "stage"]);
+const ALLOWED_BASES = new Set(["develop", "staging"]);
 const BLOCKING_LABELS = new Set(["do-not-merge", "wip", "blocked"]);
 const PR_FIELDS = [
 	"number",
@@ -33,7 +33,7 @@ const USAGE = `Usage:
   node scripts/merge-pr.mjs <number> [--dry-run]
   node scripts/merge-pr.mjs --all [--dry-run]
 
-Only develop and stage are mergeable. main is never allowed.`;
+Only develop and staging are mergeable. main is never allowed.`;
 
 function gh(args) {
 	const result = spawnSync("gh", args, {
@@ -236,7 +236,7 @@ function evaluatePr(pr, repo) {
 	if (pr.isDraft) reasons.push("the pull request is a draft");
 	if (!ALLOWED_BASES.has(pr.baseRefName)) {
 		reasons.push(
-			`base ${pr.baseRefName ?? "unknown"} is not allowed; only develop and stage are mergeable (main is forbidden)`,
+			`base ${pr.baseRefName ?? "unknown"} is not allowed; only develop and staging are mergeable (main is forbidden)`,
 		);
 	}
 	if (pr.mergeable !== "MERGEABLE") {
@@ -408,7 +408,7 @@ function runAll(repo, dryRun) {
 	let merged = 0;
 	const seen = new Set();
 
-	for (const base of ["develop", "stage"]) {
+	for (const base of ["develop", "staging"]) {
 		console.log(`Open pull requests targeting ${base}:`);
 		const listed = listOpenPrs(repo, base);
 		if (!listed.ok) {
