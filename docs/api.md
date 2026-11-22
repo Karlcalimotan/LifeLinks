@@ -38,7 +38,46 @@ The database stores `sha256(token)` only. A token is shown once when the device
 is registered or rotated. A `PENDING`, `REJECTED` or `SUSPENDED` device is
 authenticated but returns `403`; an unknown token returns `401`.
 
+Device routes are rate-limited per device: heartbeat **60/min**, ingest
+**120/min**, incident **30/min**. Exceeding a limit returns `429 RATE_LIMITED`
+with a retry hint. The limiter is in-process; a multi-instance deployment should
+replace it with a shared store.
+
 ## Endpoints
+
+### `POST /api/device/heartbeat`
+
+Heartbeat-only state refresh. Use this when the tracker does not need to send a
+telemetry batch.
+
+```json
+{
+  "device_id": "AA:BB:CC:DD:EE:01",
+  "firmware_version": "0.2.0",
+  "heartbeat": {
+    "battery_v": 12.4,
+    "ignition": true,
+    "rssi_dbm": -71,
+    "satellites": 8,
+    "hdop": 1.2,
+    "lat": 10.3157,
+    "lng": 123.8854,
+    "gps_fix_age_s": 3,
+    "accel_g": 0.4,
+    "tilt_deg": 2.1,
+    "vibration": false,
+    "config_rev": 123456789
+  }
+}
+```
+
+The optional `Idempotency-Key` header is stored as the `HEARTBEAT` event's
+client id; a retry with the same key does not duplicate the event. The tracker
+state update itself is naturally idempotent.
+
+```json
+{ "data": { "received": true, "duplicate": false, "server_time": 1763472005, "config_rev": 123456789, "heartbeat_interval_s": 30 } }
+```
 
 ### `POST /api/device/ingest`
 

@@ -15,9 +15,9 @@ status and may update their own branch copy.
       confirm dialogs and an audit log.
 - [ ] **T3 TODO** — Trackers: search, filter (status, vehicle, approval), sort,
       pagination.
-- [ ] **T4 CLAIMED:lead** — Device ingestion API: `POST /api/device/heartbeat`
+- [ ] **T4 IN REVIEW** — Device ingestion API: `POST /api/device/heartbeat`
       and `/api/device/incident`, per-device auth token, idempotency key, rate
-      limit, input validation (zod). Issue #37.
+      limit, input validation (zod). Issue #37; PR pending.
 - [ ] **T5 TODO** — Online/Offline logic from last heartbeat (configurable
       threshold) + low-battery flag; replace "4d ago" with live relative time.
 - [ ] **T6 TODO** — Incidents: data model + workflow (New -> Acknowledged ->
