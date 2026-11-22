@@ -20,6 +20,7 @@
 	},
 	"nav": {
 		"dashboard": "Dashboard",
+		"map": "Live na mapa",
 		"vehicles": "Mga Sasakyan",
 		"incidents": "Mga Insidente",
 		"analytics": "Analytics",
