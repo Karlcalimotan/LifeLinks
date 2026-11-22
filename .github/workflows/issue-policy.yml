@@ -1,9 +1,11 @@
 name: issue-policy
 
-# pull_request_target runs the workflow from the base branch. Check out the base
-# ref explicitly and run only the trusted checker; never check out PR code here.
+# pull_request_target would be the strongest trigger, but GitHub only runs it
+# when the workflow exists on the default branch. Until this workflow reaches
+# main, use pull_request with an explicit base-ref checkout so the checker and
+# its tests come from the trusted base, not from PR code.
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, edited, reopened, synchronize, labeled, unlabeled, ready_for_review]
 
 permissions:
