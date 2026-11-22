@@ -38,6 +38,7 @@ export async function DeviceCardList({
 	canApprove: boolean;
 }) {
 	const t = await getTranslations({ locale, namespace: "devices" });
+	const common = await getTranslations({ locale, namespace: "common" });
 
 	return (
 		<ul className="flex flex-col divide-y divide-ink-700/70">
@@ -124,7 +125,8 @@ export async function DeviceCardList({
 									<ConfirmSubmit
 										message={t("approveConfirm", { label: device.label })}
 										confirmLabel={t("approve")}
-										variant="secondary"
+										cancelLabel={common("cancel")}
+										variant="primary"
 										size="lg"
 									>
 										{t("approve")}
