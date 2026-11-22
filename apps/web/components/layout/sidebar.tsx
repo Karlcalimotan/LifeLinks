@@ -61,6 +61,7 @@ export function Sidebar({
 						<Link
 							key={item.href}
 							href={item.href}
+							aria-current={active ? "page" : undefined}
 							className={cn(
 								"flex items-center gap-3 border-l-2 px-3 py-2.5 text-body transition-colors",
 								active
@@ -109,6 +110,7 @@ export function MobileNav({
 					<Link
 						key={item.href}
 						href={item.href}
+						aria-current={active ? "page" : undefined}
 						className={cn(
 							"flex min-w-[72px] flex-none flex-col items-center gap-1 rounded-control px-1 py-2 text-meta",
 							active ? "text-signal-300" : "text-fog-500",

@@ -28,14 +28,25 @@ import {
 	parseIncidentsQuery,
 } from "@/lib/incidents/query";
 import type { Severity } from "@/lib/incidents/severity";
+import { metadataForPage } from "@/lib/page-metadata";
 import prisma from "@/lib/prisma";
 import { formatDateTime, formatRelative } from "@/lib/utils";
 import type { Prisma } from "@prisma/client";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+	params,
+}: {
+	params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+	const { locale } = await params;
+	return metadataForPage(locale, "incidents");
+}
 
 const STATUS_LABELS: Record<IncidentStatusFilter, string> = {
 	SUSPECTED: "statusSuspected",

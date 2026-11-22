@@ -34,12 +34,23 @@ import {
 	parseDevicesQuery,
 } from "@/lib/device/query";
 import { batteryBand, deviceConnectionState } from "@/lib/device/status";
+import { metadataForPage } from "@/lib/page-metadata";
 import prisma from "@/lib/prisma";
 import { formatDateTime, formatRelative } from "@/lib/utils";
 import { ChevronDown, ChevronRight, ChevronUp } from "lucide-react";
+import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+	params,
+}: {
+	params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+	const { locale } = await params;
+	return metadataForPage(locale, "devices");
+}
 
 export default async function DevicesPage({
 	params,

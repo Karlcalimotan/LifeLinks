@@ -32,12 +32,12 @@ import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-const COMMANDS = [
+const COMMANDS: ReadonlyArray<{ kind: string; label: string; confirmKey?: "confirmDisarm" }> = [
 	{ kind: "LOCATE", label: "Locate now" },
 	{ kind: "TEST_ALERT", label: "Test alert" },
 	{ kind: "ARM", label: "Arm" },
-	{ kind: "DISARM", label: "Disarm" },
-] as const;
+	{ kind: "DISARM", label: "Disarm", confirmKey: "confirmDisarm" },
+];
 
 export default async function DeviceDetailPage({
 	params,
@@ -55,6 +55,7 @@ export default async function DeviceDetailPage({
 	const { command, error, approved, rejected } = await searchParams;
 	const current = await requireRole("ADMIN");
 	const t = await getTranslations({ locale, namespace: "devices" });
+	const common = await getTranslations({ locale, namespace: "common" });
 
 	const [device, vehicles] = await Promise.all([
 		prisma.trackerDevice.findFirst({
@@ -89,7 +90,7 @@ export default async function DeviceDetailPage({
 			/>
 
 			{command === "queued" ? (
-				<p className="mb-4 rounded border border-clear-500/30 bg-clear-500/10 px-3 py-2 text-xs text-clear-300">
+				<p className="mb-4 rounded border border-clear-400/30 bg-clear-400/10 px-3 py-2 text-xs text-clear-300">
 					Command queued. The tracker picks it up on its next poll.
 				</p>
 			) : null}
@@ -101,12 +102,12 @@ export default async function DeviceDetailPage({
 				</p>
 			) : null}
 			{approved === "1" ? (
-				<p className="mb-4 rounded border border-clear-500/30 bg-clear-500/10 px-3 py-2 text-xs text-clear-300">
+				<p className="mb-4 rounded border border-clear-400/30 bg-clear-400/10 px-3 py-2 text-xs text-clear-300">
 					Tracker approved.
 				</p>
 			) : null}
 			{rejected === "1" ? (
-				<p className="mb-4 rounded border border-caution-500/30 bg-caution-500/10 px-3 py-2 text-xs text-caution-200">
+				<p className="mb-4 rounded border border-caution-400/30 bg-caution-400/10 px-3 py-2 text-xs text-caution-300">
 					Tracker rejected.
 				</p>
 			) : null}
@@ -122,9 +123,9 @@ export default async function DeviceDetailPage({
 			</div>
 
 			{device.approvalStatus === "PENDING" && canAdminister(current.role) ? (
-				<Card className="mb-6 border-caution-500/30">
+				<Card className="mb-6 border-caution-400/30">
 					<CardContent className="flex flex-wrap items-center justify-between gap-3 pt-5">
-						<p className="text-sm text-caution-200">
+						<p className="text-sm text-caution-300">
 							This tracker is waiting for approval. It cannot send data until approved.
 						</p>
 						<div className="flex gap-2">
@@ -134,6 +135,7 @@ export default async function DeviceDetailPage({
 								<ConfirmSubmit
 									message="Approve this tracker? It will start sending data."
 									confirmLabel="Approve"
+									cancelLabel={common("cancel")}
 								>
 									Approve
 								</ConfirmSubmit>
@@ -145,6 +147,7 @@ export default async function DeviceDetailPage({
 									variant="outline"
 									message="Reject this tracker? It will stop sending data until approved again."
 									confirmLabel="Reject"
+									cancelLabel={common("cancel")}
 								>
 									Reject
 								</ConfirmSubmit>
@@ -226,7 +229,7 @@ export default async function DeviceDetailPage({
 				<Card>
 					<CardHeader className="flex-row items-center justify-between">
 						<CardTitle>{t("tokenTitle")}</CardTitle>
-						<RotateTokenButton deviceId={device.id} locale={locale} />
+						<RotateTokenButton deviceId={device.id} label={device.label} locale={locale} />
 					</CardHeader>
 					<CardContent>
 						<p className="text-xs leading-relaxed text-fog-500">{t("tokenDescription")}</p>
@@ -251,9 +254,20 @@ export default async function DeviceDetailPage({
 										<input type="hidden" name="locale" value={locale} />
 										<input type="hidden" name="deviceId" value={device.id} />
 										<input type="hidden" name="kind" value={entry.kind} />
-										<Button type="submit" size="sm" variant="secondary">
-											{entry.label}
-										</Button>
+										{entry.confirmKey ? (
+											<ConfirmSubmit
+												variant="danger"
+												message={t(entry.confirmKey)}
+												confirmLabel={t("disarm")}
+												cancelLabel={common("cancel")}
+											>
+												{t("disarm")}
+											</ConfirmSubmit>
+										) : (
+											<Button type="submit" size="sm" variant="secondary">
+												{entry.label}
+											</Button>
+										)}
 									</form>
 								))}
 							</div>
@@ -361,6 +375,7 @@ export default async function DeviceDetailPage({
 							message={`Delete ${device.label} (${device.mac})? This removes its trips, samples and incidents and cannot be undone.`}
 							confirmText={device.mac}
 							confirmLabel="Delete tracker"
+							cancelLabel={common("cancel")}
 						>
 							Delete tracker
 						</ConfirmSubmit>

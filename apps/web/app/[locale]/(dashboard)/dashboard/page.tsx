@@ -17,6 +17,7 @@ import { loadDashboardData } from "@/lib/dashboard/data";
 import { type FleetMarkerState, fleetMarkerState } from "@/lib/dashboard/metrics";
 import { LOW_BATTERY_V } from "@/lib/device/query";
 import { deviceConnectionState, isGpsStale } from "@/lib/device/status";
+import { metadataForPage } from "@/lib/page-metadata";
 import { formatDateTime, formatRelative } from "@/lib/utils";
 import {
 	ArrowUpRight,
@@ -35,10 +36,20 @@ import {
 	WifiOff,
 	XCircle,
 } from "lucide-react";
+import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import type { ReactNode } from "react";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+	params,
+}: {
+	params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+	const { locale } = await params;
+	return metadataForPage(locale, "dashboard");
+}
 
 function incidentActivityIcon(action: string): LucideIcon {
 	switch (action) {
@@ -326,7 +337,7 @@ export default async function DashboardPage({
 				</div>
 			</Card>
 
-			<div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
+			<div className="mt-4 grid items-start gap-4 xl:grid-cols-[1.2fr_1fr]">
 				<Card className="flex flex-col">
 					<CardHeader className="flex-row items-start justify-between gap-3">
 						<div className="min-w-0">
