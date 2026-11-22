@@ -45,21 +45,28 @@ if (webPackage.version !== version) {
 	fail(`apps/web/package.json version ${webPackage.version} does not match root ${version}`);
 }
 
+// Firmware versions independently from the application/PWA. The two firmware
+// sources must agree with each other, not with package.json.
 const platformio = read("firmware/platformio.ini");
 const firmwareBuild = platformio.match(/-DFW_VERSION=\\?"([^"\\]+)\\?"/);
 if (!firmwareBuild) {
 	fail("firmware/platformio.ini does not define FW_VERSION");
-} else if (firmwareBuild[1] !== version) {
-	fail(`firmware/platformio.ini FW_VERSION ${firmwareBuild[1]} does not match root ${version}`);
+} else if (!SEMVER.test(firmwareBuild[1])) {
+	fail(`firmware/platformio.ini FW_VERSION is not valid SemVer: ${firmwareBuild[1]}`);
 }
 
 const mainIno = read("firmware/main/main.ino");
 const firmwareDefault = mainIno.match(/#define FW_VERSION "([^"]+)"/);
 if (!firmwareDefault) {
 	fail("firmware/main/main.ino does not define a default FW_VERSION");
-} else if (firmwareDefault[1] !== version) {
+} else if (!SEMVER.test(firmwareDefault[1])) {
+	fail(`firmware/main/main.ino FW_VERSION is not valid SemVer: ${firmwareDefault[1]}`);
+}
+
+const firmwareVersion = firmwareBuild?.[1] ?? firmwareDefault?.[1] ?? "unknown";
+if (firmwareBuild && firmwareDefault && firmwareBuild[1] !== firmwareDefault[1]) {
 	fail(
-		`firmware/main/main.ino default FW_VERSION ${firmwareDefault[1]} does not match root ${version}`,
+		`firmware versions disagree: platformio.ini ${firmwareBuild[1]} vs main.ino ${firmwareDefault[1]}`,
 	);
 }
 
@@ -99,8 +106,12 @@ if (requireRelease) {
 }
 
 if (tag) {
-	if (tag !== `v${version}`) fail(`tag ${tag} does not match v${version}`);
-	if (currentSection === null) fail(`CHANGELOG.md has no section for ${version}`);
+	const isFirmwareTag = tag.startsWith("fw-v");
+	const expectedTag = isFirmwareTag ? `fw-v${firmwareVersion}` : `v${version}`;
+	if (tag !== expectedTag) fail(`tag ${tag} does not match ${expectedTag}`);
+	if (!isFirmwareTag && currentSection === null) {
+		fail(`CHANGELOG.md has no section for ${version}`);
+	}
 	try {
 		const type = execFileSync("git", ["cat-file", "-t", tag], {
 			cwd: ROOT,
@@ -132,4 +143,6 @@ if (failures.length > 0) {
 const suffix = [tag ? `tag ${tag}` : "", requireRelease ? "release-ready" : ""]
 	.filter(Boolean)
 	.join(", ");
-console.log(`release-check: PASS (version ${version}${suffix ? `, ${suffix}` : ""})`);
+console.log(
+	`release-check: PASS (app ${version}, firmware ${firmwareVersion}${suffix ? `, ${suffix}` : ""})`,
+);

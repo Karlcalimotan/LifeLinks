@@ -50,12 +50,12 @@ reading is uncertain.
 ## Branch and promotion flow
 
 1. Feature branch -> pull request to `develop`.
-2. `develop` -> pull request to `stage` once the integration checks pass.
-3. `stage` -> versioned pull request to `main`; only the human owner merges
+2. `develop` -> pull request to `staging` once the integration checks pass.
+3. `staging` -> versioned pull request to `main`; only the human owner merges
    `main`.
 
-Never push directly to `develop`, `stage` or `main`. `stage` is the
-release-candidate gate and is not a Vercel deployment target.
+Never push directly to `develop`, `staging` or `main`. `develop` is the
+reconciliation gate and does not deploy; `staging` is the preview deployment.
 
 ## Commit style
 
