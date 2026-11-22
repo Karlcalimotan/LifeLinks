@@ -90,9 +90,36 @@ bypasses RLS. The optional `NEXT_PUBLIC_SUPABASE_*` variables exist only for a
 future Supabase client integration and can stay empty.
 
 The `20261118000100_enable_rls` migration enables row-level security on every
-application table. Prisma uses the `postgres` role, which bypasses RLS, so the
-app is unaffected. If you later use the Supabase client, add explicit policies
-for the tables it needs; otherwise the Data API returns no rows.
+application table. The `20261122000000_rls_org_policies` migration adds per-org
+policies and a non-owner verification role. Prisma uses the `postgres` role,
+which bypasses RLS, so the application is unaffected and the app's orgId guards
+remain the authoritative tenant boundary. RLS is defense-in-depth for non-owner
+roles such as PostgREST or a future application role.
+
+### Verify RLS
+
+The RLS test is skipped unless both variables are set. Use a disposable
+database, never production:
+
+```bash
+RLS_TEST_ALLOW=1 \
+RLS_TEST_DATABASE_URL="postgresql://user:pass@host:5432/lifelink?schema=public" \
+pnpm --filter web prisma:deploy
+
+RLS_TEST_ALLOW=1 \
+RLS_TEST_DATABASE_URL="postgresql://user:pass@host:5432/lifelink?schema=public" \
+pnpm --filter web test
+```
+
+The migration creates the `lifelink_rls_test` role as `NOLOGIN` and grants it
+membership to the migration user. The test connects as the owner, runs
+`SET LOCAL ROLE lifelink_rls_test`, and sets `app.current_org_id` only inside the
+transaction. With no setting, the policies return no rows. CI runs this against
+a disposable Postgres service.
+
+If the migration user lacks `CREATEROLE`, the role creation is skipped with a
+notice; the application policies still apply to other non-owner roles, but the
+local RLS test cannot run until a role is created by the owner.
 
 ## 4. Deploying
 
