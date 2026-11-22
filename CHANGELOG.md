@@ -6,6 +6,32 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-22
+
+### Added
+
+- Trackers page redesign: a registration drawer, fleet summary, pending-approval
+  callout, combined status column with exact-time hover, battery threshold bar,
+  neutral labels and monospaced MAC addresses.
+- Tracker search, filters, sortable columns and server-side pagination (20 per
+  page), including empty and clear-filter states.
+- Design-system contract and tokens: JetBrains Mono for machine data, a six-step
+  type scale, radius and shadow tokens, measured contrast, component states and
+  `scripts/design-lint.sh`.
+- Dashboard loading, error and type-scale states.
+- WiFi provisioning portal and runtime provisioning on the tracker firmware.
+
+### Fixed
+
+- Low-battery detection now uses the 12 V tracker threshold (11.5 V) instead of
+  the single-cell voltage value.
+- The Trackers table preserves the current filters when sorting or paging.
+
+### Changed
+
+- Tracker registration moved from a full-width page panel to a right-side drawer
+  on desktop and a full-width sheet on mobile.
+
 ## [0.2.0] - 2026-11-22
 
 ### Added
