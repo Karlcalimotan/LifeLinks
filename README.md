@@ -114,11 +114,14 @@ rewrites and what it deliberately leaves behind.
 
 ## Deployment
 
-The promotion path is `feature -> develop -> stage -> versioned main`.
-Production deploys only from `main`; `develop` is the integration deployment.
-`stage` is the release-candidate gate and is **not** a Vercel deployment target.
-Every other branch, including pull-request previews, is ineligible. The version
-contract and the release process are in
+The promotion path is `feature -> develop (gate) -> staging (preview) ->
+versioned main`. Production deploys only from `main`; `staging` is the preview
+deployment; `develop` is the integration and reconciliation gate and does not
+deploy. Every other branch, including pull-request previews, is ineligible.
+
+The firmware version is independent of the application and PWA version. Bump
+`FW_VERSION` only when the firmware changes; an application release does not
+force a firmware release. The version contract and the release process are in
 [`docs/deployment.md`](docs/deployment.md).
 
 ```bash

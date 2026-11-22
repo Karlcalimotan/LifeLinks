@@ -3,7 +3,7 @@ name: deployment-policy
 on:
   pull_request:
   push:
-    branches: [main, develop, stage]
+    branches: [main, develop, staging]
 
 permissions:
   contents: read

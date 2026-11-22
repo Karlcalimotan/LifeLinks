@@ -5,7 +5,7 @@
     node scripts/deployment-check.mjs
 
   What this proves:
-    - both vercel.json files allow only main and develop
+    - both vercel.json files allow only main and staging
     - the negative glob actually matches branches that contain a slash
     - the build command is the repository build
     - no repository workflow or script contains a CLI/API deploy pathway
@@ -29,7 +29,7 @@ const ROOT = path.resolve(import.meta.dirname, "..");
 const ALLOWED = new Map([
 	["**", false],
 	["main", true],
-	["develop", true],
+	["staging", true],
 ]);
 const failures = [];
 function fail(message) {
@@ -78,7 +78,7 @@ for (const file of ["vercel.json", "apps/web/vercel.json"]) {
 		continue;
 	}
 	if (!sameAllowlist(config?.git?.deploymentEnabled)) {
-		fail(`${file} must enable deployments only for main and develop`);
+		fail(`${file} must enable deployments only for main and staging`);
 	}
 	if (config.buildCommand !== "pnpm build") {
 		fail(`${file} buildCommand must be "pnpm build"`);
@@ -164,6 +164,6 @@ if (failures.length > 0) {
 
 console.log("deployment-check: PASS");
 console.log(
-	"  verified: **:false covers slash branches, main/develop allowlist, build command, no CLI/API deploy pathways",
+	"  verified: **:false covers slash branches, main/staging allowlist, build command, no CLI/API deploy pathways",
 );
 console.log("  manual: Vercel production branch, preview settings and dashboard deploy hooks");
