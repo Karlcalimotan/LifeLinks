@@ -65,7 +65,7 @@ export function CreateDeviceForm({
 					<Input
 						id="device-label"
 						name="label"
-						placeholder="Navara tracker"
+						placeholder="Hilux engine bay"
 						value={label}
 						onChange={(event) => setLabel(event.target.value)}
 						aria-invalid={errors.label ? true : undefined}
@@ -79,7 +79,7 @@ export function CreateDeviceForm({
 					<Input
 						id="device-mac"
 						name="mac"
-						placeholder="AA:BB:CC:DD:EE:01"
+						placeholder="24:0A:C4:9F:2A:71"
 						value={mac}
 						onChange={(event) => setMac(event.target.value)}
 						aria-invalid={errors.mac ? true : undefined}

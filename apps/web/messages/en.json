@@ -157,7 +157,22 @@
 		"pendingApproval": "Pending approval",
 		"approve": "Approve",
 		"reject": "Reject",
-		"tokenShown": "Copy this token now. It will not be shown again."
+		"tokenShown": "Copy this token now. It will not be shown again.",
+		"register": "Register tracker",
+		"registerTitle": "Register a tracker",
+		"registerBody": "Add a unit and optionally assign it to a vehicle.",
+		"close": "Close",
+		"status": "Status",
+		"unassigned": "Unassigned",
+		"open": "Open",
+		"summary": "{count, plural, one {# tracker} other {# trackers}}",
+		"summaryApproved": "{count} approved",
+		"summaryPending": "{count} pending",
+		"summaryOffline": "{count} offline",
+		"summaryUnknown": "{count} never seen",
+		"summaryLowBattery": "{count} low battery",
+		"pendingCallout": "{count, plural, one {# tracker is waiting for approval.} other {# trackers are waiting for approval.}}",
+		"reviewPending": "Review"
 	},
 	"settings": {
 		"title": "Settings",

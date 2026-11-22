@@ -157,7 +157,22 @@
 		"pendingApproval": "Pending approval",
 		"approve": "Approve",
 		"reject": "Reject",
-		"tokenShown": "Copy this token now. It will not be shown again."
+		"tokenShown": "Copy this token now. It will not be shown again.",
+		"register": "Magrehistro ng tracker",
+		"registerTitle": "Magrehistro ng tracker",
+		"registerBody": "Magdagdag ng unit at opsyonal na i-assign sa sasakyan.",
+		"close": "Isara",
+		"status": "Kalagayan",
+		"unassigned": "Walang sasakyan",
+		"open": "Buksan",
+		"summary": "{count, plural, one {# tracker} other {# tracker}}",
+		"summaryApproved": "{count} aprubado",
+		"summaryPending": "{count} naghihintay",
+		"summaryOffline": "{count} offline",
+		"summaryUnknown": "{count} hindi pa nakita",
+		"summaryLowBattery": "{count} mababa ang baterya",
+		"pendingCallout": "{count, plural, one {# tracker ang naghihintay ng aprubasyon.} other {# tracker ang naghihintay ng aprubasyon.}}",
+		"reviewPending": "Suriin"
 	},
 	"settings": {
 		"title": "Mga Setting",
