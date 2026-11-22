@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Per-organization RLS policies with a non-owner verification role and test.
+  CI runs the test against a disposable Postgres service.
+
+### Changed
+
+- Documented the application orgId filters and role checks as the authoritative
+  tenant boundary; RLS is defense-in-depth for non-owner roles.
+
 ## [0.2.0] - 2026-11-22
 
 ### Added
