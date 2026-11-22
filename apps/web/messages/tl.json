@@ -259,7 +259,12 @@
 		"speed": "Speed",
 		"battery": "Battery",
 		"ignition": "Ignition",
-		"viewMap": "Open map"
+		"viewMap": "Open map",
+		"errorTitle": "Hindi ma-load ang mga sasakyan",
+		"errorBody": "Hindi dumating ang data ng mga sasakyan. Subukan muli, at kung patuloy na nabigo, tingnan ang health endpoint.",
+		"errorRetry": "Subukan muli",
+		"errorBack": "Bumalik sa dashboard",
+		"errorBackList": "Bumalik sa mga sasakyan"
 	},
 	"incidents": {
 		"title": "Mga Insidente",
@@ -409,7 +414,12 @@
 		"bulkForbidden": "Hindi puwedeng mag-apruba ng tracker ang role mo.",
 		"bulkInvalid": "Pumili ng kahit isang pending na tracker.",
 		"bulkTooMany": "Pumili ng hanggang {max} tracker sa isang pagkakataon.",
-		"bulkFailed": "{failed, plural, one {# tracker ang hindi naaprubahan dahil sa database error.} other {# tracker ang hindi naaprubahan dahil sa database error.}}"
+		"bulkFailed": "{failed, plural, one {# tracker ang hindi naaprubahan dahil sa database error.} other {# tracker ang hindi naaprubahan dahil sa database error.}}",
+		"errorTitle": "Hindi ma-load ang mga tracker",
+		"errorBody": "Hindi dumating ang data ng mga tracker. Subukan muli, at kung patuloy na nabigo, tingnan ang health endpoint.",
+		"errorRetry": "Subukan muli",
+		"errorBack": "Bumalik sa dashboard",
+		"errorBackList": "Bumalik sa mga tracker"
 	},
 	"map": {
 		"title": "Live na mapa",
@@ -481,7 +491,7 @@
 	},
 	"settings": {
 		"title": "Mga Setting",
-		"subtitle": "Organisasyon, alert contacts at crash thresholds.",
+		"subtitle": "Organisasyon, thresholds, mga tao at kalagayan ng sistema.",
 		"organization": "Organisasyon",
 		"alertContacts": "Mga alert contact",
 		"thresholds": "Mga crash threshold",
@@ -553,7 +563,11 @@
 		"incidentRetention": "Incident retention (days)",
 		"parkedImpactAlerts": "Alert on impacts while parked",
 		"saveSettings": "Save settings",
-		"adminOnly": "Only admins can change these settings."
+		"adminOnly": "Only admins can change these settings.",
+		"errorTitle": "Hindi ma-load ang mga setting",
+		"errorBody": "Hindi dumating ang data ng settings. Subukan muli, at kung patuloy na nabigo, tingnan ang health endpoint.",
+		"errorRetry": "Subukan muli",
+		"errorBack": "Bumalik sa dashboard"
 	},
 	"errors": {
 		"notFound": "Page not found",

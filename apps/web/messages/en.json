@@ -259,7 +259,12 @@
 		"speed": "Speed",
 		"battery": "Battery",
 		"ignition": "Ignition",
-		"viewMap": "Open map"
+		"viewMap": "Open map",
+		"errorTitle": "Vehicles could not load",
+		"errorBody": "The vehicle data did not arrive. Try again, and if it keeps failing, check the health endpoint.",
+		"errorRetry": "Try again",
+		"errorBack": "Back to the dashboard",
+		"errorBackList": "Back to vehicles"
 	},
 	"incidents": {
 		"title": "Incidents",
@@ -409,7 +414,12 @@
 		"bulkForbidden": "Your role cannot approve trackers.",
 		"bulkInvalid": "Select at least one pending tracker.",
 		"bulkTooMany": "Select at most {max} trackers at once.",
-		"bulkFailed": "{failed, plural, one {# tracker could not be approved because of a database error.} other {# trackers could not be approved because of a database error.}}"
+		"bulkFailed": "{failed, plural, one {# tracker could not be approved because of a database error.} other {# trackers could not be approved because of a database error.}}",
+		"errorTitle": "Trackers could not load",
+		"errorBody": "The tracker data did not arrive. Try again, and if it keeps failing, check the health endpoint.",
+		"errorRetry": "Try again",
+		"errorBack": "Back to the dashboard",
+		"errorBackList": "Back to trackers"
 	},
 	"map": {
 		"title": "Live map",
@@ -481,7 +491,7 @@
 	},
 	"settings": {
 		"title": "Settings",
-		"subtitle": "Organization identity, alert contacts and crash thresholds.",
+		"subtitle": "Organization, thresholds, people and system status.",
 		"organization": "Organization",
 		"alertContacts": "Alert contacts",
 		"thresholds": "Crash thresholds",
@@ -553,7 +563,11 @@
 		"incidentRetention": "Incident retention (days)",
 		"parkedImpactAlerts": "Alert on impacts while parked",
 		"saveSettings": "Save settings",
-		"adminOnly": "Only admins can change these settings."
+		"adminOnly": "Only admins can change these settings.",
+		"errorTitle": "Settings could not load",
+		"errorBody": "The settings data did not arrive. Try again, and if it keeps failing, check the health endpoint.",
+		"errorRetry": "Try again",
+		"errorBack": "Back to the dashboard"
 	},
 	"errors": {
 		"notFound": "Page not found",

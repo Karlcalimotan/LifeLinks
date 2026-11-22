@@ -98,7 +98,7 @@ export default async function VehicleDetailPage({
 									<p className="text-sm text-fog-100">
 										{formatCoord(device.lastLat)}, {formatCoord(device.lastLng)}
 									</p>
-									<p className="mt-1 text-[11px] text-fog-500">
+									<p className="mt-1 text-meta text-fog-500">
 										GPS age {gpsAgeSeconds(device.lastFixAt) ?? "unknown"}s / {t("lastSeen")}{" "}
 										{formatRelative(device.lastSeenAt)}
 									</p>
@@ -113,23 +113,23 @@ export default async function VehicleDetailPage({
 
 						<div className="mt-5 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
 							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
-								<p className="text-[11px] font-medium text-fog-500">{t("speed")}</p>
+								<p className="text-meta font-medium text-fog-500">{t("speed")}</p>
 								<p className="mt-1 text-sm text-fog-100">
 									{device?.lastSpeedKph != null ? `${Math.round(device.lastSpeedKph)} kph` : "—"}
 								</p>
 							</div>
 							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
-								<p className="text-[11px] font-medium text-fog-500">{t("battery")}</p>
+								<p className="text-meta font-medium text-fog-500">{t("battery")}</p>
 								<p className="mt-1 text-sm text-fog-100">
 									{device?.batteryV != null ? `${device.batteryV.toFixed(1)} V` : "—"}
 								</p>
 							</div>
 							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
-								<p className="text-[11px] font-medium text-fog-500">Satellites</p>
+								<p className="text-meta font-medium text-fog-500">Satellites</p>
 								<p className="mt-1 text-sm text-fog-100">{device?.satellites ?? "—"}</p>
 							</div>
 							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
-								<p className="text-[11px] font-medium text-fog-500">{t("ignition")}</p>
+								<p className="text-meta font-medium text-fog-500">{t("ignition")}</p>
 								<p className="mt-1 text-sm text-fog-100">
 									{device?.ignition == null ? "—" : device.ignition ? "On" : "Off"}
 								</p>
