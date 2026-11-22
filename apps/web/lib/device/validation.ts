@@ -12,4 +12,14 @@ export const createDeviceSchema = z.object({
 	vehicleId: z.string().trim().optional(),
 });
 
+export const updateDeviceSchema = z.object({
+	deviceId: z.string().trim().min(1),
+	label: z.string().trim().min(2, "Enter a device label.").max(80),
+	vehicleId: z.string().trim().optional(),
+});
+
+export const deleteDeviceSchema = z.object({
+	deviceId: z.string().trim().min(1),
+});
+
 export const commandSchema = z.enum(["LOCATE", "ARM", "DISARM", "TEST_ALERT", "SET_CONFIG"]);
