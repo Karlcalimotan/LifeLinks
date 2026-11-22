@@ -107,7 +107,7 @@ describe("createDeviceAction", () => {
 		expect(state.ok).toBe(false);
 		expect(state.error).toBeUndefined();
 		expect(state.fieldErrors).toEqual({
-			mac: "Use a MAC address like AA:BB:CC:DD:EE:FF.",
+			mac: "Use a MAC address like 24:0A:C4:9F:2A:71.",
 		});
 		expect(state.values?.mac).toBe("not-a-mac");
 		expect(mocks.trackerDevice.findUnique).not.toHaveBeenCalled();
@@ -118,7 +118,7 @@ describe("createDeviceAction", () => {
 		const state = await createDeviceAction(initial, registration({ mac: "nope", label: "x" }));
 
 		expect(state.fieldErrors).toEqual({
-			mac: "Use a MAC address like AA:BB:CC:DD:EE:FF.",
+			mac: "Use a MAC address like 24:0A:C4:9F:2A:71.",
 			label: "Enter a device label.",
 		});
 		expect(state.values).toMatchObject({ mac: "nope", label: "x" });

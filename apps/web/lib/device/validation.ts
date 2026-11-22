@@ -4,7 +4,7 @@ import { z } from "zod";
 export const MAC_REGEX = /^([0-9A-F]{2}:){5}[0-9A-F]{2}$/;
 
 /**
- * Normalize a MAC address to AA:BB:CC:DD:EE:FF.
+ * Normalize a MAC address to six upper-case hex pairs, colon-separated.
  *
  * Colon, hyphen, dotted-group and bare 12-hex-digit input are accepted. Invalid
  * input is returned trimmed and upper-cased so the schema can report the format
@@ -23,7 +23,7 @@ export const macSchema = z
 	.string()
 	.trim()
 	.transform(normalizeMac)
-	.refine((value) => MAC_REGEX.test(value), "Use a MAC address like AA:BB:CC:DD:EE:FF.");
+	.refine((value) => MAC_REGEX.test(value), "Use a MAC address like 24:0A:C4:9F:2A:71.");
 
 export const createDeviceSchema = z.object({
 	mac: macSchema,

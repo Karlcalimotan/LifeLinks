@@ -44,7 +44,7 @@ describe("device validation", () => {
 		expect(result.success).toBe(false);
 		if (result.success) return;
 		expect(result.error.issues[0]?.path).toEqual(["mac"]);
-		expect(result.error.issues[0]?.message).toBe("Use a MAC address like AA:BB:CC:DD:EE:FF.");
+		expect(result.error.issues[0]?.message).toBe("Use a MAC address like 24:0A:C4:9F:2A:71.");
 	});
 
 	it("rejects a short label with a field-level message", () => {
