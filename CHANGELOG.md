@@ -40,6 +40,9 @@ All notable changes to this project are documented here. The format follows
   checks, conversation resolution, no force pushes and no branch deletion.
   `main` additionally requires one approval and linear history.
 - Immutable `v*` release tags via a repository ruleset.
+- `stage` promotion branch: feature PRs go to `develop`, `develop` promotes to
+  `stage`, and `stage` promotes a versioned release to `main`. `stage` is
+  protected but is not a Vercel deployment target.
 
 ### Changed
 
@@ -75,6 +78,8 @@ All notable changes to this project are documented here. The format follows
 - The native PlatformIO environment includes `firmware/include`, and cppcheck
   suppresses its known ArduinoJson preprocessor false positive.
 - `pnpm self-check` now includes the release and deployment policy checks.
+- Release promotion now runs `develop` -> `stage` -> versioned `main`; CI and
+  the deployment-policy workflow also run on `stage` pushes.
 
 ### Removed
 

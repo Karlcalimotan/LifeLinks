@@ -34,16 +34,23 @@ grade.
 - Crash logic must be pure functions (no hardware calls) so it can be unit
   tested.
 - Never flash hardware, never push to main, never change CI secrets.
+- `develop` and `stage` are PR-only protected branches. Do not push directly to
+  them.
 - Hardware bring-up and bench tests belong to the human hardware owner (Jeff).
   The agent may write and test code, but must not power, wire or flash the
   device.
 
 ## Workflow
 
-1. Work on a new branch, never on main.
+1. Work on a new feature branch; never work directly on `main`, `stage` or
+   `develop`.
 2. Small changes, one concern per PR.
-3. Run `bash scripts/verify.sh` before finishing.
-4. Commit often.
+3. Open feature PRs against `develop`.
+4. Promote `develop` to `stage` through a PR after the checks pass.
+5. Promote `stage` to `main` through a versioned release PR. Only the human
+   owner merges `main`.
+6. Run `bash scripts/verify.sh` before finishing.
+7. Commit often.
 
 ## Done means
 

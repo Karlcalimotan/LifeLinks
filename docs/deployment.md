@@ -20,7 +20,13 @@ Only two branches are eligible for automatic Vercel deployments:
 | --- | --- | --- |
 | `main` | Production | Allowed |
 | `develop` | Integration | Allowed |
+| `stage` | Release candidate / promotion gate | **Ineligible** |
 | Any other branch | Feature, fix, agent, experiment, Dependabot | **Ineligible** |
+
+`stage` is deliberately not in the allowlist. It is the promotion gate between
+`develop` and `main`, and the final deployment is from `main`. Adding `stage` to
+`vercel.json` would violate the current deployment policy and fail
+`deployment-check.mjs`.
 
 Pull-request previews are deployments. A preview from a non-allowlisted branch
 is prohibited. The allowlist is declared in both `vercel.json` files:
@@ -47,6 +53,20 @@ CI.
 `deployment-check.mjs` also fails if either file drifts from that allowlist, if
 the build command changes, or if a workflow/script adds a CLI or API deployment
 pathway.
+
+## Promotion flow
+
+```text
+feature/* --PR--> develop --PR--> stage --PR--> main --tag--> vX.Y.Z
+```
+
+- Feature branches open a PR to `develop`; integration checks run.
+- `develop` promotes to `stage` through a PR. `stage` is a release candidate and
+  is **not** deployed.
+- `stage` promotes a versioned release to `main` through a PR. `main` is the only
+  production deployment.
+- The integrator may merge `develop` and `stage` after the required checks pass.
+  Only the human owner merges `main`.
 
 ## Version sources of truth
 
@@ -83,13 +103,16 @@ with a new PATCH release.
 4. Move the `Unreleased` entries into a dated version section in
    `CHANGELOG.md`; add migration notes for breaking changes.
 5. Run `node scripts/release-check.mjs --require-release`.
-6. Open the release PR to `develop`; CI must be green.
-7. Promote to `main` through a pull request; the human owner merges.
-8. A human creates and pushes the annotated tag:
+6. Open the release-prep PR to `develop`; CI must be green.
+7. Promote `develop` to `stage` through a pull request; CI must be green.
+   `stage` is not a deployment.
+8. Open the `stage` -> `main` pull request. `main` requires one approval and
+   `release-check --require-release`; the human owner merges it.
+9. A human creates and pushes the annotated tag:
    `git tag -a vX.Y.Z -m "vX.Y.Z"` and `git push origin vX.Y.Z`.
-9. Confirm the Vercel production deployment came from the tagged `main`
-   commit.
-10. Run `node scripts/release-check.mjs --tag vX.Y.Z` against the tag before or
+10. Confirm the Vercel production deployment came from the tagged `main`
+    commit.
+11. Run `node scripts/release-check.mjs --tag vX.Y.Z` against the tag before or
     during release verification.
 
 Agents prepare the version, changelog and PR. Agents do not create or push
@@ -97,32 +120,36 @@ release tags, publish releases or promote to `main`.
 
 ## Branch protection
 
-The `main` and `develop` branches are protected by repository settings:
+The `main`, `stage` and `develop` branches are protected by repository settings:
 
-| Control | `main` | `develop` |
-| --- | --- | --- |
-| Pull request required | Yes | Yes |
-| Required approvals | 1 | 0 |
-| Dismiss stale approvals | Yes | Not applicable |
-| Require approval after last push | Yes | No |
-| Required checks | Web, Firmware | Web, Firmware |
-| Branch must be up to date | Yes | Yes |
-| Conversation resolution | Yes | Yes |
-| Linear history | Yes | No |
-| Force pushes | Denied | Denied |
-| Branch deletion | Denied | Denied |
-| Administrators enforced | Yes | Yes |
+| Control | `main` | `stage` | `develop` |
+| --- | --- | --- | --- |
+| Pull request required | Yes | Yes | Yes |
+| Required approvals | 1 | 0 | 0 |
+| Dismiss stale approvals | Yes | Not applicable | Not applicable |
+| Require approval after last push | Yes | No | No |
+| Required checks | Web, Firmware, Deployment policy after promotion | Web, Firmware, Deployment policy | Web, Firmware, Deployment policy |
+| Branch must be up to date | Yes | Yes | Yes |
+| Conversation resolution | Yes | Yes | Yes |
+| Linear history | Yes | No | No |
+| Force pushes | Denied | Denied | Denied |
+| Branch deletion | Denied | Denied | Denied |
+| Administrators enforced | Yes | Yes | Yes |
 
-The `Deployment policy` check must be added to the required-check list on each
-branch after this workflow has been promoted to that branch. A required check
-that does not exist on the base branch blocks every pull request, so it is added
-only after the workflow is present.
+`stage` requires zero approvals so the integrator can promote `develop` without
+a second reviewer. The human review gate is `main`, which requires one approval.
+
+The `Deployment policy` check is present on `develop` and `stage`. Add it to
+`main`'s required checks after the workflow has been promoted to `main`. A
+required check that does not exist on the base branch blocks every pull request,
+so it is added only after the workflow is present.
 
 ## Vercel controls
 
 Verified statically by `deployment-check.mjs`:
 
 - the `main`/`develop` allowlist in both `vercel.json` files;
+- `stage` is not an allowlisted deployment branch;
 - the allowlist uses `"**": false`, and the negative pattern actually matches
   branches containing a slash;
 - the `pnpm build` build command;
@@ -159,8 +186,8 @@ needed for another reason; `pnpm build` is the normal local check.
 2. Keep the change minimal and add the tests that prove it.
 3. Bump PATCH and add a dated changelog section.
 4. Open a PR to `main`; required checks and one approval apply.
-5. After merge and the production check, backport the fix to `develop` so the
-   next release does not regress it.
+5. After merge and the production check, backport the fix to `stage` and
+   `develop` so the next release does not regress it.
 6. Never bypass branch protection, force-push or delete a release tag.
 
 ## First-instantiation checklist
@@ -174,10 +201,13 @@ needed for another reason; `pnpm build` is the normal local check.
 - [ ] Duplicate deployment pathways checked in the dashboard; deploy hooks
       removed.
 - [x] Repository workflows and scripts checked by `deployment-check.mjs`.
-- [x] Branch protection enabled on `main` and `develop`.
+- [x] Branch protection enabled on `main`, `stage` and `develop`.
+- [x] `stage` created from `develop`, protected, and excluded from the Vercel
+      allowlist.
 - [x] `refs/tags/v*` protected against update and deletion.
 - [x] Version sources of truth declared and checked.
-- [ ] `Deployment policy` added to required checks after promotion.
-- [ ] A release PR to `main` passes `release-check.mjs --require-release`.
+- [ ] `Deployment policy` added to `main`'s required checks after promotion.
+- [ ] A `stage` -> `main` release PR passes `release-check.mjs
+      --require-release`.
 
 Unchecked items require the human owner and the Vercel dashboard.
