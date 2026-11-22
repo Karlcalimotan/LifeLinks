@@ -49,6 +49,8 @@ All notable changes to this project are documented here. The format follows
   events and 13 incidents across every workflow status.
 - Route-level loading skeletons and error boundaries for vehicles, incidents,
   trackers and settings.
+- Mobile card lists for incidents and trackers, so Acknowledge and Approve stay
+  visible at 390 px without a horizontal table swipe.
 
 ### Changed
 
@@ -62,6 +64,13 @@ All notable changes to this project are documented here. The format follows
   longer collide with the heartbeat connection state "Weak signal".
 - The header search trigger shows the word Search; the Ctrl/Cmd+K hint moves to
   the palette and the button's `aria-keyshortcuts`.
+- Incident detail now shows the driver call link, a map link and the
+  acknowledgement/resolution audit events in the timeline.
+- Disarm, Rotate token, Mark false alarm and Cancel incident ask for
+  confirmation. The console has a skip link, `aria-current` navigation and
+  per-route page titles.
+- Notifications leads with a "Sender not connected" banner; the dashboard hint
+  says alert rows are queued, not delivered.
 
 ### Fixed
 
@@ -81,6 +90,25 @@ All notable changes to this project are documented here. The format follows
 - Destructive buttons use dark ink text on the lighter alarm fill, raising the
   contrast from 4.12:1 to 6.89:1.
 - The command-palette trigger's accessible name matches its visible label.
+- The one-time tracker token, rejection and incident banners use defined
+  palette tokens; the design linter rejects the old non-existent classes.
+- Inputs keep the global 2 px focus ring, and KPI hints wrap instead of
+  truncating.
+
+### Security
+
+- The device cancel endpoint enforces the server-side countdown and audits late
+  attempts; command, acknowledgement, cancel and search have rate limits and
+  the in-process bucket map is pruned and capped.
+- Demo account credentials are no longer in the message bundle or the client
+  payload. The login hint is server-gated to development/test, and a non-local
+  seed requires both `SEED_DEMO=yes` and `SEED_ALLOW_REMOTE=yes`.
+- Production sessions fail closed without a 32-byte `AUTH_SECRET`; HTTPS
+  deployments set the Secure cookie. `/api/health` no longer discloses
+  configuration presence, and device evidence/meta JSON is capped at 32 keys
+  and 8 KiB.
+- The privacy notice now states that retention is configurable but automatic
+  deletion is not yet enabled, instead of promising a job that does not exist.
 
 
 ## [0.2.0] - 2026-11-22
