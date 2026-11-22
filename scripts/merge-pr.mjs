@@ -9,7 +9,9 @@
  *   node scripts/merge-pr.mjs --all [--dry-run]
  */
 import { spawnSync } from "node:child_process";
+import path from "node:path";
 
+const ROOT = path.resolve(import.meta.dirname, "..");
 const ALLOWED_BASES = new Set(["develop", "stage"]);
 const BLOCKING_LABELS = new Set(["do-not-merge", "wip", "blocked"]);
 const PR_FIELDS = [
@@ -35,6 +37,7 @@ Only develop and stage are mergeable. main is never allowed.`;
 
 function gh(args) {
 	const result = spawnSync("gh", args, {
+		cwd: ROOT,
 		encoding: "utf8",
 		windowsHide: true,
 		maxBuffer: 16 * 1024 * 1024,

@@ -30,7 +30,11 @@ const baseEnv = {
 
 const steps = [
 	{ label: "Stack contract", command: process.execPath, args: ["stack/src/verify.mjs", "--self"] },
-	{ label: "Issue policy tests", command: process.execPath, args: ["--test", "scripts/issue-policy.test.mjs"] },
+	{
+		label: "Issue policy tests",
+		command: process.execPath,
+		args: ["--test", "scripts/issue-policy.test.mjs"],
+	},
 	{ label: "Release contract", command: process.execPath, args: ["scripts/release-check.mjs"] },
 	{ label: "Deployment policy", command: process.execPath, args: ["scripts/deployment-check.mjs"] },
 	{ label: "Biome", command: "pnpm", args: ["lint"] },

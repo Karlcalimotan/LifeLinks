@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Issue-first collaboration: issue and pull-request templates, an `Issue policy`
+  CI check, and `scripts/issue-policy.mjs`.
+- Mandatory overlap check against J-Akiru5's open issues and PRs before creating
+  a new task.
+- Multi-agent definitions for `integrator`, `release-manager` and `reviewer`,
+  plus `scripts/merge-pr.mjs` and `docs/agents.md`.
+
+### Changed
+
+- `develop` and `stage` merges are handled by the `integrator` subagent through
+  `scripts/merge-pr.mjs`, which refuses `main` and unfinished checks; `main`
+  remains human-merged.
+- `pnpm self-check` now includes the issue-policy tests.
+
 ## [0.2.0] - 2026-11-22
 
 ### Added
@@ -45,12 +61,6 @@ All notable changes to this project are documented here. The format follows
 - `stage` promotion branch: feature PRs go to `develop`, `develop` promotes to
   `stage`, and `stage` promotes a versioned release to `main`. `stage` is
   protected but is not a Vercel deployment target.
-- Issue-first collaboration: issue and pull-request templates, an `Issue policy`
-  CI check, and `scripts/issue-policy.mjs`.
-- Mandatory overlap check against J-Akiru5's open issues and PRs before creating
-  a new task.
-- Multi-agent definitions for `integrator`, `release-manager` and `reviewer`,
-  plus `scripts/merge-pr.mjs` and `docs/agents.md`.
 
 ### Changed
 
@@ -88,10 +98,6 @@ All notable changes to this project are documented here. The format follows
 - `pnpm self-check` now includes the release and deployment policy checks.
 - Release promotion now runs `develop` -> `stage` -> versioned `main`; CI and
   the deployment-policy workflow also run on `stage` pushes.
-- `develop` and `stage` merges are handled by the `integrator` subagent through
-  `scripts/merge-pr.mjs`, which refuses `main` and unfinished checks; `main`
-  remains human-merged.
-- `pnpm self-check` now includes the issue-policy tests.
 
 ### Removed
 
