@@ -1,0 +1,73 @@
+# Delegation plan — false alarm, push, tenancy, firmware
+
+Date: 2026-11-22. Status: **assigned, not started.**
+Decisions locked by Jeff: post-dispatch false alarm is the priority; Web Push; LifeLinks
+firmware; all nine config fields; WiFi for commissioning then OTA; platform superadmin in scope;
+5.0 g ceiling; rollover hold per profile; seed org defaults before first sync.
+
+## Ownership
+
+| Owner | Layer | Repos | Not their job |
+| --- | --- | --- | --- |
+| **Karl** | Application layer: frontend + backend (`apps/web`) | LifeLinks | Firmware, wiring, flashing |
+| **Jeff** | Physical layer + firmware; backend support where it meets the device | LifeLinks `firmware/`, accident detection | Rewriting the dashboard |
+
+## Task matrix
+
+| ID | Task | Owner | Branch | Depends on | Definition of done |
+| --- | --- | --- | --- | --- | --- |
+| **K1** | Post-dispatch false alarm: `CANCEL_ALERT` command, incident state, all-clear | Karl (app) + Jeff (device contract) | `feat/false-alarm` | contract below | Web action creates the command; device ACKs; incident goes `FALSE_ALARM` only on ACK; all-clear sent |
+| **K2** | Web Push: VAPID, subscriptions, service worker, cancel deep link | Karl | `feat/web-push` | K1 payload | Notification opens the incident; Cancel works from the notification |
+| **K3** | Tenancy: invites, soft revoke, permissions, org status, platform admin, RLS | Karl | `feat/tenancy` | — | Invite accept, revoke, suspend, superadmin audit, non-owner RLS test |
+| **J1** | Phase 1 modular split + config seam (no behaviour change) | Jeff | `feat/phase1-modular` | baseline tag | Build clean; constants pinned by native tests; transcript unchanged |
+| **J2** | Firmware `CANCEL_ALERT` handler: stop retries, ACK, all-clear SMS | Jeff | `feat/fw-false-alarm` | K1 contract | Cancel within one poll; second recipient suppressed; ACK carries state |
+| **J3** | WiFi portal on LifeLinks firmware + GPIO 33 reset | Jeff | `feat/wifi-portal` | rewiring | Portal provisions, joins, heartbeats; 5 s/10 s reset works |
+| **J4** | Merge Phase 1 into LifeLinks firmware behind `BoardProfile` | Jeff | `feat/phase1-merge` | J1, J2 | Both profiles build; native tests; bench replay |
+
+### Parallel-safe now
+K3 (tenancy) is independent of everything. J1 is independent of the app layer.
+K1 and J2 must agree on the contract before either ships — freeze §Contract first.
+
+## Contract — `CANCEL_ALERT`
+
+```json
+{
+  "kind": "CANCEL_ALERT",
+  "payload": {
+    "incident_id": "<ImpactEvent.id>",
+    "reason": "false_alarm",
+    "all_clear": true
+  }
+}
+```
+
+Rules:
+- Device accepts only while `Countdown` **or** while retrying a dispatched incident.
+- Device stops the SMS retry ladder before the next recipient, calls `markAcknowledged()`,
+  optionally sends one all-clear SMS to the cached numbers, then ACKs.
+- ACK payload: `{ "result": "cancelled" | "too_late" | "unknown_incident" }`.
+- The web sets `FALSE_ALARM` **only** on `result=cancelled`; otherwise it shows
+  "device offline / not cancelled" rather than lying.
+- `cancelRequestedAt` on `ImpactEvent` so the UI can show "waiting for device".
+- The platform does not send SMS itself. The device owns the modem and the numbers.
+
+Rationale: this keeps the network out of the emergency path and avoids adding an SMS provider
+to the web app.
+
+## Handoff notes
+
+- **Karl**: do not change the Prisma enum without a migration; `CommandKind` is a Postgres enum.
+- **Karl**: `cancelIncidentAction` today sets `CANCELLED` optimistically — for post-dispatch use a
+  new action, do not repurpose it silently.
+- **Jeff**: the bench wiring is Phase 1 (buzzer 25, LED 26, SW 27). LifeLinks firmware needs
+  SW 32, buzzer 25 via NPN, GPS 26/27, modem 16/17 + PWRKEY 4. Rewiring is a separate step (J3).
+- **Jeff**: Phase 1 repo has no remote; the baseline bundle is at
+  `S:\Dev\_agentops-backups\accident-detection-phase1-2026-11-22.bundle`.
+
+## Order of work
+
+1. Freeze the contract (this doc).
+2. K3 and J1 in parallel — neither blocks the other.
+3. K1 server side → J2 firmware → K1 UI wired to real ACKs.
+4. K2 push on top of K1.
+5. J3 after rewiring; J4 last.
