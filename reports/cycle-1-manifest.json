@@ -1,0 +1,149 @@
+{
+  "generatedAt": "2026-11-22T17:16:33.680Z",
+  "baseURL": "http://localhost:3000",
+  "locale": "en",
+  "cycle": "cycle-1",
+  "screens": [
+    {
+      "page": "login",
+      "viewport": "desktop",
+      "url": "http://localhost:3000/en/login",
+      "title": "LifeLink — Crash detection and emergency response for every vehicle.",
+      "file": "reports/screens/cycle-1/desktop/login.png"
+    },
+    {
+      "page": "dashboard",
+      "viewport": "desktop",
+      "url": "http://localhost:3000/en/dashboard",
+      "title": "LifeLink — Crash detection and emergency response for every vehicle.",
+      "file": "reports/screens/cycle-1/desktop/dashboard.png"
+    },
+    {
+      "page": "vehicles",
+      "viewport": "desktop",
+      "url": "http://localhost:3000/en/vehicles",
+      "title": "LifeLink — Crash detection and emergency response for every vehicle.",
+      "file": "reports/screens/cycle-1/desktop/vehicles.png"
+    },
+    {
+      "page": "incidents",
+      "viewport": "desktop",
+      "url": "http://localhost:3000/en/incidents",
+      "title": "LifeLink — Crash detection and emergency response for every vehicle.",
+      "file": "reports/screens/cycle-1/desktop/incidents.png"
+    },
+    {
+      "page": "devices",
+      "viewport": "desktop",
+      "url": "http://localhost:3000/en/devices",
+      "title": "LifeLink — Crash detection and emergency response for every vehicle.",
+      "file": "reports/screens/cycle-1/desktop/devices.png"
+    },
+    {
+      "page": "devices-drawer",
+      "viewport": "desktop",
+      "url": "http://localhost:3000/en/devices",
+      "title": "LifeLink — Crash detection and emergency response for every vehicle.",
+      "file": "reports/screens/cycle-1/desktop/devices-drawer.png"
+    },
+    {
+      "page": "analytics",
+      "viewport": "desktop",
+      "url": "http://localhost:3000/en/analytics",
+      "title": "LifeLink — Crash detection and emergency response for every vehicle.",
+      "file": "reports/screens/cycle-1/desktop/analytics.png"
+    },
+    {
+      "page": "map",
+      "viewport": "desktop",
+      "url": "http://localhost:3000/en/map",
+      "title": "LifeLink — Crash detection and emergency response for every vehicle.",
+      "file": "reports/screens/cycle-1/desktop/map.png"
+    },
+    {
+      "page": "notifications",
+      "viewport": "desktop",
+      "url": "http://localhost:3000/en/notifications",
+      "title": "LifeLink — Crash detection and emergency response for every vehicle.",
+      "file": "reports/screens/cycle-1/desktop/notifications.png"
+    },
+    {
+      "page": "settings",
+      "viewport": "desktop",
+      "url": "http://localhost:3000/en/settings",
+      "title": "LifeLink — Crash detection and emergency response for every vehicle.",
+      "file": "reports/screens/cycle-1/desktop/settings.png"
+    },
+    {
+      "page": "login",
+      "viewport": "mobile",
+      "url": "http://localhost:3000/en/login",
+      "title": "LifeLink — Crash detection and emergency response for every vehicle.",
+      "file": "reports/screens/cycle-1/mobile/login.png"
+    },
+    {
+      "page": "dashboard",
+      "viewport": "mobile",
+      "url": "http://localhost:3000/en/dashboard",
+      "title": "LifeLink — Crash detection and emergency response for every vehicle.",
+      "file": "reports/screens/cycle-1/mobile/dashboard.png"
+    },
+    {
+      "page": "vehicles",
+      "viewport": "mobile",
+      "url": "http://localhost:3000/en/vehicles",
+      "title": "LifeLink — Crash detection and emergency response for every vehicle.",
+      "file": "reports/screens/cycle-1/mobile/vehicles.png"
+    },
+    {
+      "page": "incidents",
+      "viewport": "mobile",
+      "url": "http://localhost:3000/en/incidents",
+      "title": "LifeLink — Crash detection and emergency response for every vehicle.",
+      "file": "reports/screens/cycle-1/mobile/incidents.png"
+    },
+    {
+      "page": "devices",
+      "viewport": "mobile",
+      "url": "http://localhost:3000/en/devices",
+      "title": "LifeLink — Crash detection and emergency response for every vehicle.",
+      "file": "reports/screens/cycle-1/mobile/devices.png"
+    },
+    {
+      "page": "devices-drawer",
+      "viewport": "mobile",
+      "url": "http://localhost:3000/en/devices",
+      "title": "LifeLink — Crash detection and emergency response for every vehicle.",
+      "file": "reports/screens/cycle-1/mobile/devices-drawer.png"
+    },
+    {
+      "page": "analytics",
+      "viewport": "mobile",
+      "url": "http://localhost:3000/en/analytics",
+      "title": "LifeLink — Crash detection and emergency response for every vehicle.",
+      "file": "reports/screens/cycle-1/mobile/analytics.png"
+    },
+    {
+      "page": "map",
+      "viewport": "mobile",
+      "url": "http://localhost:3000/en/map",
+      "title": "LifeLink — Crash detection and emergency response for every vehicle.",
+      "file": "reports/screens/cycle-1/mobile/map.png"
+    },
+    {
+      "page": "notifications",
+      "viewport": "mobile",
+      "url": "http://localhost:3000/en/notifications",
+      "title": "LifeLink — Crash detection and emergency response for every vehicle.",
+      "file": "reports/screens/cycle-1/mobile/notifications.png"
+    },
+    {
+      "page": "settings",
+      "viewport": "mobile",
+      "url": "http://localhost:3000/en/settings",
+      "title": "LifeLink — Crash detection and emergency response for every vehicle.",
+      "file": "reports/screens/cycle-1/mobile/settings.png"
+    }
+  ],
+  "consoleErrors": []
+}
