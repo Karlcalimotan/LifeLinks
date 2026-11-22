@@ -114,6 +114,10 @@ with a new PATCH release.
     commit.
 11. Run `node scripts/release-check.mjs --tag vX.Y.Z` against the tag before or
     during release verification.
+12. Back-merge after release: merge `main` back into `develop` and `stage`
+    through a pull request. This keeps the histories aligned so the next
+    promotion is not reported as `BEHIND`. `main` is never force-pushed or
+    rewritten.
 
 Agents prepare the version, changelog and PR. Agents do not create or push
 release tags, publish releases or promote to `main`.
