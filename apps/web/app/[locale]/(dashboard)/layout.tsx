@@ -17,8 +17,11 @@ export default async function DashboardLayout({
 
 	const labels = {
 		dashboard: t("dashboard"),
+		map: t("map"),
 		vehicles: t("vehicles"),
 		incidents: t("incidents"),
+		analytics: t("analytics"),
+		notifications: t("notifications"),
 		devices: t("devices"),
 		settings: t("settings"),
 	};

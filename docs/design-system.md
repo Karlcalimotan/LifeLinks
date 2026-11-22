@@ -184,6 +184,10 @@ error. Destructive actions require confirmation and an audit entry.
 | | weak | caution | Weak signal |
 | | offline | alarm | Offline |
 | | never seen | muted | Never seen |
+| Tracker signal (RSSI) | strong (above −70 dBm) | clear | Strong |
+| | good (−79 to −70 dBm) | clear | Good |
+| | fair (−89 to −80 dBm) | caution | Fair |
+| | poor (−90 dBm and below) | alarm | Poor |
 | Approval | approved | clear | Approved |
 | | pending | caution | Pending |
 | | rejected | alarm | Rejected |
@@ -201,6 +205,11 @@ error. Destructive actions require confirmation and an audit entry.
 | Vehicle | active | clear | Active |
 | | maintenance | caution | Maintenance |
 | | retired | muted | Retired |
+
+The signal column is RSSI, independent of the heartbeat connection state. An
+offline or never-seen tracker shows “No signal” instead of a stale reading. The
+RSSI band never uses the connection label “Weak signal”; that label belongs to
+the 2–5 minute heartbeat window only.
 
 ## Layout and responsive
 
@@ -249,13 +258,15 @@ error. Destructive actions require confirmation and an audit entry.
 
 Implemented today: colour tokens, Barlow/Barlow Condensed, button, input,
 select, textarea, label, badge, card, table, stat card, page header, empty
-state, status badges, Sonner toast, logo.
+state, status badges, Sonner toast, logo, drawer, modal, skeleton, copy
+control, pagination, command palette, incident bell, schematic map, charts and
+the analytics, notifications, live map and vehicle-tab surfaces.
 
 Added in Cycle 0: JetBrains Mono, `fog-400`, a six-step type scale, radius and
 shadow tokens, opaque sticky surfaces, and tokenised chart/logo/toast colours.
 
-Missing and required by this contract: drawer, modal, skeleton, tooltip, focus
-trap, copy-to-clipboard control and pagination.
+Still missing from the component contract: a shared tooltip and a reusable
+focus-trap primitive (the palette and bell implement their own).
 
 Known debt to fix as each page is touched:
 

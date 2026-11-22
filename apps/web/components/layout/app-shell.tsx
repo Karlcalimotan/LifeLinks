@@ -2,8 +2,11 @@ import { LogoMark } from "@/components/brand/logo";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { LogoutButton } from "@/components/layout/logout-button";
 import { MobileNav, Sidebar } from "@/components/layout/sidebar";
+import { CommandPalette } from "@/components/search/command-palette";
+import { IncidentBell } from "@/components/search/incident-bell";
 import { Badge } from "@/components/ui/badge";
 import type { MemberRoleName } from "@/lib/auth/roles";
+import { loadAwaitingIncidents } from "@/lib/search/notifications";
 
 function roleTone(role: MemberRoleName) {
 	switch (role) {
@@ -16,7 +19,7 @@ function roleTone(role: MemberRoleName) {
 	}
 }
 
-export function AppShell({
+export async function AppShell({
 	locale,
 	user,
 	org,
@@ -27,14 +30,28 @@ export function AppShell({
 	children,
 }: {
 	locale: string;
-	user: { name: string; email: string };
-	org: { name: string; slug: string };
+	user: { id: string; name: string; email: string };
+	org: { id: string; name: string; slug: string };
 	role: MemberRoleName;
 	roleLabel: string;
 	navLabels: Record<string, string>;
 	signOutLabel: string;
 	children: React.ReactNode;
 }) {
+	const awaiting: Awaited<ReturnType<typeof loadAwaitingIncidents>> = { count: 0, items: [] };
+	try {
+		Object.assign(
+			awaiting,
+			await loadAwaitingIncidents({
+				role,
+				orgId: org.id,
+				userId: user.id,
+			}),
+		);
+	} catch {
+		// The bell is secondary: a failed count must not take down every page.
+	}
+
 	const initials = user.name
 		.split(/\s+/)
 		.filter((part) => /^[A-Za-z]/.test(part))
@@ -63,6 +80,8 @@ export function AppShell({
 							</div>
 						</div>
 						<div className="flex shrink-0 items-center gap-2">
+							<CommandPalette role={role} />
+							<IncidentBell locale={locale} initial={awaiting} />
 							<span className="hidden sm:inline-flex">{roleBadge}</span>
 							<div className="hidden items-center gap-2 sm:flex">
 								<LocaleSwitcher />
