@@ -11,6 +11,7 @@
 | [api-regulation.md](api-regulation.md) | Envelope, latency budget, Singapore region, test recipe |
 | [local-database.md](local-database.md) | Supabase setup, pooled/direct URLs, migrations and seed |
 | [deployment.md](deployment.md) | Allowlist, branch protection, version contract and release process |
+| [agents.md](agents.md) | Multi-agent roles, worktrees, issue-first and merge policy |
 | [runbook.md](runbook.md) | Build, flash, provisioning, health checks, troubleshooting |
 | [current-state.md](current-state.md) | Setup baseline and gaps before the work phases |
 | [adr/](adr/) | Architecture decisions and the template |

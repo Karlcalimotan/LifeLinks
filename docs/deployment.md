@@ -128,7 +128,7 @@ The `main`, `stage` and `develop` branches are protected by repository settings:
 | Required approvals | 1 | 0 | 0 |
 | Dismiss stale approvals | Yes | Not applicable | Not applicable |
 | Require approval after last push | Yes | No | No |
-| Required checks | Web, Firmware, Deployment policy after promotion | Web, Firmware, Deployment policy | Web, Firmware, Deployment policy |
+| Required checks | Web, Firmware, Deployment policy and Issue policy after promotion | Web, Firmware, Deployment policy, Issue policy | Web, Firmware, Deployment policy, Issue policy |
 | Branch must be up to date | Yes | Yes | Yes |
 | Conversation resolution | Yes | Yes | Yes |
 | Linear history | Yes | No | No |
@@ -139,10 +139,24 @@ The `main`, `stage` and `develop` branches are protected by repository settings:
 `stage` requires zero approvals so the integrator can promote `develop` without
 a second reviewer. The human review gate is `main`, which requires one approval.
 
-The `Deployment policy` check is present on `develop` and `stage`. Add it to
-`main`'s required checks after the workflow has been promoted to `main`. A
-required check that does not exist on the base branch blocks every pull request,
-so it is added only after the workflow is present.
+The `Deployment policy` and `Issue policy` checks are added to `develop` and
+`stage` after their workflows are present. Add both to `main`'s required checks
+after promotion. A required check that does not exist on the base branch blocks
+every pull request, so it is added only after the workflow is present.
+
+## Agent integration
+
+- Every pull request must link an issue. `Issue policy` enforces it; bot PRs and
+  PRs labelled `release` or `promotion` are exempt.
+- `integrator` is a subagent that merges only `develop` and `stage` PRs after all
+  required checks pass. It runs `node scripts/merge-pr.mjs`, which refuses
+  `main`, drafts, conflicts, behind branches, blocked labels and missing/failing
+  required checks.
+- `release-manager` prepares version bumps and changelog sections. It never
+  pushes, tags, merges or deploys.
+- `reviewer` is read-only and reports findings; it cannot edit or merge.
+- `main` is always merged by the human owner.
+- The full protocol is in [`agents.md`](agents.md).
 
 ## Vercel controls
 
@@ -206,7 +220,11 @@ needed for another reason; `pnpm build` is the normal local check.
       allowlist.
 - [x] `refs/tags/v*` protected against update and deletion.
 - [x] Version sources of truth declared and checked.
-- [ ] `Deployment policy` added to `main`'s required checks after promotion.
+- [x] Issue templates, pull-request template and `Issue policy` workflow added.
+- [x] `integrator`, `release-manager` and `reviewer` subagents defined.
+- [ ] `Deployment policy` and `Issue policy` added to `develop`/`stage`
+      required checks after this PR merges.
+- [ ] Both checks added to `main`'s required checks after promotion.
 - [ ] A `stage` -> `main` release PR passes `release-check.mjs
       --require-release`.
 
