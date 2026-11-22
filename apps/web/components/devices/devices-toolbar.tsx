@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Input, Select } from "@/components/ui/field";
+import { Field, Input, Label, Select } from "@/components/ui/field";
 import { Link } from "@/i18n/routing";
 import { type DevicesQuery, hasActiveFilters } from "@/lib/device/query";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -44,7 +44,7 @@ export function DevicesToolbar({ query, total }: { query: DevicesQuery; total: n
 	return (
 		<div className="mb-4 flex flex-col gap-2">
 			<form
-				className="flex flex-wrap items-center gap-2"
+				className="flex flex-wrap items-end gap-2"
 				onSubmit={(event) => {
 					event.preventDefault();
 					const next = new URLSearchParams(searchParams.toString());
@@ -54,65 +54,74 @@ export function DevicesToolbar({ query, total }: { query: DevicesQuery; total: n
 					push(next);
 				}}
 			>
-				<Input
-					id="devices-search"
-					value={q}
-					onChange={(event) => setQ(event.target.value)}
-					placeholder="Search label, MAC or plate"
-					aria-label="Search trackers"
-					className="w-full sm:w-64"
-				/>
-				<Select
-					aria-label="Filter by approval"
-					value={query.approval ?? ""}
-					onChange={(event) => setParam("approval", event.target.value)}
-					className="w-full sm:w-40"
-				>
-					<option value="">All approvals</option>
-					<option value="PENDING">Pending</option>
-					<option value="APPROVED">Approved</option>
-					<option value="REJECTED">Rejected</option>
-				</Select>
-				<Select
-					aria-label="Filter by connection"
-					value={query.connection ?? ""}
-					onChange={(event) => setParam("connection", event.target.value)}
-					className="w-full sm:w-40"
-				>
-					<option value="">All connections</option>
-					<option value="online">Online</option>
-					<option value="weak">Weak signal</option>
-					<option value="offline">Offline</option>
-					<option value="never">Never seen</option>
-				</Select>
-				<Select
-					aria-label="Filter by vehicle assignment"
-					value={query.assigned ?? ""}
-					onChange={(event) => setParam("assigned", event.target.value)}
-					className="w-full sm:w-40"
-				>
-					<option value="">Assigned or not</option>
-					<option value="yes">Assigned</option>
-					<option value="no">Unassigned</option>
-				</Select>
-				<Select
-					aria-label="Filter by battery"
-					value={query.battery ?? ""}
-					onChange={(event) => setParam("battery", event.target.value)}
-					className="w-full sm:w-36"
-				>
-					<option value="">Any battery</option>
-					<option value="low">Low battery</option>
-				</Select>
+				<Field className="w-full sm:w-64">
+					<Label htmlFor="devices-search">Search</Label>
+					<Input
+						id="devices-search"
+						value={q}
+						onChange={(event) => setQ(event.target.value)}
+						placeholder="Label, MAC or plate"
+					/>
+				</Field>
+				<Field className="w-full sm:w-40">
+					<Label htmlFor="filter-approval">Approval</Label>
+					<Select
+						id="filter-approval"
+						value={query.approval ?? ""}
+						onChange={(event) => setParam("approval", event.target.value)}
+					>
+						<option value="">All</option>
+						<option value="PENDING">Pending</option>
+						<option value="APPROVED">Approved</option>
+						<option value="REJECTED">Rejected</option>
+					</Select>
+				</Field>
+				<Field className="w-full sm:w-40">
+					<Label htmlFor="filter-connection">Connection</Label>
+					<Select
+						id="filter-connection"
+						value={query.connection ?? ""}
+						onChange={(event) => setParam("connection", event.target.value)}
+					>
+						<option value="">All</option>
+						<option value="online">Online</option>
+						<option value="weak">Weak signal</option>
+						<option value="offline">Offline</option>
+						<option value="never">Never seen</option>
+					</Select>
+				</Field>
+				<Field className="w-full sm:w-40">
+					<Label htmlFor="filter-assigned">Assignment</Label>
+					<Select
+						id="filter-assigned"
+						value={query.assigned ?? ""}
+						onChange={(event) => setParam("assigned", event.target.value)}
+					>
+						<option value="">All</option>
+						<option value="yes">Assigned</option>
+						<option value="no">Unassigned</option>
+					</Select>
+				</Field>
+				<Field className="w-full sm:w-36">
+					<Label htmlFor="filter-battery">Battery</Label>
+					<Select
+						id="filter-battery"
+						value={query.battery ?? ""}
+						onChange={(event) => setParam("battery", event.target.value)}
+					>
+						<option value="">All</option>
+						<option value="low">Low</option>
+					</Select>
+				</Field>
 				<Button type="submit" size="sm" variant="outline">
-					Search
+					Apply
 				</Button>
-				<span className="ml-auto text-xs text-fog-500">
+				<span className="ml-auto pb-2 text-xs text-fog-500">
 					{total} tracker{total === 1 ? "" : "s"}
 				</span>
 			</form>
 			{hasActiveFilters(query) ? (
-				<Link href="/devices" className="w-fit text-xs text-signal-400 hover:text-signal-300">
+				<Link href="/devices" className="w-fit text-xs text-fog-300 underline hover:text-fog-100">
 					Clear filters
 				</Link>
 			) : null}

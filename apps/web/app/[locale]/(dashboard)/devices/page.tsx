@@ -1,6 +1,7 @@
 import { CreateDeviceForm } from "@/components/devices/create-device-form";
 import { DevicesToolbar } from "@/components/devices/devices-toolbar";
 import { ApprovalBadge, DeviceStatusBadge } from "@/components/domain/badges";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState, PageHeader } from "@/components/ui/page-header";
 import {
@@ -128,14 +129,14 @@ export default async function DevicesPage({
 					{devices.length === 0 ? (
 						<div>
 							<EmptyState
-								title={hasActiveFilters(query) ? "No trackers match these filters" : t("empty")}
-								body={
-									hasActiveFilters(query) ? "Clear the filters to see every tracker." : undefined
-								}
+								title={hasActiveFilters(query) ? "No trackers match these filters." : t("empty")}
 							/>
 							{hasActiveFilters(query) ? (
 								<div className="mt-3 text-center">
-									<Link href="/devices" className="text-xs text-signal-400 hover:text-signal-300">
+									<Link
+										href="/devices"
+										className="text-xs text-fog-300 underline hover:text-fog-100"
+									>
 										Clear filters
 									</Link>
 								</div>
@@ -145,7 +146,7 @@ export default async function DevicesPage({
 						<Table>
 							<TableHeader>
 								<TableRow>
-									<TableHead>
+									<TableHead className="sticky left-0 z-10 bg-ink-800">
 										<Link
 											href={sortHref("label")}
 											className="inline-flex items-center gap-1 hover:text-fog-100"
@@ -199,8 +200,8 @@ export default async function DevicesPage({
 								{devices.map((device) => {
 									const lowBattery = device.batteryV != null && device.batteryV < LOW_BATTERY_V;
 									return (
-										<TableRow key={device.id}>
-											<TableCell>
+										<TableRow key={device.id} className="group">
+											<TableCell className="sticky left-0 z-10 bg-ink-800 group-hover:bg-ink-700/40">
 												<Link
 													href={`/devices/${device.id}`}
 													className="font-medium text-fog-100 hover:text-signal-300 hover:underline"
@@ -229,13 +230,15 @@ export default async function DevicesPage({
 											</TableCell>
 											<TableCell className="text-xs">
 												{device.batteryV != null ? (
-													<span
-														className={lowBattery ? "font-medium text-alarm-300" : "text-fog-500"}
-													>
-														{device.batteryV.toFixed(1)} V
-														{lowBattery ? (
-															<span className="ml-1 text-[10px] uppercase">Low</span>
-														) : null}
+													<span className="inline-flex items-center gap-2">
+														<span
+															className={
+																lowBattery ? "font-medium text-caution-300" : "text-fog-500"
+															}
+														>
+															{device.batteryV.toFixed(1)} V
+														</span>
+														{lowBattery ? <Badge tone="warning">Low</Badge> : null}
 													</span>
 												) : (
 													<span className="text-fog-500">—</span>
