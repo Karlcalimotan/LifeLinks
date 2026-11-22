@@ -156,12 +156,11 @@ export const POST = withApi(
 			});
 		});
 
-		return ok({
-			received: true,
-			status: "CANCELLED",
-			changed: !racedCancelled,
-			duplicate: racedCancelled,
-		});
+		if (racedCancelled) {
+			return ok({ received: true, status: "CANCELLED", changed: false, duplicate: true });
+		}
+
+		return ok({ received: true, status: "CANCELLED", changed: true });
 	},
 	{ route: "POST /api/device/incident/cancel" },
 );
