@@ -6,6 +6,54 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Dashboard command center: six scoped KPIs, a needs-attention queue with
+  inline acknowledge, an offline schematic fleet map, a recent-activity feed
+  and a 14-day incident trend.
+- Incidents workspace: search across plate, driver, incident id and
+  coordinates; status chips with counts; severity and date-range filters;
+  sortable detected column; server-side pagination; alert-delivery ratio and
+  time to acknowledge per row.
+- Analytics page: incidents, real crashes, false-alarm rate, acknowledgement
+  and resolve time, daily trend, severity distribution, top vehicles,
+  hour-of-day and slowest acknowledgements.
+- Settings workspace: organization, crash thresholds, retention, members and
+  role matrix, paginated audit log and read-only health counts.
+- Live map page: vehicle list, search and status filters, schematic positions,
+  selected-vehicle panel, legend and stale-fix handling.
+- Command palette (Ctrl/Cmd+K and `/`) with authenticated, scoped search, and a
+  header bell for incidents awaiting acknowledgement.
+- Tracker table polish: copyable MAC addresses, signal bands, firmware update
+  marker, combined connection detail and bulk approve with separate
+  approved/skipped/failed reporting.
+- Vehicle detail tabs (overview, trips, incidents, settings) and an audited
+  maintenance-mode action.
+- Notifications page: alert targets, emergency contacts, paginated delivery log
+  and a policy summary that matches the implemented intake behaviour.
+- Realistic demo seed: 11 vehicles, 13 trackers, 26 trips, telemetry, device
+  events and 13 incidents across every workflow status.
+- Route-level loading skeletons and error boundaries for vehicles, incidents,
+  trackers and settings.
+
+### Changed
+
+- Dashboard and analytics now share the Manila day bucketing, acknowledgement
+  sampling and duration formatting in `lib/analytics`.
+- Incident transitions accept an optional `returnTo` so acknowledging from the
+  dashboard or the filtered incident list returns the operator to that view.
+- The tracker signal bands are named Strong, Good, Fair and Poor, so they no
+  longer collide with the heartbeat connection state "Weak signal".
+
+### Fixed
+
+- Dashboard acknowledgement KPI is scoped before the audit query and uses the
+  same earliest-acknowledgement semantics as analytics.
+- Bulk tracker approval reports database failures separately from trackers that
+  were no longer pending, instead of counting both as skipped.
+- Copy MAC controls and route error copy are translated and distinguish each
+  row.
+
 ## [0.2.0] - 2026-11-22
 
 ### Added

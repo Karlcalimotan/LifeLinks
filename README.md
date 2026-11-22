@@ -39,9 +39,10 @@ Open http://localhost:3000 and sign in with one of the three demo roles:
 | Vehicle owner | `owner@lifelink.local` | `Owner123!` | Only the vehicles owned by that user |
 | CDRRMO / Pulis | `responder@lifelink.local` | `Responder123!` | The whole fleet and every incident |
 
-The seed creates three vehicles (two owned by the demo owner plus a fleet
-reserve), three trackers (one pending approval), an incident with evidence,
-telemetry and an alert trail.
+The seed creates 11 vehicles (three owned by the demo owner plus unowned fleet
+units), 13 trackers (10 approved, 2 pending and 1 rejected), 26 trips,
+telemetry and device events, and 13 incidents across every workflow status with
+alert deliveries in mixed states.
 
 The app needs a Supabase project (or any PostgreSQL 14+ instance). See
 [`docs/local-database.md`](docs/local-database.md) for the pooled `DATABASE_URL`,

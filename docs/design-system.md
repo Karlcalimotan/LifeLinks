@@ -258,13 +258,15 @@ the 2–5 minute heartbeat window only.
 
 Implemented today: colour tokens, Barlow/Barlow Condensed, button, input,
 select, textarea, label, badge, card, table, stat card, page header, empty
-state, status badges, Sonner toast, logo.
+state, status badges, Sonner toast, logo, drawer, modal, skeleton, copy
+control, pagination, command palette, incident bell, schematic map, charts and
+the analytics, notifications, live map and vehicle-tab surfaces.
 
 Added in Cycle 0: JetBrains Mono, `fog-400`, a six-step type scale, radius and
 shadow tokens, opaque sticky surfaces, and tokenised chart/logo/toast colours.
 
-Missing and required by this contract: drawer, modal, skeleton, tooltip, focus
-trap, copy-to-clipboard control and pagination.
+Still missing from the component contract: a shared tooltip and a reusable
+focus-trap primitive (the palette and bell implement their own).
 
 Known debt to fix as each page is touched:
 

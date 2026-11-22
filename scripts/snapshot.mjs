@@ -19,7 +19,8 @@ const outDir = process.env.SNAPSHOT_OUT ?? path.resolve(`reports/screens/${cycle
 const email = process.env.SNAPSHOT_EMAIL ?? "admin@lifelink.local";
 const password = process.env.SNAPSHOT_PASSWORD ?? "Admin123!";
 const requested = (
-	process.env.SNAPSHOT_PAGES ?? "login,dashboard,vehicles,incidents,devices,settings"
+	process.env.SNAPSHOT_PAGES ??
+	"login,dashboard,vehicles,incidents,devices,analytics,map,notifications,settings"
 )
 	.split(",")
 	.map((page) => page.trim())
@@ -28,9 +29,12 @@ const requested = (
 const routes = {
 	login: "login",
 	dashboard: "dashboard",
+	map: "map",
 	vehicles: "vehicles",
 	incidents: "incidents",
 	devices: "devices",
+	analytics: "analytics",
+	notifications: "notifications",
 	settings: "settings",
 };
 
