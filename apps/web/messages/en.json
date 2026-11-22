@@ -283,6 +283,8 @@
 		"alertDelivery": "Alert delivery",
 		"timeToAcknowledge": "Time to acknowledge",
 		"sortDetected": "Sort by detected time",
+		"sortNewest": "Detected, newest first",
+		"sortOldest": "Detected, oldest first",
 		"resultCount": "{count, plural, one {# incident} other {# incidents}}",
 		"showing": "Showing {from}–{to} of {total}",
 		"pageOf": "Page {page} of {pages}",

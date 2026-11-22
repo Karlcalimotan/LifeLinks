@@ -1,7 +1,15 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
-const CHIPS = ["all", "suspected", "confirmed", "acknowledged", "resolved", "cancelled"];
+const CHIPS = [
+	"all",
+	"suspected",
+	"confirmed",
+	"acknowledged",
+	"resolved",
+	"cancelled",
+	"false-alarm",
+];
 const ROWS = ["row-a", "row-b", "row-c", "row-d", "row-e", "row-f"];
 
 export default function IncidentsLoading() {

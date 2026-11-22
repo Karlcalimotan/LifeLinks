@@ -283,6 +283,8 @@
 		"alertDelivery": "Paghahatid ng alert",
 		"timeToAcknowledge": "Oras bago kilalanin",
 		"sortDetected": "Ayusin ayon sa oras ng pag-detect",
+		"sortNewest": "Na-detect, pinakabago muna",
+		"sortOldest": "Na-detect, pinakaluma muna",
 		"resultCount": "{count, plural, one {# insidente} other {# insidente}}",
 		"showing": "Ipinapakita ang {from}–{to} ng {total}",
 		"pageOf": "Pahina {page} ng {pages}",

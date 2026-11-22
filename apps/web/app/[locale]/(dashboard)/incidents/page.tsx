@@ -33,6 +33,7 @@ import { formatDateTime, formatRelative } from "@/lib/utils";
 import type { Prisma } from "@prisma/client";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { getTranslations } from "next-intl/server";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +75,7 @@ export default async function IncidentsPage({
 	const raw = await searchParams;
 	const query = parseIncidentsQuery(raw);
 	const error = typeof raw.error === "string" ? raw.error : "";
+	const updated = raw.updated === "1";
 	const current = await requireUser();
 	const t = await getTranslations({ locale, namespace: "incidents" });
 	const now = new Date();
@@ -96,6 +98,10 @@ export default async function IncidentsPage({
 	const pageCount = Math.max(1, Math.ceil(total / INCIDENT_PAGE_SIZE));
 	const page = Math.min(query.page, pageCount);
 	const effectiveQuery: IncidentsQuery = { ...query, page };
+
+	if (query.page > pageCount) {
+		redirect(`/${locale}${buildIncidentsHref(effectiveQuery)}`);
+	}
 	const statusCounts: Record<string, number> = {};
 	let allCount = 0;
 	for (const group of statusGroups) {
@@ -160,14 +166,19 @@ export default async function IncidentsPage({
 		<>
 			<PageHeader title={t("title")} subtitle={t("subtitle")} />
 
+			{updated ? (
+				<p className="mb-4 rounded-panel border border-clear-400/30 bg-clear-400/10 px-3 py-2 text-meta text-clear-300">
+					{t("statusUpdated")}
+				</p>
+			) : null}
 			{error === "notfound" ? (
 				<p className="mb-4 rounded-panel border border-alarm-400/30 bg-alarm-400/10 px-3 py-2 text-meta text-alarm-300">
 					{t("errorNotFound")}
 				</p>
 			) : null}
 
-			<Card className="min-w-0">
-				<CardContent className="pt-5">
+			<Card className="min-w-0 overflow-hidden">
+				<CardContent className="min-w-0 pt-5">
 					<IncidentsToolbar locale={locale} query={effectiveQuery} total={total} />
 					<IncidentStatusChips
 						locale={locale}
@@ -199,10 +210,11 @@ export default async function IncidentsPage({
 						<Table className="min-w-[960px]">
 							<TableHeader>
 								<TableRow>
-									<TableHead>
+									<TableHead aria-sort={effectiveQuery.dir === "asc" ? "ascending" : "descending"}>
 										<Link
 											href={sortHref}
 											title={t("sortDetected")}
+											aria-label={effectiveQuery.dir === "asc" ? t("sortOldest") : t("sortNewest")}
 											className="inline-flex items-center gap-1 hover:text-fog-100"
 										>
 											{t("detected")}
@@ -294,6 +306,11 @@ export default async function IncidentsPage({
 													<form action={acknowledgeIncidentAction} className="inline-flex">
 														<input type="hidden" name="locale" value={locale} />
 														<input type="hidden" name="incidentId" value={incident.id} />
+														<input
+															type="hidden"
+															name="returnTo"
+															value={buildIncidentsHref(effectiveQuery)}
+														/>
 														<Button type="submit" size="sm" variant="secondary">
 															{t("acknowledge")}
 														</Button>
