@@ -12,8 +12,11 @@ All notable changes to this project are documented here. The format follows
 
 - Lean vehicle-alert console: dashboard, vehicles, incidents, trackers and settings.
 - Row-level security on every application table for the Supabase deployment.
+- Per-organization RLS policies with a non-owner verification role and test.
+  CI runs the test against a disposable Postgres service.
 - Vercel deployment allowlist: automatic deployments are restricted to `main`
-  and `develop`; preview deployments from other branches are disabled. The
+  (production) and `staging` (preview); `develop` is integration only and does
+  not deploy. Preview deployments from every other branch are disabled. The
   allowlist is mirrored in `apps/web/vercel.json` for the monorepo root.
 - Night Highway Dispatch design system: emergency signal palette, Barlow
   display/UI type, signal-plate logo, favicon and responsive console shell.
@@ -23,6 +26,12 @@ All notable changes to this project are documented here. The format follows
   pages; the evidence chart now renders immediately without animation.
 - Device API: ingest, incident, cancel, command poll, command acknowledgement and
   signed-release OTA check.
+- Dedicated `/api/device/heartbeat` endpoint with optional `Idempotency-Key` and
+  per-device rate limits for heartbeat, ingest and incident.
+- Tracker registration now normalizes MAC addresses, blocks duplicates with a
+  field-level error, preserves submitted values and reports vehicle-scope errors.
+- Tracker detail: edit the label and vehicle, confirm approve/reject/delete, and
+  audit every action.
 - Prisma schema, initial migration and idempotent demo seed.
 - Crash state machine, false-positive filters, countdown, cancel and retry logic.
 - Native Unity tests for the Arduino-free firmware headers.
@@ -41,15 +50,24 @@ All notable changes to this project are documented here. The format follows
 - Branch protection on `main`, `staging` and `develop`: pull requests, required
   CI checks, conversation resolution, no force pushes and no branch deletion.
   `main` additionally requires one approval and linear history.
-- Immutable `v*` release tags via a repository ruleset. Firmware releases use
-  `fw-vX.Y.Z`; extend the ruleset to `refs/tags/fw-v*` before the first one.
+- Immutable application (`v*`) and firmware (`fw-v*`) release tags via a
+  repository ruleset.
 - Staging promotion: feature PRs go to `develop` (the reconciliation gate),
   `develop` promotes to `staging` (the preview deployment), and `staging`
   promotes a versioned release to `main`. `develop` is protected but is not a
   Vercel deployment target.
+- Issue-first collaboration: issue and pull-request templates, an `Issue policy`
+  CI check, and `scripts/issue-policy.mjs`.
+- Mandatory overlap check against J-Akiru5's open issues and PRs before creating
+  a new task, with a `pnpm overlap:check` preflight. On an overlapping decision,
+  J-Akiru5's decision takes priority.
+- Multi-agent definitions for `integrator`, `release-manager` and `reviewer`,
+  plus `scripts/merge-pr.mjs` and `docs/agents.md`.
 
 ### Changed
 
+- Application `orgId` filters and role checks are documented as the authoritative
+  tenant boundary; RLS is defense-in-depth for non-owner roles.
 - Deployment role swap: `staging` is the preview deployment and `develop` is the
   reconciliation gate. `develop` no longer deploys, and the earlier `stage`
   branch is retired.
@@ -70,8 +88,8 @@ All notable changes to this project are documented here. The format follows
   (`POSTGRES_PRISMA_URL` / `POSTGRES_URL_NON_POOLING`) as aliases for
   `DATABASE_URL` / `DIRECT_URL`, and `/api/health` reports which required
   environment variables are present without returning their values.
-- CI runs on pushes to `main`/`develop` and on pull requests, instead of every
-  branch push and the matching pull request.
+- CI runs on pushes to `main`, `develop` and `staging`, and on pull requests,
+  instead of every branch push and the matching pull request.
 - Access model reduced to three roles: `USER` (vehicle owner, scoped to their own
   vehicles), `RESPONDER` (CDRRMO / Pulis, whole-fleet incident response) and
   `ADMIN` (members, trackers and settings). Vehicles now carry an optional
@@ -90,8 +108,13 @@ All notable changes to this project are documented here. The format follows
 - The native PlatformIO environment includes `firmware/include`, and cppcheck
   suppresses its known ArduinoJson preprocessor false positive.
 - `pnpm self-check` now includes the release and deployment policy checks.
-- Release promotion now runs `develop` -> `stage` -> versioned `main`; CI and
-  the deployment-policy workflow also run on `stage` pushes.
+- `develop` and `staging` merges are handled by the `integrator` subagent through
+  `scripts/merge-pr.mjs`, which refuses `main` and unfinished checks; `main`
+  remains human-merged.
+- `pnpm self-check` now includes the issue-policy tests.
+- Hardened the integrator merge helper against base/head races and unreadable
+  check lists; narrowed the reviewer and release-manager permissions; the issue
+  policy now runs from the trusted base branch.
 
 ### Removed
 

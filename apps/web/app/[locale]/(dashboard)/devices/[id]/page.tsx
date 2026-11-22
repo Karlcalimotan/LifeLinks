@@ -1,3 +1,5 @@
+import { ConfirmSubmit } from "@/components/devices/confirm-submit";
+import { EditDeviceForm } from "@/components/devices/edit-device-form";
 import { RotateTokenButton } from "@/components/devices/rotate-token-button";
 import { ApprovalBadge, DeviceStatusBadge } from "@/components/domain/badges";
 import { Button } from "@/components/ui/button";
@@ -15,6 +17,7 @@ import { Link } from "@/i18n/routing";
 import {
 	approveDeviceAction,
 	commandDeviceAction,
+	deleteDeviceAction,
 	rejectDeviceAction,
 } from "@/lib/actions/devices";
 import { canAdminister, requireRole } from "@/lib/auth/session";
@@ -41,21 +44,33 @@ export default async function DeviceDetailPage({
 	searchParams,
 }: {
 	params: Promise<{ locale: string; id: string }>;
-	searchParams: Promise<{ command?: string; error?: string }>;
+	searchParams: Promise<{
+		command?: string;
+		error?: string;
+		approved?: string;
+		rejected?: string;
+	}>;
 }) {
 	const { locale, id } = await params;
-	const { command, error } = await searchParams;
+	const { command, error, approved, rejected } = await searchParams;
 	const current = await requireRole("ADMIN");
 	const t = await getTranslations({ locale, namespace: "devices" });
 
-	const device = await prisma.trackerDevice.findFirst({
-		where: { id, orgId: current.org.id },
-		include: {
-			vehicle: true,
-			commands: { orderBy: { createdAt: "desc" }, take: 10 },
-			events: { orderBy: { createdAt: "desc" }, take: 20 },
-		},
-	});
+	const [device, vehicles] = await Promise.all([
+		prisma.trackerDevice.findFirst({
+			where: { id, orgId: current.org.id },
+			include: {
+				vehicle: true,
+				commands: { orderBy: { createdAt: "desc" }, take: 10 },
+				events: { orderBy: { createdAt: "desc" }, take: 20 },
+			},
+		}),
+		prisma.vehicle.findMany({
+			where: { orgId: current.org.id },
+			orderBy: { plateNo: "asc" },
+			select: { id: true, plateNo: true, make: true, model: true },
+		}),
+	]);
 	if (!device) notFound();
 
 	const settings = await getOrgSettings(current.org.id);
@@ -85,6 +100,16 @@ export default async function DeviceDetailPage({
 						: "Command could not be queued."}
 				</p>
 			) : null}
+			{approved === "1" ? (
+				<p className="mb-4 rounded border border-clear-500/30 bg-clear-500/10 px-3 py-2 text-xs text-clear-300">
+					Tracker approved.
+				</p>
+			) : null}
+			{rejected === "1" ? (
+				<p className="mb-4 rounded border border-caution-500/30 bg-caution-500/10 px-3 py-2 text-xs text-caution-200">
+					Tracker rejected.
+				</p>
+			) : null}
 
 			<div className="mb-4 flex flex-wrap items-center gap-2">
 				<DeviceStatusBadge state={state} />
@@ -106,21 +131,49 @@ export default async function DeviceDetailPage({
 							<form action={approveDeviceAction}>
 								<input type="hidden" name="locale" value={locale} />
 								<input type="hidden" name="deviceId" value={device.id} />
-								<Button type="submit" size="sm">
+								<ConfirmSubmit
+									message="Approve this tracker? It will start sending data."
+									confirmLabel="Approve"
+								>
 									Approve
-								</Button>
+								</ConfirmSubmit>
 							</form>
 							<form action={rejectDeviceAction}>
 								<input type="hidden" name="locale" value={locale} />
 								<input type="hidden" name="deviceId" value={device.id} />
-								<Button type="submit" size="sm" variant="outline">
+								<ConfirmSubmit
+									variant="outline"
+									message="Reject this tracker? It will stop sending data until approved again."
+									confirmLabel="Reject"
+								>
 									Reject
-								</Button>
+								</ConfirmSubmit>
 							</form>
 						</div>
 					</CardContent>
 				</Card>
 			) : null}
+
+			<Card className="mb-6">
+				<CardHeader>
+					<CardTitle>Edit tracker</CardTitle>
+				</CardHeader>
+				<CardContent>
+					<EditDeviceForm
+						locale={locale}
+						device={{
+							id: device.id,
+							label: device.label,
+							mac: device.mac,
+							vehicleId: device.vehicleId,
+						}}
+						vehicles={vehicles.map((vehicle) => ({
+							id: vehicle.id,
+							label: `${vehicle.plateNo}: ${vehicle.make} ${vehicle.model}`,
+						}))}
+					/>
+				</CardContent>
+			</Card>
 
 			<div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
 				<Card>
@@ -289,6 +342,29 @@ export default async function DeviceDetailPage({
 							))}
 						</div>
 					)}
+				</CardContent>
+			</Card>
+
+			<Card className="mt-6 border-alarm-500/30">
+				<CardHeader>
+					<CardTitle>Danger zone</CardTitle>
+				</CardHeader>
+				<CardContent className="flex flex-wrap items-center justify-between gap-3">
+					<p className="max-w-xl text-xs leading-relaxed text-fog-500">
+						Deleting a tracker removes its trips, samples and incidents. This cannot be undone.
+					</p>
+					<form action={deleteDeviceAction}>
+						<input type="hidden" name="locale" value={locale} />
+						<input type="hidden" name="deviceId" value={device.id} />
+						<ConfirmSubmit
+							variant="danger"
+							message={`Delete ${device.label} (${device.mac})? This removes its trips, samples and incidents and cannot be undone.`}
+							confirmText={device.mac}
+							confirmLabel="Delete tracker"
+						>
+							Delete tracker
+						</ConfirmSubmit>
+					</form>
 				</CardContent>
 			</Card>
 		</>

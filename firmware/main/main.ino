@@ -25,9 +25,13 @@
 #include <Adafruit_Sensor.h>
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <DNSServer.h>
 #include <Preferences.h>
 #include <TinyGPSPlus.h>
+#include <WebServer.h>
+#include <WiFi.h>
 #include <Wire.h>
+#include <esp_wifi.h>
 #include <math.h>
 
 #include "config.h"
@@ -36,6 +40,7 @@
 #include "hardware.h"
 #include "modem.h"
 #include "power.h"
+#include "provisioning.h"
 #include "safety.h"
 #include "status.h"
 
@@ -77,6 +82,7 @@ uint32_t g_cancelledAt = 0;
 uint32_t g_postAlertAt = 0;
 uint32_t g_alertStartedAt = 0;
 uint32_t g_testAlertUntil = 0;
+bool g_allClearPending = false;
 
 String g_incidentId;
 uint32_t g_detectedAt = 0;
@@ -381,6 +387,1069 @@ void loadConfig() {
 }
 
 // ---------------------------------------------------------------------------
+// WiFi commissioning portal
+// ---------------------------------------------------------------------------
+//
+// WiFi is commissioning-only. The tracker's telemetry, SOS and command paths
+// stay on the A7670E; the radio is used to prove a network and collect the
+// device identity, then it is switched off. The portal is opened only when the
+// unit is not provisioned or after three failed joins of the stored network,
+// and it closes after a proven save or after ten minutes.
+//
+// The page never renders a password or token back into HTML or JSON, and this
+// file never logs either value.
+
+static const uint32_t kPortalCloseDelayMs = 2000;
+static const uint32_t kStoredWifiRetryGapMs = 2000;
+static const uint32_t kScanTimeoutMs = 12000;
+static const uint32_t kScanRetryDelayMs = 2000;
+static const int kMaxScannedNetworks = 20;
+
+WebServer g_portalServer(80);
+DNSServer g_portalDns;
+bool g_portalActive = false;
+bool g_portalRoutesRegistered = false;
+uint32_t g_portalStartedMs = 0;
+uint32_t g_portalStopAtMs = 0;
+String g_portalApName;
+
+struct ScannedNetwork {
+	String ssid;
+	int32_t rssi;
+	bool secure;
+};
+ScannedNetwork g_scannedNetworks[kMaxScannedNetworks];
+int g_scannedNetworkCount = 0;
+
+enum class PortalScanState : uint8_t {
+	Idle,
+	Running,
+	RetryWait,
+};
+PortalScanState g_portalScanState = PortalScanState::Idle;
+uint32_t g_portalScanStartedMs = 0;
+uint32_t g_portalScanRetryAtMs = 0;
+bool g_portalScanRetried = false;
+int g_portalScanLastError = 0;
+
+enum class PortalJoinState : uint8_t {
+	Idle,
+	Testing,
+	Connected,
+	Failed,
+};
+PortalJoinState g_portalJoinState = PortalJoinState::Idle;
+uint32_t g_portalJoinStartedMs = 0;
+String g_portalPendingSsid;
+String g_portalPendingPass;
+String g_portalPendingDeviceId;
+String g_portalPendingToken;
+String g_portalJoinDetail;
+String g_portalJoinMessage;
+String g_portalFormError;
+
+enum class StoredWifiState : uint8_t {
+	Idle,
+	Joining,
+	RetryWait,
+	Done,
+};
+StoredWifiState g_storedWifiState = StoredWifiState::Idle;
+bool g_storedWifiCheckActive = false;
+uint8_t g_storedWifiAttempts = 0;
+uint32_t g_storedWifiStartedMs = 0;
+uint32_t g_storedWifiRetryAtMs = 0;
+
+fw::BootResetSequence g_bootReset;
+bool g_provisioned = false;	 // NVS marker written only after a proven join
+
+void collectScannedNetworks(int found);
+void finishPortalScan(int count, bool failed);
+void stopProvisioningPortal(const char* reason);
+
+static const char kPortalStyle[] PROGMEM = R"css(
+:root{--ink:#071013;--panel:#0d1c21;--panel2:#122a30;--line:#1a3a42;--fog:#e8f1f2;--muted:#8fa3a6;--signal:#ff5a1f;--signal2:#ff7a45;--on-signal:#071013}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--ink);color:var(--fog);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.45}
+header.bar{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--line);background:var(--panel)}
+.mark{width:34px;height:34px;flex:none}
+.word{font-weight:800;font-size:1.2rem;letter-spacing:.01em}
+.tag{margin-left:auto;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+main{max-width:520px;margin:0 auto;padding:18px 16px 8px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:inset 0 1px 0 rgb(255 255 255 / .04)}
+h1{font-size:1.35rem;margin:0 0 4px}
+.lede{margin:0 0 14px;color:var(--muted);font-size:.95rem}
+h2{font-size:1rem;margin:22px 0 8px;display:flex;align-items:center;gap:8px}
+.step{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;background:var(--signal);color:var(--on-signal);font-size:.8rem;font-weight:800}
+label{display:block;font-weight:650;margin:14px 0 6px;font-size:.92rem}
+input{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--ink);color:var(--fog);font-size:1rem}
+input:focus,button:focus-visible,a:focus-visible{outline:2px solid var(--signal2);outline-offset:2px}
+.note,.hint{margin:8px 0 0;color:var(--muted);font-size:.83rem}
+.hint{margin:5px 0 0}
+.error{margin:12px 0 0;padding:10px 12px;border:1px solid #7a2a26;border-radius:10px;background:#2a1210;color:#ffb4ae;font-size:.9rem}
+.ok{margin:12px 0 0;padding:10px 12px;border:1px solid #1e6b4d;border-radius:10px;background:#0d2a20;color:#9bf0ca;font-size:.9rem}
+.empty{margin:10px 0;color:var(--muted);font-size:.9rem}
+.networks{display:grid;gap:8px;margin-top:10px}
+.net{display:flex;align-items:center;gap:10px;width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);color:inherit;text-align:left;font:inherit;cursor:pointer}
+.net:hover{border-color:var(--signal)}
+.name{flex:1;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.meta{flex:none;color:var(--muted);font-size:.76rem}
+.bars{display:inline-flex;align-items:flex-end;gap:2px;height:14px;flex:none}
+.bars i{width:3px;border-radius:1px;background:#3a4c5e}
+.bars i:nth-child(1){height:4px}.bars i:nth-child(2){height:7px}.bars i:nth-child(3){height:10px}.bars i:nth-child(4){height:14px}
+.bars.s1 i:nth-child(1),.bars.s2 i:nth-child(-n+2),.bars.s3 i:nth-child(-n+3),.bars.s4 i{background:var(--signal)}
+.scanline{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;color:var(--muted);font-size:.83rem}
+.btn{display:block;width:100%;margin-top:16px;padding:13px;border:0;border-radius:10px;font:inherit;font-weight:750;text-align:center;text-decoration:none;cursor:pointer}
+.btn.primary{background:var(--signal);color:var(--on-signal)}
+.btn.ghost{background:transparent;color:var(--fog);border:1px solid var(--line)}
+.btn.small{display:inline-block;width:auto;margin:0;padding:7px 12px;font-size:.82rem}
+.spinner{width:34px;height:34px;margin:20px auto;border:3px solid var(--line);border-top-color:var(--signal);border-radius:50%;animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.facts{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:14px 0 0;font-size:.9rem}
+dt{color:var(--muted)}dd{margin:0;font-weight:650;word-break:break-all}
+footer{max-width:520px;margin:0 auto;padding:14px 16px 30px;color:var(--muted);font-size:.78rem}
+footer code{background:var(--panel2);padding:1px 5px;border-radius:4px;color:var(--fog)}
+[hidden]{display:none!important}
+@media (prefers-color-scheme:light){:root{--ink:#f4fbfc;--panel:#fff;--panel2:#e8f1f2;--line:#c9d8da;--fog:#071013;--muted:#526a6d}}
+)css";
+
+static const char kPortalMark[] PROGMEM =
+	"<svg class=\"mark\" viewBox=\"0 0 64 64\" aria-hidden=\"true\">"
+	"<path d=\"M4 0h46l14 14v46a4 4 0 0 1-4 4H4a4 4 0 0 1-4-4V4a4 4 0 0 1 4-4Z\" fill=\"#FF5A1F\"/>"
+	"<path d=\"M14 20v24h10l5-19 6 25 5-12h10\" stroke=\"#071013\" stroke-width=\"5.5\" "
+	"stroke-linecap=\"round\" stroke-linejoin=\"round\"/>"
+	"</svg>";
+
+String htmlEscape(const String& value) {
+	String out;
+	out.reserve(value.length() + 16);
+	for (size_t index = 0; index < value.length(); index += 1) {
+		switch (value[index]) {
+			case '&':
+				out += F("&amp;");
+				break;
+			case '<':
+				out += F("&lt;");
+				break;
+			case '>':
+				out += F("&gt;");
+				break;
+			case '"':
+				out += F("&quot;");
+				break;
+			case '\'':
+				out += F("&#39;");
+				break;
+			default:
+				out += value[index];
+				break;
+		}
+	}
+	return out;
+}
+
+String portalDeviceIdForDisplay() {
+	if (fw::isValidStoredDeviceId(g_deviceId.c_str())) return g_deviceId;
+	return chipMac();
+}
+
+String portalApName() {
+	if (!g_portalApName.isEmpty()) return g_portalApName;
+	char name[fw::kProvisioningApNameMax];
+	const String mac = chipMac();
+	if (!fw::provisioningApName(mac.c_str(), name, sizeof(name))) return String("LifeLink-0000");
+	return String(name);
+}
+
+bool portalScanInProgress() {
+	return g_portalScanState == PortalScanState::Running ||
+		   g_portalScanState == PortalScanState::RetryWait;
+}
+
+int signalBarsForRssi(int32_t rssi) {
+	if (rssi > -55) return 4;
+	if (rssi > -67) return 3;
+	if (rssi > -78) return 2;
+	return 1;
+}
+
+String portalPageHead(const char* title) {
+	String page;
+	page.reserve(4096);
+	page += F(
+		"<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\">"
+		"<meta name=\"viewport\" content=\"width=device-width,initial-scale=1,viewport-fit=cover\">"
+		"<meta name=\"theme-color\" content=\"#071013\">"
+		"<meta name=\"robots\" content=\"noindex\"><title>");
+	page += title;
+	page += F("</title><style>");
+	page += FPSTR(kPortalStyle);
+	page += F("</style></head><body><header class=\"bar\">");
+	page += FPSTR(kPortalMark);
+	page +=
+		F("<span class=\"word\">LifeLink</span><span class=\"tag\">device setup</span></header>");
+	return page;
+}
+
+String portalFooter() {
+	String page;
+	page.reserve(400);
+	page += F("<footer><div>Device ID <code>");
+	page += htmlEscape(portalDeviceIdForDisplay());
+	page += F("</code></div><div>Setup AP <code>");
+	page += htmlEscape(portalApName());
+	page += F("</code> &middot; Portal <code>");
+	page += WiFi.softAPIP().toString();
+	page += F("</code></div><div>Firmware ");
+	page += F(FW_VERSION);
+	page += F(" &middot; WiFi is for commissioning only. This page closes after 10 minutes.</div>"
+			  "</footer>");
+	return page;
+}
+
+String buildNetworkRows() {
+	String rows;
+	rows.reserve(120 + static_cast<size_t>(g_scannedNetworkCount) * 220);
+	for (int index = 0; index < g_scannedNetworkCount; index += 1) {
+		const ScannedNetwork& network = g_scannedNetworks[index];
+		rows += F("<button type=\"button\" class=\"net\" data-ssid=\"");
+		rows += htmlEscape(network.ssid);
+		rows += F("\"><span class=\"bars s");
+		rows += String(signalBarsForRssi(network.rssi));
+		rows += F("\" aria-hidden=\"true\"><i></i><i></i><i></i><i></i></span>"
+				  "<span class=\"name\">");
+		rows += htmlEscape(network.ssid);
+		rows += F("</span>");
+		rows += network.secure ? F("<span class=\"meta\">Locked</span>")
+							   : F("<span class=\"meta\">Open</span>");
+		rows += F("<span class=\"meta\">");
+		rows += String(network.rssi);
+		rows += F(" dBm</span></button>");
+	}
+	return rows;
+}
+
+String portalScanHint() {
+	if (g_portalScanState == PortalScanState::Running) return String(F("Scanning..."));
+	if (g_portalScanState == PortalScanState::RetryWait) return String(F("Scanning..."));
+	if (g_scannedNetworkCount > 0) {
+		return String(g_scannedNetworkCount) + F(" network(s) found");
+	}
+	if (g_portalScanLastError != 0) return String(F("Scan failed. Tap Rescan."));
+	return String(F("No networks found. Tap Rescan."));
+}
+
+String portalSetupScript() {
+	return String(R"js(
+<script>(function(){
+var list=document.getElementById('networks');
+var hint=document.getElementById('scanhint');
+var rescan=document.getElementById('rescan');
+var ssid=document.getElementById('ssid');
+if(!list||!ssid)return;
+var esc=function(v){return String(v).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});};
+var bars=function(n){return '<span class="bars s'+n+'" aria-hidden="true"><i></i><i></i><i></i><i></i></span>';};
+var level=function(r){return r>-55?4:r>-67?3:r>-78?2:1;};
+var render=function(nets){
+ var h='';
+ if(!nets.length){h='<p class="empty">No networks found. Move closer to the router, then tap Rescan.</p>';}
+ for(var i=0;i<nets.length;i++){var n=nets[i];
+  h+='<button type="button" class="net" data-ssid="'+esc(n.ssid)+'">'+bars(level(n.rssi))+
+     '<span class="name">'+esc(n.ssid)+'</span>'+(n.secure?'<span class="meta">Locked</span>':'<span class="meta">Open</span>')+
+     '<span class="meta">'+n.rssi+' dBm</span></button>';
+ }
+ h+='<button type="button" class="btn ghost small" id="manual">Type it manually</button>';
+ list.innerHTML=h;
+ hint.textContent=nets.length?(nets.length+' network(s) found'):'No networks found';
+};
+var refresh=function(){
+ fetch('/scan',{cache:'no-store'}).then(function(r){return r.json();}).then(function(j){
+  if(j.scanning){hint.textContent='Scanning\u2026';setTimeout(refresh,900);return;}
+  render(j.networks||[]);
+ }).catch(function(){hint.textContent='Scan failed. Tap Rescan.';});
+};
+list.addEventListener('click',function(e){
+ var t=e.target;
+ while(t&&t!==list&&(' '+t.className+' ').indexOf(' net ')===-1)t=t.parentNode;
+ if(t&&t!==list){ssid.value=t.getAttribute('data-ssid')||'';ssid.focus();}
+ if(e.target&&e.target.id==='manual'){ssid.value='';ssid.focus();}
+});
+if(rescan)rescan.addEventListener('click',function(){
+ rescan.disabled=true;hint.textContent='Scanning\u2026';
+ fetch('/scan',{method:'POST',cache:'no-store'}).then(function(r){return r.json();})
+ .then(function(){setTimeout(refresh,600);})
+ .catch(function(){hint.textContent='Scan failed. Tap Rescan.';})
+ .then(function(){rescan.disabled=false;});
+});
+refresh();
+})();</script>
+)js");
+}
+
+String portalStatusScript() {
+	return String(R"js(
+<script>(function(){
+var state=document.getElementById('state');
+var msg=document.getElementById('msg');
+var spin=document.getElementById('spin');
+var facts=document.getElementById('facts');
+var err=document.getElementById('err');
+var done=document.getElementById('done');
+var back=document.getElementById('back');
+var fSsid=document.getElementById('f-ssid');
+var fIp=document.getElementById('f-ip');
+var fRssi=document.getElementById('f-rssi');
+var stopped=false;
+var dbm=function(v){return v<0?('\u2212'+Math.abs(v)+' dBm'):(v+' dBm');};
+var tick=function(){
+ fetch('/status',{cache:'no-store'}).then(function(r){return r.json();}).then(function(j){
+  if(j.state==='connected'){
+   stopped=true;state.textContent='Connected';
+   msg.textContent='The tracker joined the network and saved the settings.';
+   fSsid.textContent=j.ssid;fIp.textContent=j.ip;fRssi.textContent=dbm(j.rssi);
+   facts.hidden=false;spin.hidden=true;err.hidden=true;
+   done.textContent='Setup complete. The setup portal will close now.';done.hidden=false;
+   return;
+  }
+  if(j.state==='failed'){
+   stopped=true;state.textContent='Not connected';
+   msg.textContent='The tracker could not join that network.';
+   err.textContent=j.message||'Check the name and password, then try again.';
+   err.hidden=false;spin.hidden=true;back.hidden=false;
+   return;
+  }
+  setTimeout(tick,700);
+ }).catch(function(){if(!stopped)setTimeout(tick,1200);});
+};
+tick();
+})();</script>
+)js");
+}
+
+String buildPortalPage(const String& ssid, const String& error) {
+	const bool hasStoredToken = fw::isValidStoredToken(g_deviceToken.c_str());
+	const bool hasPendingToken = fw::isValidStoredToken(g_portalPendingToken.c_str());
+	const char* tokenHint =
+		hasStoredToken ? "Leave blank to keep the saved token."
+					   : (hasPendingToken ? "Kept from the last attempt; leave blank to reuse it."
+										  : "Required for first-time setup.");
+	String page = portalPageHead("LifeLink device setup");
+	page.reserve(9000);
+	page += F("<main><section class=\"card\"><h1>Device setup</h1>"
+			  "<p class=\"lede\">Join this tracker to a 2.4 GHz Wi-Fi network and register its "
+			  "identity. The tracker tests the network before saving anything.</p>");
+	if (!error.isEmpty()) {
+		page += F("<p class=\"error\">");
+		page += htmlEscape(error);
+		page += F("</p>");
+	}
+	page += F("<h2><span class=\"step\">1</span> Wi-Fi network</h2>"
+			  "<p class=\"note\">Choose a network below or type its name. The list covers 2.4 GHz "
+			  "networks only.</p><div class=\"networks\" id=\"networks\">");
+	if (portalScanInProgress()) page += F("<p class=\"note\">Scanning for nearby networks...</p>");
+	if (g_scannedNetworkCount > 0) {
+		page += buildNetworkRows();
+	} else if (!portalScanInProgress()) {
+		page += F("<p class=\"empty\">No networks found. Move closer to the router, then tap "
+				  "Rescan.</p>");
+	}
+	page += F("</div><div class=\"scanline\"><span id=\"scanhint\">");
+	page += portalScanHint();
+	page += F("</span><button type=\"button\" class=\"btn ghost small\" id=\"rescan\">Rescan"
+			  "</button></div>"
+			  "<form method=\"post\" action=\"/save\" id=\"setupform\">"
+			  "<label for=\"ssid\">Wi-Fi name (SSID)</label>"
+			  "<input id=\"ssid\" name=\"ssid\" type=\"text\" maxlength=\"32\" required "
+			  "autocomplete=\"off\" autocapitalize=\"none\" spellcheck=\"false\" value=\"");
+	page += htmlEscape(ssid);
+	page += F("\"><p class=\"hint\">Names are case-sensitive.</p>"
+			  "<label for=\"pass\">Password</label>"
+			  "<input id=\"pass\" name=\"pass\" type=\"password\" maxlength=\"63\" "
+			  "autocomplete=\"new-password\" autocapitalize=\"none\" spellcheck=\"false\">"
+			  "<p class=\"hint\">Leave empty for an open network; otherwise 8-63 characters. "
+			  "The password is never shown again.</p>"
+			  "<h2><span class=\"step\">2</span> Device identity</h2>"
+			  "<p class=\"note\">Find these in the LifeLink dashboard under Devices. The Device ID "
+			  "is this unit's Wi-Fi MAC.</p>"
+			  "<label for=\"device_id\">Device ID</label>"
+			  "<input id=\"device_id\" name=\"device_id\" type=\"text\" maxlength=\"64\" required "
+			  "autocomplete=\"off\" autocapitalize=\"none\" spellcheck=\"false\" value=\"");
+	page += htmlEscape(portalDeviceIdForDisplay());
+	page +=
+		F("\"><label for=\"device_token\">Device Token</label>"
+		  "<input id=\"device_token\" name=\"device_token\" type=\"password\" maxlength=\"128\" "
+		  "autocomplete=\"new-password\" autocapitalize=\"none\" spellcheck=\"false\">"
+		  "<p class=\"hint\">");
+	page += tokenHint;
+	page += F("</p><button class=\"btn primary\" type=\"submit\">Connect and save</button>"
+			  "</form><p class=\"note\">The tracker joins the network and waits for an IP address "
+			  "before writing to flash. If the join fails, the portal stays open, the stored "
+			  "credentials are unchanged, and the reason is shown here.</p></section></main>");
+	page += portalFooter();
+	page += portalSetupScript();
+	page += F("</body></html>");
+	return page;
+}
+
+String buildPortalStatusPage() {
+	String page = portalPageHead("LifeLink connecting");
+	page.reserve(3500);
+	page += F("<main><section class=\"card\"><h1 id=\"state\">Connecting...</h1>"
+			  "<p class=\"lede\" id=\"msg\">Testing <strong>");
+	page += htmlEscape(g_portalPendingSsid);
+	page += F("</strong>. This can take up to 20 seconds.</p>"
+			  "<div class=\"spinner\" id=\"spin\" aria-hidden=\"true\"></div>"
+			  "<dl class=\"facts\" id=\"facts\" hidden><dt>Network</dt><dd id=\"f-ssid\">-</dd>"
+			  "<dt>IP address</dt><dd id=\"f-ip\">-</dd><dt>Signal</dt><dd id=\"f-rssi\">-</dd>"
+			  "</dl><p class=\"error\" id=\"err\" hidden></p><p class=\"ok\" id=\"done\" "
+			  "hidden></p><a class=\"btn ghost\" id=\"back\" href=\"/\" hidden>Back to "
+			  "setup</a></section></main>");
+	page += portalFooter();
+	page += portalStatusScript();
+	page += F("</body></html>");
+	return page;
+}
+
+void sendPortalHtml(int code, const String& page) {
+	g_portalServer.sendHeader("Cache-Control", "no-store");
+	g_portalServer.sendHeader("X-Content-Type-Options", "nosniff");
+	g_portalServer.sendHeader("Referrer-Policy", "no-referrer");
+	g_portalServer.sendHeader("Content-Security-Policy",
+							  "default-src 'none'; style-src 'unsafe-inline'; script-src "
+							  "'unsafe-inline'; connect-src 'self'; img-src data:; base-uri "
+							  "'none'; form-action 'self'");
+	g_portalServer.send(code, "text/html; charset=utf-8", page);
+}
+
+void sendPortalJson(const String& json, int code) {
+	g_portalServer.sendHeader("Cache-Control", "no-store");
+	g_portalServer.sendHeader("X-Content-Type-Options", "nosniff");
+	g_portalServer.send(code, "application/json", json);
+}
+
+void stopPortalScan() {
+	if (g_portalScanState == PortalScanState::Running) esp_wifi_scan_stop();
+	WiFi.scanDelete();
+	g_portalScanState = PortalScanState::Idle;
+	g_portalScanLastError = 0;
+}
+
+void startPortalScan(bool userInitiated) {
+	if (g_portalScanState == PortalScanState::Running) return;
+	if (!g_portalActive) return;
+	if (userInitiated) g_portalScanRetried = false;
+
+	// The station must be idle before esp_wifi_scan_start(); a half-open join
+	// from the stored-network check otherwise fails with ESP_ERR_WIFI_STATE.
+	if (WiFi.status() != WL_CONNECTED) {
+		WiFi.setAutoReconnect(false);
+		WiFi.disconnect(false, false);
+	}
+	WiFi.mode(WIFI_AP_STA);
+	WiFi.scanDelete();
+
+	g_portalScanLastError = 0;
+	g_portalScanStartedMs = millis();
+	g_portalScanState = PortalScanState::Running;
+
+	const int16_t result = WiFi.scanNetworks(true, true, false, 300);
+	if (result == WIFI_SCAN_RUNNING) return;
+	if (result >= 0) {
+		// Rare, but the scan can complete before the call returns.
+		g_portalScanLastError = 0;
+		collectScannedNetworks(result);
+		finishPortalScan(result, false);
+		return;
+	}
+	g_portalScanLastError = result;
+	finishPortalScan(0, true);
+}
+
+void collectScannedNetworks(int found) {
+	g_scannedNetworkCount = 0;
+	const int limit = found > kMaxScannedNetworks * 2 ? kMaxScannedNetworks * 2 : found;
+	for (int index = 0; index < limit; index += 1) {
+		const String ssid = WiFi.SSID(index);
+		if (ssid.isEmpty() || ssid.length() > fw::kSsidMaxLength) continue;
+		const int32_t rssi = WiFi.RSSI(index);
+		const bool secure = WiFi.encryptionType(index) != WIFI_AUTH_OPEN;
+
+		int existing = -1;
+		for (int scan = 0; scan < g_scannedNetworkCount; scan += 1) {
+			if (g_scannedNetworks[scan].ssid == ssid) {
+				existing = scan;
+				break;
+			}
+		}
+		if (existing >= 0) {
+			if (rssi > g_scannedNetworks[existing].rssi) {
+				g_scannedNetworks[existing].rssi = rssi;
+				g_scannedNetworks[existing].secure = secure;
+			}
+			continue;
+		}
+		if (g_scannedNetworkCount >= kMaxScannedNetworks) continue;
+
+		ScannedNetwork entry;
+		entry.ssid = ssid;
+		entry.rssi = rssi;
+		entry.secure = secure;
+
+		int position = g_scannedNetworkCount;
+		while (position > 0 && g_scannedNetworks[position - 1].rssi < entry.rssi) {
+			g_scannedNetworks[position] = g_scannedNetworks[position - 1];
+			position -= 1;
+		}
+		g_scannedNetworks[position] = entry;
+		g_scannedNetworkCount += 1;
+	}
+	WiFi.scanDelete();
+	Serial.printf("[WIFI] scan found %d raw, %d shown\n", found, g_scannedNetworkCount);
+}
+
+void finishPortalScan(int count, bool failed) {
+	if (!failed && count > 0) {
+		g_portalScanState = PortalScanState::Idle;
+		return;
+	}
+	if (!g_portalScanRetried) {
+		g_portalScanRetried = true;
+		g_portalScanState = PortalScanState::RetryWait;
+		g_portalScanRetryAtMs = millis() + kScanRetryDelayMs;
+		return;
+	}
+	g_portalScanState = PortalScanState::Idle;
+	Serial.println(failed ? "[WIFI] scan failed twice - manual entry only"
+						  : "[WIFI] scan found no networks twice - check the antenna");
+}
+
+void servicePortalScan(uint32_t now) {
+	if (g_portalScanState == PortalScanState::Running) {
+		const int16_t count = WiFi.scanComplete();
+		if (count == WIFI_SCAN_RUNNING) {
+			if ((now - g_portalScanStartedMs) >= kScanTimeoutMs) {
+				Serial.println("[WIFI] scan timed out");
+				esp_wifi_scan_stop();
+				WiFi.scanDelete();
+				g_portalScanLastError = WIFI_SCAN_FAILED;
+				finishPortalScan(0, true);
+			}
+			return;
+		}
+		if (count >= 0) {
+			g_portalScanLastError = 0;
+			collectScannedNetworks(count);
+			finishPortalScan(count, false);
+			return;
+		}
+		g_portalScanLastError = count;
+		WiFi.scanDelete();
+		finishPortalScan(0, true);
+		return;
+	}
+	if (g_portalScanState == PortalScanState::RetryWait &&
+		static_cast<int32_t>(now - g_portalScanRetryAtMs) >= 0) {
+		startPortalScan(false);
+	}
+}
+
+String portalJoinFailureMessage(const String& detail) {
+	if (detail == "no_ssid") {
+		return String(F("Network not found. Check the name (2.4 GHz only) and that the router is "
+						"switched on."));
+	}
+	if (detail == "wrong_password") {
+		return String(F("The router refused the password. Check it and try again."));
+	}
+	if (detail == "connection_lost") {
+		return String(F("The connection dropped during setup. Move closer to the router and try "
+						"again."));
+	}
+	if (detail == "no_ip") {
+		return String(F("The network did not hand out an IP address. Check the router's DHCP "
+						"server and try again."));
+	}
+	if (detail == "invalid_config") {
+		return String(F("The radio rejected these Wi-Fi settings. Check the password and try "
+						"again."));
+	}
+	if (detail == "nvs_write") {
+		return String(F("The network connected, but the settings could not be saved to flash. "
+						"Try again."));
+	}
+	return String(F("Could not join the network. Check the name and password, then try again."));
+}
+
+void failPortalJoin(const char* detail, const char* message) {
+	g_portalJoinDetail = detail;
+	g_portalJoinMessage = message != nullptr ? message : portalJoinFailureMessage(detail);
+	g_portalJoinState = PortalJoinState::Failed;
+	g_portalPendingPass = "";
+	// Keep a first-time token in RAM so a retry does not force it to be retyped,
+	// but never let it shadow an already-stored token: a blank field then means
+	// exactly what the form says (keep the saved token).
+	if (fw::isValidStoredToken(g_deviceToken.c_str())) g_portalPendingToken = "";
+	g_portalStopAtMs = 0;
+	WiFi.disconnect(false, false);
+	WiFi.setAutoReconnect(false);
+	// Deliberately no token/password in this line.
+	Serial.printf("[WIFI] join failed (%s) - credentials not saved\n", detail);
+}
+
+bool savePortalProvisioning() {
+	bool ok = true;
+	ok = prefs.putString("wifi_ssid", g_portalPendingSsid) > 0 && ok;
+	ok = prefs.putString("wifi_pass", g_portalPendingPass) > 0 && ok;
+	ok = prefs.putString("device_id", g_portalPendingDeviceId) > 0 && ok;
+	ok = prefs.putString("device_token", g_portalPendingToken) > 0 && ok;
+	if (ok) ok = prefs.putBool("provisioned", true) > 0;
+	return ok;
+}
+
+void succeedPortalJoin() {
+	if (!savePortalProvisioning()) {
+		prefs.putBool("provisioned", false);
+		failPortalJoin("nvs_write", "The network connected, but the settings could not be saved "
+									"to flash. Try again.");
+		return;
+	}
+	g_deviceId = g_portalPendingDeviceId;
+	g_deviceToken = g_portalPendingToken;
+	g_provisioned = true;
+	g_portalJoinState = PortalJoinState::Connected;
+	g_portalStopAtMs = millis() + kPortalCloseDelayMs;
+	g_portalPendingPass = "";
+	g_portalPendingToken = "";
+	Serial.printf("[WIFI] joined \"%s\" at %s - provisioning saved; closing portal\n",
+				  g_portalPendingSsid.c_str(), WiFi.localIP().toString().c_str());
+}
+
+void startPortalJoin(const String& ssid, const String& pass, const String& deviceId,
+					 const String& token) {
+	g_portalPendingSsid = ssid;
+	g_portalPendingPass = pass;
+	g_portalPendingDeviceId = deviceId;
+	g_portalPendingToken = token;
+	g_portalJoinDetail = "";
+	g_portalJoinMessage = "";
+	g_portalFormError = "";
+	g_portalStopAtMs = 0;
+
+	stopPortalScan();
+	WiFi.mode(WIFI_AP_STA);
+	WiFi.setAutoReconnect(false);
+	WiFi.disconnect(false, false);
+	g_portalJoinState = PortalJoinState::Testing;
+	g_portalJoinStartedMs = millis();
+
+	const wl_status_t result = WiFi.begin(ssid.c_str(), pass.c_str());
+	// The SSID is broadcast; the password is never logged.
+	Serial.printf("[WIFI] testing \"%s\" before saving (begin rc=%d)\n", ssid.c_str(),
+				  static_cast<int>(result));
+	if (result == WL_CONNECT_FAILED) {
+		failPortalJoin("invalid_config", nullptr);
+	}
+}
+
+void servicePortalJoin(uint32_t now) {
+	if (g_portalJoinState == PortalJoinState::Connected) {
+		if (g_portalStopAtMs != 0 && static_cast<int32_t>(now - g_portalStopAtMs) >= 0) {
+			stopProvisioningPortal("provisioned");
+		}
+		return;
+	}
+	if (g_portalJoinState != PortalJoinState::Testing) return;
+
+	if (WiFi.status() == WL_CONNECTED) {
+		const IPAddress ip = WiFi.localIP();
+		if (ip[0] != 0 || ip[1] != 0 || ip[2] != 0 || ip[3] != 0) {
+			succeedPortalJoin();
+			return;
+		}
+	}
+
+	const uint32_t elapsed = now - g_portalJoinStartedMs;
+	const wl_status_t status = WiFi.status();
+	const bool definitive =
+		status == WL_NO_SSID_AVAIL || status == WL_CONNECT_FAILED || status == WL_CONNECTION_LOST;
+	if (definitive && elapsed >= fw::kJoinQuickFailMs) {
+		if (status == WL_NO_SSID_AVAIL) {
+			failPortalJoin("no_ssid", nullptr);
+		} else if (status == WL_CONNECT_FAILED) {
+			failPortalJoin("wrong_password", nullptr);
+		} else {
+			failPortalJoin("connection_lost", nullptr);
+		}
+		return;
+	}
+	if (elapsed >= fw::kJoinTimeoutMs) {
+		if (status == WL_NO_SSID_AVAIL) {
+			failPortalJoin("no_ssid", nullptr);
+		} else if (status == WL_CONNECT_FAILED) {
+			failPortalJoin("wrong_password", nullptr);
+		} else if (status == WL_CONNECTION_LOST) {
+			failPortalJoin("connection_lost", nullptr);
+		} else {
+			failPortalJoin("no_ip", nullptr);
+		}
+	}
+}
+
+void stopProvisioningPortal(const char* reason) {
+	if (!g_portalActive) return;
+	stopPortalScan();
+	g_portalDns.stop();
+	g_portalServer.stop();
+	WiFi.softAPdisconnect(true);
+	WiFi.disconnect(false, false);
+	WiFi.setAutoReconnect(true);
+	WiFi.mode(WIFI_OFF);
+
+	g_portalActive = false;
+	g_portalStopAtMs = 0;
+	g_portalApName = "";
+	g_portalJoinState = PortalJoinState::Idle;
+	g_portalPendingSsid = "";
+	g_portalPendingPass = "";
+	g_portalPendingDeviceId = "";
+	g_portalPendingToken = "";
+	g_portalJoinDetail = "";
+	g_portalJoinMessage = "";
+	g_portalFormError = "";
+	Serial.printf("[WIFI] setup portal stopped (%s)\n", reason);
+}
+
+void handlePortalRoot() {
+	if (g_portalJoinState == PortalJoinState::Testing ||
+		g_portalJoinState == PortalJoinState::Connected) {
+		sendPortalHtml(200, buildPortalStatusPage());
+		return;
+	}
+	String ssid = g_portalPendingSsid;
+	if (ssid.isEmpty()) ssid = prefs.getString("wifi_ssid", "");
+	String error = g_portalFormError;
+	if (error.isEmpty() && g_portalJoinState == PortalJoinState::Failed) {
+		error = g_portalJoinMessage;
+	}
+	sendPortalHtml(200, buildPortalPage(ssid, error));
+}
+
+void handlePortalSave() {
+	if (g_portalJoinState == PortalJoinState::Testing ||
+		g_portalJoinState == PortalJoinState::Connected) {
+		g_portalServer.sendHeader("Location", "/", true);
+		g_portalServer.sendHeader("Cache-Control", "no-store");
+		g_portalServer.send(303, "text/plain", "");
+		return;
+	}
+
+	const String ssid = g_portalServer.arg("ssid");
+	const String pass = g_portalServer.arg("pass");
+	String deviceId = g_portalServer.arg("device_id");
+	String token = g_portalServer.arg("device_token");
+	deviceId.trim();
+	token.trim();
+
+	if (deviceId.isEmpty()) deviceId = portalDeviceIdForDisplay();
+	if (token.isEmpty()) {
+		if (fw::isValidStoredToken(g_portalPendingToken.c_str())) {
+			token = g_portalPendingToken;
+		} else if (fw::isValidStoredToken(g_deviceToken.c_str())) {
+			token = g_deviceToken;
+		}
+	}
+
+	const fw::ProvisioningField field =
+		fw::validateProvisioningForm(ssid.c_str(), pass.c_str(), deviceId.c_str(), token.c_str());
+	if (field != fw::ProvisioningField::None) {
+		g_portalFormError = fw::provisioningFieldMessage(field);
+		if (field == fw::ProvisioningField::Token && token.isEmpty()) {
+			g_portalFormError = "Device Token is required for first-time setup.";
+		}
+		// Keep the submitted SSID visible after a refresh. The password and
+		// token are deliberately not retained in the form.
+		g_portalPendingSsid = ssid;
+		sendPortalHtml(400, buildPortalPage(ssid, g_portalFormError));
+		return;
+	}
+
+	startPortalJoin(ssid, pass, deviceId, token);
+	g_portalServer.sendHeader("Location", "/", true);
+	g_portalServer.sendHeader("Cache-Control", "no-store");
+	g_portalServer.send(303, "text/plain", "");
+}
+
+void handlePortalStatus() {
+	JsonDocument doc;
+	const char* state = "idle";
+	if (g_portalJoinState == PortalJoinState::Testing) {
+		state = "testing";
+	} else if (g_portalJoinState == PortalJoinState::Connected) {
+		state = "connected";
+	} else if (g_portalJoinState == PortalJoinState::Failed) {
+		state = "failed";
+	}
+	doc["state"] = state;
+	doc["ssid"] = g_portalPendingSsid;
+	if (g_portalJoinState == PortalJoinState::Connected) {
+		doc["ip"] = WiFi.localIP().toString();
+		doc["rssi"] = WiFi.RSSI();
+	}
+	if (g_portalJoinState == PortalJoinState::Failed) {
+		doc["detail"] = g_portalJoinDetail;
+		doc["message"] = g_portalJoinMessage;
+	}
+	String out;
+	serializeJson(doc, out);
+	sendPortalJson(out, 200);
+}
+
+void handlePortalScanGet() {
+	JsonDocument doc;
+	doc["scanning"] = portalScanInProgress();
+	doc["error"] = g_portalScanLastError;
+	JsonArray networks = doc["networks"].to<JsonArray>();
+	for (int index = 0; index < g_scannedNetworkCount; index += 1) {
+		JsonObject network = networks.add<JsonObject>();
+		network["ssid"] = g_scannedNetworks[index].ssid;
+		network["rssi"] = g_scannedNetworks[index].rssi;
+		network["secure"] = g_scannedNetworks[index].secure;
+	}
+	String out;
+	serializeJson(doc, out);
+	sendPortalJson(out, 200);
+}
+
+void handlePortalScanPost() {
+	if (g_portalJoinState == PortalJoinState::Testing ||
+		g_portalJoinState == PortalJoinState::Connected) {
+		sendPortalJson(F("{\"ok\":false,\"error\":\"busy\"}"), 409);
+		return;
+	}
+	if (!portalScanInProgress()) startPortalScan(true);
+	sendPortalJson(portalScanInProgress() ? F("{\"ok\":true,\"scanning\":true}")
+										  : F("{\"ok\":true,\"scanning\":false}"),
+				   200);
+}
+
+void handlePortalNotFound() {
+	String target = String(F("http://")) + WiFi.softAPIP().toString() + "/";
+	g_portalServer.sendHeader("Location", target, true);
+	g_portalServer.sendHeader("Cache-Control", "no-store");
+	g_portalServer.send(302, "text/plain", "");
+}
+
+void startProvisioningPortal() {
+	if (g_portalActive) return;
+
+	g_storedWifiCheckActive = false;
+	g_storedWifiState = StoredWifiState::Done;
+
+	char name[fw::kProvisioningApNameMax];
+	const String mac = chipMac();
+	if (!fw::provisioningApName(mac.c_str(), name, sizeof(name))) {
+		Serial.println("[WIFI] could not derive the setup AP name");
+		return;
+	}
+	g_portalApName = name;
+
+	WiFi.setAutoReconnect(false);
+	if (WiFi.status() != WL_CONNECTED) WiFi.disconnect(false, false);
+	WiFi.mode(WIFI_AP_STA);
+
+	// The documented portal address. The core defaults to this subnet, but pin
+	// it explicitly so a future core change cannot move the page.
+	const IPAddress apIp(192, 168, 4, 1);
+	WiFi.softAPConfig(apIp, apIp, IPAddress(255, 255, 255, 0));
+
+	if (!WiFi.softAP(g_portalApName.c_str())) {
+		Serial.println("[WIFI] could not start the setup access point");
+		WiFi.mode(WIFI_OFF);
+		g_portalApName = "";
+		return;
+	}
+
+	g_portalDns.setErrorReplyCode(DNSReplyCode::NoError);
+	g_portalDns.start(53, "*", WiFi.softAPIP());
+
+	if (!g_portalRoutesRegistered) {
+		g_portalServer.on("/", HTTP_GET, handlePortalRoot);
+		g_portalServer.on("/save", HTTP_POST, handlePortalSave);
+		g_portalServer.on("/status", HTTP_GET, handlePortalStatus);
+		g_portalServer.on("/scan", HTTP_GET, handlePortalScanGet);
+		g_portalServer.on("/scan", HTTP_POST, handlePortalScanPost);
+		g_portalServer.onNotFound(handlePortalNotFound);
+		g_portalRoutesRegistered = true;
+	}
+	g_portalServer.begin();
+
+	g_portalActive = true;
+	g_portalStartedMs = millis();
+	g_portalStopAtMs = 0;
+	g_portalJoinState = PortalJoinState::Idle;
+	g_portalPendingSsid = "";
+	g_portalPendingPass = "";
+	g_portalPendingDeviceId = "";
+	g_portalPendingToken = "";
+	g_portalJoinDetail = "";
+	g_portalJoinMessage = "";
+	g_portalFormError = "";
+
+	Serial.printf("[WIFI] setup portal \"%s\" at http://%s\n", g_portalApName.c_str(),
+				  WiFi.softAPIP().toString().c_str());
+	startPortalScan(true);
+}
+
+void startStoredWifiAttempt(uint32_t now) {
+	const String ssid = prefs.getString("wifi_ssid", "");
+	const String pass = prefs.getString("wifi_pass", "");
+	g_storedWifiAttempts += 1;
+	g_storedWifiStartedMs = now;
+	g_storedWifiState = StoredWifiState::Joining;
+
+	WiFi.mode(WIFI_STA);
+	WiFi.setAutoReconnect(false);
+	WiFi.disconnect(false, false);
+	WiFi.begin(ssid.c_str(), pass.c_str());
+	Serial.printf("[WIFI] checking stored network \"%s\" (%u/%u)\n", ssid.c_str(),
+				  static_cast<unsigned>(g_storedWifiAttempts),
+				  static_cast<unsigned>(fw::kMaxJoinFailures));
+}
+
+void serviceStoredWifiCheck(uint32_t now) {
+	if (!g_storedWifiCheckActive) return;
+
+	if (g_storedWifiState == StoredWifiState::Joining) {
+		const IPAddress ip = WiFi.localIP();
+		const bool hasIp = ip[0] != 0 || ip[1] != 0 || ip[2] != 0 || ip[3] != 0;
+		if (WiFi.status() == WL_CONNECTED && hasIp) {
+			Serial.printf("[WIFI] stored network reachable at %s; radio off\n",
+						  ip.toString().c_str());
+			WiFi.disconnect(false, false);
+			WiFi.setAutoReconnect(false);
+			WiFi.mode(WIFI_OFF);
+			g_storedWifiState = StoredWifiState::Done;
+			g_storedWifiCheckActive = false;
+			return;
+		}
+
+		const uint32_t elapsed = now - g_storedWifiStartedMs;
+		const wl_status_t status = WiFi.status();
+		const bool definitive = status == WL_NO_SSID_AVAIL || status == WL_CONNECT_FAILED ||
+								status == WL_CONNECTION_LOST;
+		if (!(definitive && elapsed >= fw::kJoinQuickFailMs) && elapsed < fw::kJoinTimeoutMs) {
+			return;
+		}
+
+		Serial.printf("[WIFI] stored join attempt %u failed (status %d)\n",
+					  static_cast<unsigned>(g_storedWifiAttempts), static_cast<int>(status));
+		WiFi.disconnect(false, false);
+		WiFi.setAutoReconnect(false);
+		if (g_storedWifiAttempts >= fw::kMaxJoinFailures) {
+			g_storedWifiCheckActive = false;
+			g_storedWifiState = StoredWifiState::Done;
+			Serial.println("[WIFI] three failed joins - opening the setup portal");
+			startProvisioningPortal();
+			return;
+		}
+		g_storedWifiState = StoredWifiState::RetryWait;
+		g_storedWifiRetryAtMs = now + kStoredWifiRetryGapMs;
+		return;
+	}
+
+	if (g_storedWifiState == StoredWifiState::RetryWait &&
+		static_cast<int32_t>(now - g_storedWifiRetryAtMs) >= 0) {
+		startStoredWifiAttempt(now);
+	}
+}
+
+void serviceWifiCommissioning(uint32_t now) {
+	if (g_portalActive) {
+		g_portalDns.processNextRequest();
+		g_portalServer.handleClient();
+		// A handled request can start a join or a scan. Re-read the clock so
+		// their elapsed-time checks do not see the pre-request timestamp (which
+		// would underflow a uint32_t subtraction and look like a timeout).
+		now = millis();
+		servicePortalScan(now);
+		servicePortalJoin(now);
+		if (!g_portalActive) return;
+		if (g_portalStopAtMs != 0 && static_cast<int32_t>(now - g_portalStopAtMs) >= 0) {
+			stopProvisioningPortal("provisioned");
+			return;
+		}
+		if ((now - g_portalStartedMs) >= fw::kPortalMaxLifetimeMs) {
+			stopProvisioningPortal("lifetime elapsed");
+			return;
+		}
+		return;
+	}
+	serviceStoredWifiCheck(now);
+}
+
+void setupWifiCommissioning() {
+	const String ssid = prefs.getString("wifi_ssid", "");
+	const String pass = prefs.getString("wifi_pass", "");
+	g_provisioned = prefs.getBool("provisioned", false);
+	if (!fw::isProvisioningComplete(g_provisioned, ssid.c_str(), pass.c_str(), g_deviceId.c_str(),
+									g_deviceToken.c_str())) {
+		Serial.println("[WIFI] unit is not provisioned - opening the setup portal");
+		startProvisioningPortal();
+		return;
+	}
+	Serial.println("[WIFI] provisioned - checking the stored network");
+	g_storedWifiCheckActive = true;
+	g_storedWifiAttempts = 0;
+	g_storedWifiState = StoredWifiState::Idle;
+	startStoredWifiAttempt(millis());
+}
+
+void clearStoredWifiCredentials() {
+	prefs.remove("wifi_ssid");
+	prefs.remove("wifi_pass");
+}
+
+void clearStoredIdentity() {
+	prefs.remove("device_id");
+	prefs.remove("device_token");
+	prefs.remove("provisioned");
+	g_deviceId = chipMac();
+	g_deviceToken = "";
+	g_provisioned = false;
+}
+
+void serviceBootReset(uint32_t now, bool alertActive) {
+	if (!g_bootReset.active() && !g_bootReset.restartPending()) return;
+	if (alertActive) {
+		// A pending restart must not interrupt an alert. The NVS clear (if it
+		// already happened) stays; the portal reopens on the next boot.
+		g_bootReset.abort();
+		Serial.println("[RESET] boot reset cancelled: alert is active");
+		return;
+	}
+	if (g_bootReset.restartPending()) {
+		Serial.println("[RESET] restarting");
+		delay(150);
+		ESP.restart();
+	}
+
+	const bool pressed = digitalRead(hw::kCancelButton) == LOW;
+	const fw::BootResetAction action = g_bootReset.update(now, pressed);
+	if (action == fw::BootResetAction::ClearWifi) {
+		clearStoredWifiCredentials();
+		Serial.println("[RESET] WiFi cleared, identity kept; release to restart");
+	} else if (action == fw::BootResetAction::ClearAll) {
+		clearStoredWifiCredentials();
+		clearStoredIdentity();
+		Serial.println("[RESET] WiFi, identity and provisioning cleared");
+	}
+	if (g_bootReset.restartPending()) {
+		delay(100);
+		ESP.restart();
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Payloads
 // ---------------------------------------------------------------------------
 
@@ -511,8 +1580,34 @@ void sendSmsAlerts() {
 	const String phone2 = prefs.getString("alert_phone_2", "");
 	bool sent = false;
 	if (!phone1.isEmpty()) sent = sendSms(phone1, String(bodyBuffer)) || sent;
+
+	// A remote cancel can only be observed between blocking AT calls. If the
+	// operator cancelled while the first message was in flight, do not send the
+	// second one.
+	if (g_safety.state() != fw::AlertState::Alerting) {
+		Serial.println("[SOS] cancel observed; second recipient suppressed");
+		return;
+	}
+
 	if (!phone2.isEmpty()) sent = sendSms(phone2, String(bodyBuffer)) || sent;
 	Serial.println(sent ? "[SOS] SMS sent" : "[SOS] SMS failed or no phone configured");
+}
+
+/**
+ * All-clear for a cancelled incident. The device owns the modem and the
+ * recipient numbers, so the platform does not need an SMS provider. If the
+ * device is offline this cannot be delivered; the incident record still shows
+ * the false alarm.
+ */
+void sendAllClearSms() {
+	const String plate = prefs.getString("plate_no", "vehicle");
+	const String body = "LIFELINK ALL CLEAR " + plate +
+						" - false alarm. The earlier SOS was cancelled. No emergency.";
+	const String phone1 = prefs.getString("alert_phone_1", "");
+	const String phone2 = prefs.getString("alert_phone_2", "");
+	if (!phone1.isEmpty()) sendSms(phone1, body);
+	if (!phone2.isEmpty()) sendSms(phone2, body);
+	Serial.println("[SOS] all-clear sent");
 }
 
 void sendCommandAck(const String& commandId, const char* status, const char* detail) {
@@ -547,6 +1642,25 @@ void handleCommands(JsonArray commands) {
 			g_armed = false;
 		} else if (kind == "SET_CONFIG") {
 			// The config object is applied from the same poll response.
+		} else if (kind == "CANCEL_ALERT") {
+			const String incidentId = command["payload"]["incident_id"] | "";
+			const bool allClear = command["payload"]["all_clear"] | false;
+
+			if (!incidentId.isEmpty() && !g_incidentId.isEmpty() && incidentId != g_incidentId) {
+				Serial.println("[CMD] CANCEL_ALERT for a different incident");
+				sendCommandAck(id, "ACKED", "unknown_incident");
+				continue;
+			}
+
+			if (g_safety.cancelFromRemote()) {
+				Serial.println("[CMD] CANCEL_ALERT accepted");
+				if (allClear) g_allClearPending = true;
+				sendCommandAck(id, "ACKED", "cancelled");
+			} else {
+				Serial.println("[CMD] CANCEL_ALERT too late");
+				sendCommandAck(id, "ACKED", "too_late");
+			}
+			continue;
 		}
 		sendCommandAck(id, "ACKED", nullptr);
 	}
@@ -692,9 +1806,12 @@ void setup() {
 	Serial.print("[IDENTITY] ");
 	Serial.println(g_deviceId);
 	if (g_deviceToken.isEmpty()) {
-		Serial.println("[SETUP] No token. Send: SET_TOKEN llk_... and SET_ID <MAC>");
+		Serial.println("[SETUP] No token. Use the WiFi setup portal or send SET_TOKEN llk_...");
 		Serial.println("[SETUP] Then: SET_PHONE1 +63... and SET_PLATE ABC1234");
 	}
+	Serial.println("[RESET] Hold cancel (GPIO 33) 5 s to clear WiFi, 10 s to clear everything");
+	g_bootReset.begin(millis());
+	setupWifiCommissioning();
 	Serial.println("[READY] LifeLink tracker online");
 }
 
@@ -789,8 +1906,21 @@ void loop() {
 			g_safety.reset();
 		}
 
+		if (g_allClearPending && state != fw::AlertState::Alerting) {
+			g_allClearPending = false;
+			sendAllClearSms();
+		}
+
 		g_lastState = state;
+		// Boot-only commissioning reset. It is disabled permanently as soon as
+		// the alert state machine leaves Idle, so a long cancel press during a
+		// countdown can never reboot the tracker.
+		serviceBootReset(now, state != fw::AlertState::Idle);
 	}
+
+	// WiFi is serviced after the impact/alert pass so the safety-critical sample
+	// is always taken before any portal work.
+	serviceWifiCommissioning(millis());
 
 	if (g_testAlertUntil > 0 && now > g_testAlertUntil) {
 		g_buzzer.setPattern(fw::BuzzerPattern::Off, now);

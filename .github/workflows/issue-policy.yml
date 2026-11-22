@@ -1,0 +1,42 @@
+name: issue-policy
+
+# pull_request_target would be the strongest trigger, but GitHub only runs it
+# when the workflow exists on the default branch. Until this workflow reaches
+# main, use pull_request with an explicit base-ref checkout so the checker and
+# its tests come from the trusted base, not from PR code.
+#
+# Issue-first applies to integration PRs. Release/promotion PRs to main are
+# exempt; this also avoids checking `main` for a script it does not have yet.
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, labeled, unlabeled, ready_for_review]
+    branches: [develop, staging]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  issue:
+    name: Issue policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test the issue policy
+        run: node --test scripts/issue-policy.test.mjs
+      - name: Require a linked issue
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: node scripts/issue-policy.mjs

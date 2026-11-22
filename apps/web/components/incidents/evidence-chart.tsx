@@ -40,28 +40,28 @@ export function EvidenceChart({ points }: { points: EvidencePoint[] }) {
 		<div className="h-56 w-full">
 			<ResponsiveContainer width="100%" height="100%">
 				<LineChart data={data} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
-					<CartesianGrid stroke="#1a3a42" strokeDasharray="3 3" />
+					<CartesianGrid stroke="var(--color-ink-600)" strokeDasharray="3 3" />
 					<XAxis
 						dataKey="label"
-						tick={{ fill: "#8fa3a6", fontSize: 10 }}
+						tick={{ fill: "var(--color-fog-500)", fontSize: 10 }}
 						interval="preserveStartEnd"
 					/>
-					<YAxis tick={{ fill: "#8fa3a6", fontSize: 10 }} />
+					<YAxis tick={{ fill: "var(--color-fog-500)", fontSize: 10 }} />
 					<Tooltip
 						contentStyle={{
-							background: "#0d1c21",
-							border: "1px solid #1a3a42",
+							background: "var(--color-ink-800)",
+							border: "1px solid var(--color-ink-600)",
 							borderRadius: 4,
-							color: "#e8f1f2",
+							color: "var(--color-fog-100)",
 							fontSize: 12,
 						}}
 					/>
-					<Legend wrapperStyle={{ fontSize: 11, color: "#8fa3a6" }} />
+					<Legend wrapperStyle={{ fontSize: 11, color: "var(--color-fog-500)" }} />
 					<Line
 						type="monotone"
 						dataKey="accelG"
 						name="Acceleration (g)"
-						stroke="#45b8e8"
+						stroke="var(--color-rescue-400)"
 						strokeWidth={2}
 						dot={false}
 						isAnimationActive={false}
@@ -70,7 +70,7 @@ export function EvidenceChart({ points }: { points: EvidencePoint[] }) {
 						type="monotone"
 						dataKey="tiltDeg"
 						name="Tilt (deg)"
-						stroke="#ffb020"
+						stroke="var(--color-caution-400)"
 						strokeWidth={2}
 						dot={false}
 						isAnimationActive={false}

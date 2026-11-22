@@ -15,16 +15,19 @@ export function LogoMark({
 			aria-label={decorative ? undefined : "LifeLink"}
 			aria-hidden={decorative ? true : undefined}
 		>
-			<path d="M4 0h46l14 14v46a4 4 0 0 1-4 4H4a4 4 0 0 1-4-4V4a4 4 0 0 1 4-4Z" fill="#FF5A1F" />
+			<path
+				d="M4 0h46l14 14v46a4 4 0 0 1-4 4H4a4 4 0 0 1-4-4V4a4 4 0 0 1 4-4Z"
+				fill="var(--color-signal-500)"
+			/>
 			<path
 				d="M14 20v24h10l5-19 6 25 5-12h10"
 				fill="none"
-				stroke="#071013"
+				stroke="var(--color-ink-950)"
 				strokeWidth="5.5"
 				strokeLinecap="round"
 				strokeLinejoin="round"
 			/>
-			<rect x="46" y="34" width="8" height="8" rx="1" fill="#F4FBFC" />
+			<rect x="46" y="34" width="8" height="8" rx="1" fill="var(--color-fog-50)" />
 		</svg>
 	);
 }

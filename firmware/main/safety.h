@@ -58,6 +58,29 @@ class CrashSafety {
 
 	void markAcknowledged() { state_ = AlertState::PostAlert; }
 
+	/**
+	 * Cancel requested from the server (web or push notification).
+	 *
+	 * Countdown  -> Cancelled: the SOS was never sent.
+	 * Alerting   -> PostAlert: stop the retry ladder immediately.
+	 * Anything else is too late; the caller reports it as such instead of
+	 * pretending the alert was stopped.
+	 *
+	 * This never suppresses an alert that has not started, and it never
+	 * delays the SOS. It only ever shortens an alert the operator owns.
+	 */
+	bool cancelFromRemote() {
+		if (state_ == AlertState::Countdown) {
+			state_ = AlertState::Cancelled;
+			return true;
+		}
+		if (state_ == AlertState::Alerting) {
+			state_ = AlertState::PostAlert;
+			return true;
+		}
+		return false;
+	}
+
 	void stopAlerting() { state_ = AlertState::PostAlert; }
 
 	void reset() { state_ = AlertState::Idle; }

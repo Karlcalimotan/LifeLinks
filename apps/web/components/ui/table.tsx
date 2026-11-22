@@ -4,7 +4,7 @@ import type { HTMLAttributes, TdHTMLAttributes, ThHTMLAttributes } from "react";
 export function Table({ className, ...props }: HTMLAttributes<HTMLTableElement>) {
 	return (
 		<div className="w-full overflow-x-auto">
-			<table className={cn("w-full caption-bottom text-sm", className)} {...props} />
+			<table className={cn("w-full caption-bottom text-body", className)} {...props} />
 		</div>
 	);
 }
@@ -32,7 +32,7 @@ export function TableRow({ className, ...props }: HTMLAttributes<HTMLTableRowEle
 export function TableHead({ className, ...props }: ThHTMLAttributes<HTMLTableCellElement>) {
 	return (
 		<th
-			className={cn("px-4 py-2.5 text-left text-[11px] font-medium text-fog-500", className)}
+			className={cn("px-4 py-2.5 text-left text-meta font-medium text-fog-500", className)}
 			{...props}
 		/>
 	);

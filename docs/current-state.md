@@ -1,5 +1,30 @@
 # Current state
 
+## Product state (2026-11-22)
+
+- **Stack:** Next.js 16 App Router + React 19, Supabase Postgres + Prisma,
+  next-intl (English/Tagalog), Tailwind 4, Biome, Vitest and Playwright.
+- **Roles:** `USER` (own vehicles), `RESPONDER` (whole fleet, incidents) and
+  `ADMIN` (members, trackers, settings). Org scope comes from the membership row;
+  the app-level orgId filters are authoritative.
+- **Pages:** dashboard, devices (trackers), vehicles, incidents, settings, login
+  and public legal pages. Tracker detail and incident detail exist.
+- **Device API:** `/api/device/ingest` (heartbeat + batched telemetry),
+  `/api/device/incident`, `/api/device/incident/cancel`, `/api/device/command`,
+  `/api/device/command/ack`, plus the signed firmware check. Device tokens are
+  SHA-256 hashed, approved-only, and the incident route already deduplicates on
+  `(deviceId, clientIncidentId)`.
+- **Product gaps:** tracker registration errors/duplicates (T1), a dedicated
+  heartbeat endpoint and per-device rate limits (T4), tracker actions (T2/T3),
+  incident workflow/map/timeline (T6), alert delivery status (T7), live KPIs
+  and maps (T8/T9), and API/workflow tests (T15). The shared queue is
+  [`../TASKS.md`](../TASKS.md).
+- **Verification:** `pnpm self-check` is the local gate; the web job runs lint,
+  typecheck, Vitest, the RLS test against a disposable Postgres service and the
+  production build. Firmware has its own `scripts/verify.sh` gate.
+
+## Firmware setup baseline (2026-11-22)
+
 Snapshot: 2026-11-22, branch `develop` at `feb8297`, firmware version `0.1.0`.
 
 This note is the baseline for the agent setup. It records what exists before the
@@ -26,11 +51,12 @@ outside a build system. No migration was needed.
 | `firmware/main/safety.h` | Countdown, cancel, retry, faults, reset history, intervals (Arduino-free) |
 | `firmware/main/gps.h` | Fix validation (Arduino-free) |
 | `firmware/main/power.h` | ADC scaling and power classification (Arduino-free) |
+| `firmware/main/provisioning.h` | Setup AP name, form/NVS validation, boot reset gesture (Arduino-free) |
 | `firmware/main/status.h` | Buzzer patterns (Arduino-free) |
 | `firmware/main/modem.h` | Bounded ASCII SOS body (Arduino-free) |
 | `firmware/main/hardware.h` | `hw::` aliases over the canonical pin map |
 | `firmware/include/pins.h` | Canonical GPIO map (added by the setup) |
-| `firmware/test/` | 23 native Unity tests across config, filters and safety |
+| `firmware/test/` | 47 native Unity tests across config, filters, provisioning and safety |
 
 The pure headers are compiled on the host by the `native` PlatformIO
 environment. The sketch needs the ESP32 core and is excluded from that build.
@@ -45,7 +71,9 @@ environment. The sketch needs the ESP32 core and is excluded from that build.
 - Versioned configuration from the server, validated against a min/max envelope
   and persisted in NVS.
 - Serial provisioning (`SET_ID`, `SET_TOKEN`, `SET_PHONE1`, `SET_PHONE2`,
-  `SET_PLATE`, `STATUS`, `REBOOT`).
+  `SET_PLATE`, `STATUS`, `REBOOT`) and the WiFi commissioning portal
+  (test-before-save, 10-minute lifetime, GPIO 33 boot reset). WiFi is
+  commissioning-only; the A7670E remains the uplink.
 - Server-side contract drift test parses `firmware/main/config.h`.
 
 ## Existing CI

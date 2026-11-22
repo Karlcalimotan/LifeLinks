@@ -61,6 +61,13 @@ export const ingestSchema = z.object({
 	events: z.array(deviceEventSchema).max(30).default([]),
 });
 
+/** A heartbeat-only request; batched telemetry and events stay on /ingest. */
+export const heartbeatRequestSchema = ingestSchema.pick({
+	device_id: true,
+	firmware_version: true,
+	heartbeat: true,
+});
+
 export const incidentSchema = z.object({
 	device_id: z.string().min(1).max(64),
 	incident_id: z.string().min(1).max(64),
@@ -84,6 +91,7 @@ export const commandAckSchema = z.object({
 	detail: z.string().max(500).optional(),
 });
 
+export type HeartbeatInput = z.infer<typeof heartbeatRequestSchema>;
 export type IngestInput = z.infer<typeof ingestSchema>;
 export type IncidentInput = z.infer<typeof incidentSchema>;
 export type CommandAckInput = z.infer<typeof commandAckSchema>;

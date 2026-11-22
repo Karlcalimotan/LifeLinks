@@ -40,6 +40,20 @@ grade.
   The agent may write and test code, but must not power, wire or flash the
   device.
 
+## Issue-first workflow
+
+1. Before creating an issue or starting work, run `pnpm overlap:check` to list
+   J-Akiru5's open issues and pull requests. If an item already covers the task,
+   coordinate on it instead of creating a duplicate. Do not take over an issue
+   assigned to someone else. If there is an overlap decision, J-Akiru5's
+   decision takes priority: pause the conflicting work, comment on his issue or
+   PR, and align with his design instead of merging a competing one.
+2. Create a GitHub issue from `.github/ISSUE_TEMPLATE/`.
+3. Put the objective, scope, acceptance criteria and test plan in the issue.
+4. Open the PR against `develop` and link the issue with `Closes #N`,
+   `Fixes #N`, `Refs #N` or `Part of #N`.
+5. The `Issue policy` check enforces this. Do not start work without an issue.
+
 ## Workflow
 
 1. Work on a new feature branch; never work directly on `main`, `staging` or
@@ -55,6 +69,19 @@ grade.
 7. Commit often.
 8. The firmware version is independent of the application/PWA version. Bump
    `FW_VERSION` only when the firmware changes.
+
+## Agent collaboration
+
+- `reviewer` is a read-only reviewer. It cannot edit, push or merge.
+- `release-manager` prepares version bumps and changelog sections. It cannot
+  push, tag, merge, deploy or touch `main`.
+- `integrator` merges PRs into `develop` and `staging` only after every required
+  check passes. It uses `node scripts/merge-pr.mjs` and cannot merge `main`.
+- The parent agent owns the issue, worktree, scope, verification and final
+  report. It verifies subagent work instead of trusting a report.
+- One task, one issue, one worktree, one branch. Never edit another agent's
+  worktree.
+- See [`docs/agents.md`](docs/agents.md) for the full protocol.
 
 ## Done means
 
