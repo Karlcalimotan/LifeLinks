@@ -14,23 +14,40 @@ function value(formData: FormData, key: string): string {
 async function transition(formData: FormData, to: ImpactStatusName) {
 	const locale = value(formData, "locale") === "tl" ? "tl" : "en";
 	const incidentId = value(formData, "incidentId");
+	const fromDashboard = value(formData, "returnTo") === "dashboard";
 	const current = await requireUser();
 
 	if (!canManageIncidents(current.role)) {
-		redirect(`/${locale}/incidents/${incidentId}?error=forbidden`);
+		redirect(
+			fromDashboard
+				? `/${locale}/dashboard?error=forbidden`
+				: `/${locale}/incidents/${incidentId}?error=forbidden`,
+		);
 	}
 
 	const incident = await prisma.impactEvent.findFirst({
 		where: { id: incidentId, orgId: current.org.id },
 		include: { vehicle: { select: { ownerId: true } } },
 	});
-	if (!incident) redirect(`/${locale}/incidents?error=notfound`);
+	if (!incident) {
+		redirect(
+			fromDashboard ? `/${locale}/dashboard?error=notfound` : `/${locale}/incidents?error=notfound`,
+		);
+	}
 	if (current.role === "USER" && incident.vehicle.ownerId !== current.user.id) {
-		redirect(`/${locale}/incidents/${incidentId}?error=forbidden`);
+		redirect(
+			fromDashboard
+				? `/${locale}/dashboard?error=forbidden`
+				: `/${locale}/incidents/${incidentId}?error=forbidden`,
+		);
 	}
 
 	if (!canTransition(incident.status as ImpactStatusName, to)) {
-		redirect(`/${locale}/incidents/${incident.id}?error=transition`);
+		redirect(
+			fromDashboard
+				? `/${locale}/dashboard?error=transition`
+				: `/${locale}/incidents/${incident.id}?error=transition`,
+		);
 	}
 
 	const now = new Date();
@@ -67,6 +84,9 @@ async function transition(formData: FormData, to: ImpactStatusName) {
 	revalidatePath(`/${locale}/dashboard`);
 	revalidatePath(`/${locale}/incidents`);
 	revalidatePath(`/${locale}/incidents/${incident.id}`);
+	if (fromDashboard) {
+		redirect(`/${locale}/dashboard?updated=${to === "ACKNOWLEDGED" ? "acknowledged" : "1"}`);
+	}
 	redirect(`/${locale}/incidents/${incident.id}?updated=1`);
 }
 
