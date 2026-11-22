@@ -147,7 +147,12 @@
 		"speed": "Speed",
 		"battery": "Battery",
 		"ignition": "Ignition",
-		"viewMap": "Open map"
+		"viewMap": "Open map",
+		"errorTitle": "Vehicles could not load",
+		"errorBody": "The vehicle data did not arrive. Try again, and if it keeps failing, check the health endpoint.",
+		"errorRetry": "Try again",
+		"errorBack": "Back to the dashboard",
+		"errorBackList": "Back to vehicles"
 	},
 	"incidents": {
 		"title": "Incidents",
@@ -178,7 +183,10 @@
 		"resolution": "Resolution",
 		"incidentId": "Incident ID",
 		"backToList": "Back to incidents",
-		"statusUpdated": "Incident updated."
+		"statusUpdated": "Incident updated.",
+		"errorTitle": "Incidents could not load",
+		"errorBody": "The incident list did not arrive. Try again, and if it keeps failing, check the health endpoint.",
+		"retry": "Try again"
 	},
 	"devices": {
 		"title": "Trackers",
@@ -223,7 +231,12 @@
 		"summaryUnknown": "{count} never seen",
 		"summaryLowBattery": "{count} low battery",
 		"pendingCallout": "{count, plural, one {# tracker is waiting for approval.} other {# trackers are waiting for approval.}}",
-		"reviewPending": "Review"
+		"reviewPending": "Review",
+		"errorTitle": "Trackers could not load",
+		"errorBody": "The tracker data did not arrive. Try again, and if it keeps failing, check the health endpoint.",
+		"errorRetry": "Try again",
+		"errorBack": "Back to the dashboard",
+		"errorBackList": "Back to trackers"
 	},
 	"settings": {
 		"title": "Settings",
@@ -299,7 +312,11 @@
 		"incidentRetention": "Incident retention (days)",
 		"parkedImpactAlerts": "Alert on impacts while parked",
 		"saveSettings": "Save settings",
-		"adminOnly": "Only admins can change these settings."
+		"adminOnly": "Only admins can change these settings.",
+		"errorTitle": "Settings could not load",
+		"errorBody": "The settings data did not arrive. Try again, and if it keeps failing, check the health endpoint.",
+		"errorRetry": "Try again",
+		"errorBack": "Back to the dashboard"
 	},
 	"errors": {
 		"notFound": "Page not found",

@@ -147,7 +147,12 @@
 		"speed": "Speed",
 		"battery": "Battery",
 		"ignition": "Ignition",
-		"viewMap": "Open map"
+		"viewMap": "Open map",
+		"errorTitle": "Hindi ma-load ang mga sasakyan",
+		"errorBody": "Hindi dumating ang data ng mga sasakyan. Subukan muli, at kung patuloy na nabigo, tingnan ang health endpoint.",
+		"errorRetry": "Subukan muli",
+		"errorBack": "Bumalik sa dashboard",
+		"errorBackList": "Bumalik sa mga sasakyan"
 	},
 	"incidents": {
 		"title": "Mga Insidente",
@@ -178,7 +183,10 @@
 		"resolution": "Resolution",
 		"incidentId": "Incident ID",
 		"backToList": "Back to incidents",
-		"statusUpdated": "Incident updated."
+		"statusUpdated": "Incident updated.",
+		"errorTitle": "Hindi ma-load ang mga insidente",
+		"errorBody": "Hindi dumating ang listahan ng insidente. Subukan muli, at kung patuloy na nabigo, tingnan ang health endpoint.",
+		"retry": "Subukan muli"
 	},
 	"devices": {
 		"title": "Mga Tracker",
@@ -223,7 +231,12 @@
 		"summaryUnknown": "{count} hindi pa nakita",
 		"summaryLowBattery": "{count} mababa ang baterya",
 		"pendingCallout": "{count, plural, one {# tracker ang naghihintay ng aprubasyon.} other {# tracker ang naghihintay ng aprubasyon.}}",
-		"reviewPending": "Suriin"
+		"reviewPending": "Suriin",
+		"errorTitle": "Hindi ma-load ang mga tracker",
+		"errorBody": "Hindi dumating ang data ng mga tracker. Subukan muli, at kung patuloy na nabigo, tingnan ang health endpoint.",
+		"errorRetry": "Subukan muli",
+		"errorBack": "Bumalik sa dashboard",
+		"errorBackList": "Bumalik sa mga tracker"
 	},
 	"settings": {
 		"title": "Mga Setting",
@@ -299,7 +312,11 @@
 		"incidentRetention": "Incident retention (days)",
 		"parkedImpactAlerts": "Alert on impacts while parked",
 		"saveSettings": "Save settings",
-		"adminOnly": "Only admins can change these settings."
+		"adminOnly": "Only admins can change these settings.",
+		"errorTitle": "Hindi ma-load ang mga setting",
+		"errorBody": "Hindi dumating ang data ng settings. Subukan muli, at kung patuloy na nabigo, tingnan ang health endpoint.",
+		"errorRetry": "Subukan muli",
+		"errorBack": "Bumalik sa dashboard"
 	},
 	"errors": {
 		"notFound": "Page not found",

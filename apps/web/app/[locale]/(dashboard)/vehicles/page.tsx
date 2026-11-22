@@ -76,7 +76,7 @@ export default async function VehiclesPage({ params }: { params: Promise<{ local
 											<TableCell>
 												{vehicle.driverName ?? "—"}
 												{vehicle.driverPhone ? (
-													<span className="block text-[11px] text-fog-500">
+													<span className="block text-meta text-fog-500">
 														{vehicle.driverPhone}
 													</span>
 												) : null}
