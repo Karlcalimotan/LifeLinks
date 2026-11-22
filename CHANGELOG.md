@@ -12,6 +12,8 @@ All notable changes to this project are documented here. The format follows
 
 - Lean vehicle-alert console: dashboard, vehicles, incidents, trackers and settings.
 - Row-level security on every application table for the Supabase deployment.
+- Per-organization RLS policies with a non-owner verification role and test.
+  CI runs the test against a disposable Postgres service.
 - Vercel deployment allowlist: automatic deployments are restricted to `main`
   (production) and `staging` (preview); `develop` is integration only and does
   not deploy. Preview deployments from every other branch are disabled. The
@@ -64,6 +66,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Application `orgId` filters and role checks are documented as the authoritative
+  tenant boundary; RLS is defense-in-depth for non-owner roles.
 - Deployment role swap: `staging` is the preview deployment and `develop` is the
   reconciliation gate. `develop` no longer deploys, and the earlier `stage`
   branch is retired.

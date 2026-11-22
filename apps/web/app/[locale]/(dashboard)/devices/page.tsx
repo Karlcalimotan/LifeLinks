@@ -1,4 +1,6 @@
 import { RegisterTrackerDrawer } from "@/components/devices/register-tracker-drawer";
+import { CreateDeviceForm } from "@/components/devices/create-device-form";
+import { DevicesToolbar } from "@/components/devices/devices-toolbar";
 import { ApprovalBadge, DeviceStatusBadge } from "@/components/domain/badges";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState, PageHeader } from "@/components/ui/page-header";
@@ -16,6 +18,20 @@ import { batteryBand, deviceConnectionState } from "@/lib/device/status";
 import prisma from "@/lib/prisma";
 import { formatDateTime, formatRelative } from "@/lib/utils";
 import { ChevronRight } from "lucide-react";
+import {
+	DEVICE_PAGE_SIZE,
+	LOW_BATTERY_V,
+	type SortField,
+	buildDevicesHref,
+	deviceOrderBy,
+	deviceWhere,
+	hasActiveFilters,
+	parseDevicesQuery,
+} from "@/lib/device/query";
+import { deviceConnectionState } from "@/lib/device/status";
+import prisma from "@/lib/prisma";
+import { formatDateTime, formatRelative } from "@/lib/utils";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
@@ -25,17 +41,32 @@ export default async function DevicesPage({
 	searchParams,
 }: {
 	params: Promise<{ locale: string }>;
-	searchParams: Promise<{ deleted?: string; error?: string }>;
+	searchParams: Promise<{
+		deleted?: string;
+		error?: string;
+		[key: string]: string | string[] | undefined;
+	}>;
 }) {
 	const { locale } = await params;
-	const { deleted, error } = await searchParams;
+	const rawSearch = await searchParams;
+	const deleted = typeof rawSearch.deleted === "string" ? rawSearch.deleted : "";
+	const error = typeof rawSearch.error === "string" ? rawSearch.error : "";
+	const query = parseDevicesQuery(rawSearch);
 	const current = await requireRole("ADMIN");
 	const t = await getTranslations({ locale, namespace: "devices" });
 
+	const where = deviceWhere(current.org.id, query);
+	const total = await prisma.trackerDevice.count({ where });
+	const pageCount = Math.max(1, Math.ceil(total / DEVICE_PAGE_SIZE));
+	const page = Math.min(query.page, pageCount);
+	const effectiveQuery = { ...query, page };
+
 	const [devices, vehicles] = await Promise.all([
 		prisma.trackerDevice.findMany({
-			where: { orgId: current.org.id },
-			orderBy: { createdAt: "desc" },
+			where,
+			orderBy: deviceOrderBy(effectiveQuery),
+			skip: (page - 1) * DEVICE_PAGE_SIZE,
+			take: DEVICE_PAGE_SIZE,
 			include: { vehicle: true },
 		}),
 		prisma.vehicle.findMany({
@@ -63,6 +94,20 @@ export default async function DevicesPage({
 		id: vehicle.id,
 		label: `${vehicle.plateNo}: ${vehicle.make} ${vehicle.model}`,
 	}));
+	const sortHref = (field: SortField) =>
+		buildDevicesHref(effectiveQuery, {
+			sort: field,
+			dir: effectiveQuery.sort === field && effectiveQuery.dir === "asc" ? "desc" : "asc",
+			page: 1,
+		});
+	const sortIcon = (field: SortField) => {
+		if (effectiveQuery.sort !== field) return null;
+		return effectiveQuery.dir === "asc" ? (
+			<ChevronUp className="size-3" />
+		) : (
+			<ChevronDown className="size-3" />
+		);
+	};
 
 	return (
 		<>
@@ -128,8 +173,23 @@ export default async function DevicesPage({
 
 			<Card>
 				<CardContent className="pt-5">
+					<DevicesToolbar query={effectiveQuery} total={total} />
 					{devices.length === 0 ? (
-						<EmptyState title={t("empty")} />
+						<div>
+							<EmptyState
+								title={hasActiveFilters(query) ? "No trackers match these filters" : t("empty")}
+								body={
+									hasActiveFilters(query) ? "Clear the filters to see every tracker." : undefined
+								}
+							/>
+							{hasActiveFilters(query) ? (
+								<div className="mt-3 text-center">
+									<Link href="/devices" className="text-xs text-signal-400 hover:text-signal-300">
+										Clear filters
+									</Link>
+								</div>
+							) : null}
+						</div>
 					) : (
 						<Table className="min-w-[720px]">
 							<TableHeader>
@@ -140,6 +200,54 @@ export default async function DevicesPage({
 									<TableHead>{t("battery")}</TableHead>
 									<TableHead>{t("firmware")}</TableHead>
 									<TableHead className="text-right">{t("actions")}</TableHead>
+									<TableHead>
+										<Link
+											href={sortHref("label")}
+											className="inline-flex items-center gap-1 hover:text-fog-100"
+										>
+											{t("label")}
+											{sortIcon("label")}
+										</Link>
+									</TableHead>
+									<TableHead>
+										<Link
+											href={sortHref("mac")}
+											className="inline-flex items-center gap-1 hover:text-fog-100"
+										>
+											{t("mac")}
+											{sortIcon("mac")}
+										</Link>
+									</TableHead>
+									<TableHead>{t("vehicle")}</TableHead>
+									<TableHead>
+										<Link
+											href={sortHref("approval")}
+											className="inline-flex items-center gap-1 hover:text-fog-100"
+										>
+											{t("approval")}
+											{sortIcon("approval")}
+										</Link>
+									</TableHead>
+									<TableHead>Status</TableHead>
+									<TableHead>{t("firmware")}</TableHead>
+									<TableHead>
+										<Link
+											href={sortHref("lastSeen")}
+											className="inline-flex items-center gap-1 hover:text-fog-100"
+										>
+											{t("lastSeen")}
+											{sortIcon("lastSeen")}
+										</Link>
+									</TableHead>
+									<TableHead>
+										<Link
+											href={sortHref("battery")}
+											className="inline-flex items-center gap-1 hover:text-fog-100"
+										>
+											{t("battery")}
+											{sortIcon("battery")}
+										</Link>
+									</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
@@ -154,6 +262,7 @@ export default async function DevicesPage({
 													Math.max(0, ((device.batteryV - 10.5) / (13.2 - 10.5)) * 100),
 												);
 
+									const lowBattery = device.batteryV != null && device.batteryV < LOW_BATTERY_V;
 									return (
 										<TableRow key={device.id}>
 											<TableCell>
@@ -180,6 +289,10 @@ export default async function DevicesPage({
 												>
 													{formatRelative(device.lastSeenAt)}
 												</span>
+											</TableCell>
+											<TableCell className="font-mono text-xs text-fog-500">{device.mac}</TableCell>
+											<TableCell className="text-fog-300">
+												{device.vehicle?.plateNo ?? "Unassigned"}
 											</TableCell>
 											<TableCell>
 												<ApprovalBadge status={device.approvalStatus} />
@@ -221,6 +334,30 @@ export default async function DevicesPage({
 													{t("open")}
 													<ChevronRight className="size-3.5" aria-hidden="true" />
 												</Link>
+												<DeviceStatusBadge state={deviceConnectionState(device.lastSeenAt)} />
+											</TableCell>
+											<TableCell className="text-xs text-fog-500">
+												{device.firmwareVersion ?? "—"}
+											</TableCell>
+											<TableCell
+												className="text-xs text-fog-500"
+												title={formatDateTime(device.lastSeenAt, locale)}
+											>
+												{formatRelative(device.lastSeenAt)}
+											</TableCell>
+											<TableCell className="text-xs">
+												{device.batteryV != null ? (
+													<span
+														className={lowBattery ? "font-medium text-alarm-300" : "text-fog-500"}
+													>
+														{device.batteryV.toFixed(1)} V
+														{lowBattery ? (
+															<span className="ml-1 text-[10px] uppercase">Low</span>
+														) : null}
+													</span>
+												) : (
+													<span className="text-fog-500">—</span>
+												)}
 											</TableCell>
 										</TableRow>
 									);
@@ -228,6 +365,31 @@ export default async function DevicesPage({
 							</TableBody>
 						</Table>
 					)}
+					{pageCount > 1 ? (
+						<div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+							<span className="text-xs text-fog-500">
+								Page {page} of {pageCount} · {total} trackers
+							</span>
+							<div className="flex gap-2">
+								{page > 1 ? (
+									<Link
+										href={buildDevicesHref(effectiveQuery, { page: page - 1 })}
+										className="inline-flex h-8 items-center rounded border border-ink-600 px-3 text-xs text-fog-300 hover:bg-ink-700/60"
+									>
+										Previous
+									</Link>
+								) : null}
+								{page < pageCount ? (
+									<Link
+										href={buildDevicesHref(effectiveQuery, { page: page + 1 })}
+										className="inline-flex h-8 items-center rounded border border-ink-600 px-3 text-xs text-fog-300 hover:bg-ink-700/60"
+									>
+										Next
+									</Link>
+								) : null}
+							</div>
+						</div>
+					) : null}
 				</CardContent>
 			</Card>
 		</>

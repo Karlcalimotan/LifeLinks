@@ -24,6 +24,10 @@ status and may update their own branch copy.
       Part of #46; first visible improvement.
 - [ ] **T3 TODO** — Trackers: search, filter (status, vehicle, approval), sort,
       pagination.
+- [x] **T2 DONE** - Trackers: Approve / Reject / Edit / Delete actions with
+      confirm dialogs and an audit log. PR #40.
+- [ ] **T3 IN REVIEW** - Trackers: search, filter (status, vehicle, approval), sort,
+      pagination. Issue #45; PR #50.
 - [x] **T4 DONE** — Device ingestion API: `POST /api/device/heartbeat`
       and `/api/device/incident`, per-device auth token, idempotency key, rate
       limit, input validation (zod). Issue #37, PR #39.
