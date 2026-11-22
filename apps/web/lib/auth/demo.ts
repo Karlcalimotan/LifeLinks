@@ -13,5 +13,5 @@ export const DEMO_ACCOUNTS = [
 ] as const;
 
 export function demoModeEnabled(env: Record<string, string | undefined> = process.env): boolean {
-	return env.DEMO_MODE === "true";
+	return env.DEMO_MODE === "true" && (env.NODE_ENV === "development" || env.NODE_ENV === "test");
 }

@@ -19,13 +19,16 @@ function secretBytes(secret: string): Uint8Array {
 
 export function resolveAuthSecret(env: Env = process.env): Uint8Array {
 	const secret = env.AUTH_SECRET?.trim();
+	const isDevelopment = env.NODE_ENV === "development" || env.NODE_ENV === "test";
 
-	if (env.NODE_ENV === "production") {
+	if (!isDevelopment) {
 		if (!secret) {
-			throw new Error("AUTH_SECRET is required in production.");
+			throw new Error("AUTH_SECRET is required outside development and test.");
 		}
 		if (secretBytes(secret).length < MIN_AUTH_SECRET_BYTES) {
-			throw new Error(`AUTH_SECRET must be at least ${MIN_AUTH_SECRET_BYTES} bytes in production.`);
+			throw new Error(
+				`AUTH_SECRET must be at least ${MIN_AUTH_SECRET_BYTES} bytes outside development and test.`,
+			);
 		}
 		return secretBytes(secret);
 	}

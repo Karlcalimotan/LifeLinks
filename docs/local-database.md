@@ -45,6 +45,7 @@ commit real credentials.
 ```bash
 pnpm prisma:deploy
 SEED_DEMO=yes pnpm seed
+# A remote demo target also requires SEED_ALLOW_REMOTE=yes.
 ```
 
 PowerShell:

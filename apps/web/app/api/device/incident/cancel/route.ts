@@ -2,7 +2,11 @@ import { ok } from "@/lib/api/envelope";
 import { badRequest, conflict, forbidden, notFound, rateLimited } from "@/lib/api/errors";
 import { withApi } from "@/lib/api/instrumentation";
 import { isDeviceApproved, requireDevice } from "@/lib/device/auth";
-import { CANCEL_RATE_LIMIT, evaluateCancelAttempt } from "@/lib/device/cancel";
+import {
+	CANCELLABLE_STATUSES,
+	CANCEL_RATE_LIMIT,
+	evaluateCancelAttempt,
+} from "@/lib/device/cancel";
 import { resolveDeviceTime } from "@/lib/device/time";
 import prisma from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
@@ -120,11 +124,12 @@ export const POST = withApi(
 			});
 		}
 
+		let racedCancelled = false;
 		await prisma.$transaction(async (tx) => {
 			// Re-check the cancellable status in the update itself. An operator
 			// acknowledging the incident between the read and this write must win.
 			const updated = await tx.impactEvent.updateMany({
-				where: { id: incident.id, status: { in: ["SUSPECTED", "CONFIRMED"] } },
+				where: { id: incident.id, status: { in: [...CANCELLABLE_STATUSES] } },
 				data: {
 					status: "CANCELLED",
 					cancelledAt,
@@ -132,6 +137,14 @@ export const POST = withApi(
 				},
 			});
 			if (updated.count === 0) {
+				const current = await tx.impactEvent.findUnique({
+					where: { id: incident.id },
+					select: { status: true },
+				});
+				if (current?.status === "CANCELLED") {
+					racedCancelled = true;
+					return;
+				}
 				throw conflict("Incident can no longer be cancelled by the device.");
 			}
 			await tx.deviceStateEvent.create({
@@ -143,7 +156,12 @@ export const POST = withApi(
 			});
 		});
 
-		return ok({ received: true, status: "CANCELLED", changed: true });
+		return ok({
+			received: true,
+			status: "CANCELLED",
+			changed: !racedCancelled,
+			duplicate: racedCancelled,
+		});
 	},
 	{ route: "POST /api/device/incident/cancel" },
 );

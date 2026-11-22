@@ -28,6 +28,7 @@ pnpm install
 cp apps/web/.env.example apps/web/.env   # fill in the Supabase URLs
 pnpm prisma:deploy
 SEED_DEMO=yes pnpm seed                  # PowerShell: $env:SEED_DEMO="yes"; pnpm seed
+                                         # remote demo target also needs SEED_ALLOW_REMOTE=yes
 pnpm dev
 ```
 

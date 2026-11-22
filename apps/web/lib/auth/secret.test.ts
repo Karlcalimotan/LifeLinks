@@ -9,16 +9,22 @@ import {
 const decode = (bytes: Uint8Array) => new TextDecoder().decode(bytes);
 
 describe("auth secret policy", () => {
-	it("fails closed in production when the secret is missing", () => {
+	it("fails closed outside development and test when the secret is missing", () => {
 		expect(() => resolveAuthSecret({ NODE_ENV: "production" })).toThrow(
-			/AUTH_SECRET is required in production/,
+			/AUTH_SECRET is required outside development and test/,
+		);
+		expect(() => resolveAuthSecret({ NODE_ENV: "staging" })).toThrow(
+			/AUTH_SECRET is required outside development and test/,
 		);
 	});
 
-	it("rejects a production secret shorter than 32 bytes", () => {
+	it("rejects a short secret outside development and test", () => {
 		expect(() =>
 			resolveAuthSecret({ NODE_ENV: "production", AUTH_SECRET: "x".repeat(31) }),
 		).toThrow(new RegExp(`at least ${MIN_AUTH_SECRET_BYTES} bytes`));
+		expect(() => resolveAuthSecret({ NODE_ENV: "staging", AUTH_SECRET: "x".repeat(31) })).toThrow(
+			new RegExp(`at least ${MIN_AUTH_SECRET_BYTES} bytes`),
+		);
 	});
 
 	it("accepts a 32-byte production secret and ignores surrounding spaces", () => {
