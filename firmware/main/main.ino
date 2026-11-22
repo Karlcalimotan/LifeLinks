@@ -578,8 +578,7 @@ void handleCommands(JsonArray commands) {
 			const String incidentId = command["payload"]["incident_id"] | "";
 			const bool allClear = command["payload"]["all_clear"] | false;
 
-			if (!incidentId.isEmpty() && !g_incidentId.isEmpty() &&
-				incidentId != g_incidentId) {
+			if (!incidentId.isEmpty() && !g_incidentId.isEmpty() && incidentId != g_incidentId) {
 				Serial.println("[CMD] CANCEL_ALERT for a different incident");
 				sendCommandAck(id, "ACKED", "unknown_incident");
 				continue;
