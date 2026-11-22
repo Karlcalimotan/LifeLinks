@@ -2,16 +2,59 @@
 
 import { canAdminister, requireUser } from "@/lib/auth/session";
 import { generateDeviceToken, hashDeviceToken } from "@/lib/device/auth";
-import { commandSchema, createDeviceSchema, normalizeMac } from "@/lib/device/validation";
+import { commandSchema, createDeviceSchema } from "@/lib/device/validation";
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import type { ZodError } from "zod";
+
+export interface DeviceFormValues {
+	mac: string;
+	label: string;
+	vehicleId: string;
+}
+
+export interface DeviceFormFieldErrors {
+	mac?: string;
+	label?: string;
+	vehicleId?: string;
+}
 
 export interface DeviceTokenState {
 	ok: boolean;
 	error?: string;
+	fieldErrors?: DeviceFormFieldErrors;
+	values?: DeviceFormValues;
 	token?: string;
 	mac?: string;
+}
+
+const DEVICE_FIELDS = new Set(["mac", "label", "vehicleId"]);
+const DUPLICATE_MAC = "A tracker with this MAC is already registered.";
+
+function isDeviceField(value: string): value is keyof DeviceFormFieldErrors {
+	return DEVICE_FIELDS.has(value);
+}
+
+function fieldErrorsFrom(error: ZodError): DeviceFormFieldErrors {
+	const fieldErrors: DeviceFormFieldErrors = {};
+	for (const issue of error.issues) {
+		const field = issue.path[0];
+		if (typeof field === "string" && isDeviceField(field) && !fieldErrors[field]) {
+			fieldErrors[field] = issue.message;
+		}
+	}
+	return fieldErrors;
+}
+
+function isUniqueMacError(error: unknown): boolean {
+	if (typeof error !== "object" || error === null) return false;
+	if (!("code" in error) || error.code !== "P2002") return false;
+	const meta = "meta" in error ? error.meta : null;
+	const target = typeof meta === "object" && meta !== null && "target" in meta ? meta.target : null;
+	if (Array.isArray(target)) return target.some((value) => String(value).includes("mac"));
+	if (typeof target === "string") return target.includes("mac");
+	return true;
 }
 
 function localeFrom(formData: FormData): string {
@@ -27,38 +70,54 @@ export async function createDeviceAction(
 		return { ok: false, error: "Only admins can register trackers." };
 	}
 
-	const parsed = createDeviceSchema.safeParse({
+	const values: DeviceFormValues = {
 		mac: String(formData.get("mac") ?? ""),
 		label: String(formData.get("label") ?? ""),
 		vehicleId: String(formData.get("vehicleId") ?? ""),
-	});
+	};
+	const parsed = createDeviceSchema.safeParse(values);
 	if (!parsed.success) {
-		return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid tracker details." };
+		return { ok: false, fieldErrors: fieldErrorsFrom(parsed.error), values };
 	}
 
-	const mac = normalizeMac(parsed.data.mac);
-	const existing = await prisma.trackerDevice.findUnique({ where: { mac } });
-	if (existing) return { ok: false, error: "A tracker with that MAC already exists." };
+	const mac = parsed.data.mac;
+	const existing = await prisma.trackerDevice.findUnique({ where: { mac }, select: { id: true } });
+	if (existing) return { ok: false, fieldErrors: { mac: DUPLICATE_MAC }, values };
 
 	const vehicleId = parsed.data.vehicleId || null;
 	if (vehicleId) {
 		const vehicle = await prisma.vehicle.findFirst({
 			where: { id: vehicleId, orgId: current.org.id },
+			select: { id: true },
 		});
-		if (!vehicle) return { ok: false, error: "That vehicle is not in your organization." };
+		if (!vehicle) {
+			return {
+				ok: false,
+				fieldErrors: { vehicleId: "Choose a vehicle from your organization." },
+				values,
+			};
+		}
 	}
 
 	const token = generateDeviceToken();
-	const device = await prisma.trackerDevice.create({
-		data: {
-			orgId: current.org.id,
-			vehicleId,
-			mac,
-			label: parsed.data.label,
-			tokenHash: hashDeviceToken(token),
-			approvalStatus: "APPROVED",
-		},
-	});
+	const device = await prisma.trackerDevice
+		.create({
+			data: {
+				orgId: current.org.id,
+				vehicleId,
+				mac,
+				label: parsed.data.label,
+				tokenHash: hashDeviceToken(token),
+				approvalStatus: "APPROVED",
+			},
+		})
+		.catch((error) => {
+			// The pre-check above is not atomic; the unique index is the final
+			// guard against two admins registering the same MAC at once.
+			if (isUniqueMacError(error)) return null;
+			throw error;
+		});
+	if (!device) return { ok: false, fieldErrors: { mac: DUPLICATE_MAC }, values };
 
 	await prisma.auditLog.create({
 		data: {
