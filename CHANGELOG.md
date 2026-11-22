@@ -34,6 +34,7 @@ All notable changes to this project are documented here. The format follows
 - Branch protection on `main` and `develop`: pull requests, required CI
   checks, conversation resolution, no force pushes and no branch deletion.
   `main` additionally requires one approval and linear history.
+- Immutable `v*` release tags via a repository ruleset.
 
 ### Changed
 

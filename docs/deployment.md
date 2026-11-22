@@ -60,9 +60,10 @@ requires:
 - an empty `## [Unreleased]` section, because the release entries have moved
   into the version section.
 
-Tags are annotated `vX.Y.Z` and point at the release commit. A tag, once pushed,
-is immutable: never move, delete or replace it. Fix forward with a new PATCH
-release.
+Tags are annotated `vX.Y.Z` and point at the release commit. A repository
+ruleset (`immutable-release-tags`) blocks deletion and update of `refs/tags/v*`.
+A tag, once pushed, is immutable: never move, delete or replace it. Fix forward
+with a new PATCH release.
 
 ## Release process
 
@@ -160,6 +161,7 @@ needed for another reason; `pnpm build` is the normal local check.
       removed.
 - [x] Repository workflows and scripts checked by `deployment-check.mjs`.
 - [x] Branch protection enabled on `main` and `develop`.
+- [x] `refs/tags/v*` protected against update and deletion.
 - [x] Version sources of truth declared and checked.
 - [ ] `Deployment policy` added to required checks after promotion.
 - [ ] A release PR to `main` passes `release-check.mjs --require-release`.
