@@ -1,6 +1,5 @@
-import { RegisterTrackerDrawer } from "@/components/devices/register-tracker-drawer";
-import { CreateDeviceForm } from "@/components/devices/create-device-form";
 import { DevicesToolbar } from "@/components/devices/devices-toolbar";
+import { RegisterTrackerDrawer } from "@/components/devices/register-tracker-drawer";
 import { ApprovalBadge, DeviceStatusBadge } from "@/components/domain/badges";
 import { Card, CardContent } from "@/components/ui/card";
 import { EmptyState, PageHeader } from "@/components/ui/page-header";
@@ -14,10 +13,7 @@ import {
 } from "@/components/ui/table";
 import { Link } from "@/i18n/routing";
 import { canAdminister, requireRole } from "@/lib/auth/session";
-import { batteryBand, deviceConnectionState } from "@/lib/device/status";
-import prisma from "@/lib/prisma";
-import { formatDateTime, formatRelative } from "@/lib/utils";
-import { ChevronRight } from "lucide-react";
+import { DEVICE_OFFLINE_AFTER_MIN } from "@/lib/constants";
 import {
 	DEVICE_PAGE_SIZE,
 	LOW_BATTERY_V,
@@ -28,10 +24,10 @@ import {
 	hasActiveFilters,
 	parseDevicesQuery,
 } from "@/lib/device/query";
-import { deviceConnectionState } from "@/lib/device/status";
+import { batteryBand, deviceConnectionState } from "@/lib/device/status";
 import prisma from "@/lib/prisma";
 import { formatDateTime, formatRelative } from "@/lib/utils";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
@@ -60,8 +56,20 @@ export default async function DevicesPage({
 	const pageCount = Math.max(1, Math.ceil(total / DEVICE_PAGE_SIZE));
 	const page = Math.min(query.page, pageCount);
 	const effectiveQuery = { ...query, page };
+	const orgWhere = { orgId: current.org.id };
+	const offlineBefore = new Date(Date.now() - DEVICE_OFFLINE_AFTER_MIN * 60_000);
 
-	const [devices, vehicles] = await Promise.all([
+	const [
+		devices,
+		vehicles,
+		orgTotal,
+		approvedCount,
+		pendingCount,
+		neverSeenCount,
+		offlineCount,
+		lowBatteryCount,
+		firstPending,
+	] = await Promise.all([
 		prisma.trackerDevice.findMany({
 			where,
 			orderBy: deviceOrderBy(effectiveQuery),
@@ -74,26 +82,23 @@ export default async function DevicesPage({
 			orderBy: { plateNo: "asc" },
 			select: { id: true, plateNo: true, make: true, model: true },
 		}),
+		prisma.trackerDevice.count({ where: orgWhere }),
+		prisma.trackerDevice.count({ where: { ...orgWhere, approvalStatus: "APPROVED" } }),
+		prisma.trackerDevice.count({ where: { ...orgWhere, approvalStatus: "PENDING" } }),
+		prisma.trackerDevice.count({ where: { ...orgWhere, lastSeenAt: null } }),
+		prisma.trackerDevice.count({
+			where: { ...orgWhere, lastSeenAt: { lt: offlineBefore } },
+		}),
+		prisma.trackerDevice.count({
+			where: { ...orgWhere, batteryV: { lt: LOW_BATTERY_V } },
+		}),
+		prisma.trackerDevice.findFirst({
+			where: { ...orgWhere, approvalStatus: "PENDING" },
+			orderBy: { createdAt: "asc" },
+			select: { id: true },
+		}),
 	]);
 
-	const counts = {
-		total: devices.length,
-		approved: devices.filter((device) => device.approvalStatus === "APPROVED").length,
-		pending: devices.filter((device) => device.approvalStatus === "PENDING").length,
-		offline: devices.filter((device) => deviceConnectionState(device.lastSeenAt) === "offline")
-			.length,
-		unknown: devices.filter((device) => deviceConnectionState(device.lastSeenAt) === "unknown")
-			.length,
-		lowBattery: devices.filter((device) => {
-			const band = batteryBand(device.batteryV);
-			return band === "low" || band === "critical";
-		}).length,
-	};
-	const firstPending = devices.find((device) => device.approvalStatus === "PENDING");
-	const vehicleOptions = vehicles.map((vehicle) => ({
-		id: vehicle.id,
-		label: `${vehicle.plateNo}: ${vehicle.make} ${vehicle.model}`,
-	}));
 	const sortHref = (field: SortField) =>
 		buildDevicesHref(effectiveQuery, {
 			sort: field,
@@ -103,9 +108,9 @@ export default async function DevicesPage({
 	const sortIcon = (field: SortField) => {
 		if (effectiveQuery.sort !== field) return null;
 		return effectiveQuery.dir === "asc" ? (
-			<ChevronUp className="size-3" />
+			<ChevronUp className="size-3" aria-hidden="true" />
 		) : (
-			<ChevronDown className="size-3" />
+			<ChevronDown className="size-3" aria-hidden="true" />
 		);
 	};
 
@@ -118,7 +123,10 @@ export default async function DevicesPage({
 					canAdminister(current.role) ? (
 						<RegisterTrackerDrawer
 							locale={locale}
-							vehicles={vehicleOptions}
+							vehicles={vehicles.map((vehicle) => ({
+								id: vehicle.id,
+								label: `${vehicle.plateNo}: ${vehicle.make} ${vehicle.model}`,
+							}))}
 							labels={{
 								trigger: t("register"),
 								title: t("registerTitle"),
@@ -146,22 +154,22 @@ export default async function DevicesPage({
 			) : null}
 
 			<div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-meta text-fog-500">
-				<span className="font-medium text-fog-100">{t("summary", { count: counts.total })}</span>
+				<span className="font-medium text-fog-100">{t("summary", { count: orgTotal })}</span>
 				<span aria-hidden="true">·</span>
-				<span>{t("summaryApproved", { count: counts.approved })}</span>
+				<span>{t("summaryApproved", { count: approvedCount })}</span>
 				<span aria-hidden="true">·</span>
-				<span>{t("summaryPending", { count: counts.pending })}</span>
+				<span>{t("summaryPending", { count: pendingCount })}</span>
 				<span aria-hidden="true">·</span>
-				<span>{t("summaryOffline", { count: counts.offline })}</span>
+				<span>{t("summaryOffline", { count: offlineCount })}</span>
 				<span aria-hidden="true">·</span>
-				<span>{t("summaryUnknown", { count: counts.unknown })}</span>
+				<span>{t("summaryUnknown", { count: neverSeenCount })}</span>
 				<span aria-hidden="true">·</span>
-				<span>{t("summaryLowBattery", { count: counts.lowBattery })}</span>
+				<span>{t("summaryLowBattery", { count: lowBatteryCount })}</span>
 			</div>
 
-			{counts.pending > 0 && firstPending ? (
+			{pendingCount > 0 && firstPending ? (
 				<div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-panel border border-caution-400/30 bg-caution-400/10 px-3 py-2 text-meta text-caution-300">
-					<span>{t("pendingCallout", { count: counts.pending })}</span>
+					<span>{t("pendingCallout", { count: pendingCount })}</span>
 					<Link
 						href={`/devices/${firstPending.id}`}
 						className="font-medium underline-offset-2 hover:underline"
@@ -184,22 +192,16 @@ export default async function DevicesPage({
 							/>
 							{hasActiveFilters(query) ? (
 								<div className="mt-3 text-center">
-									<Link href="/devices" className="text-xs text-signal-400 hover:text-signal-300">
+									<Link href="/devices" className="text-meta text-fog-300 hover:text-signal-300">
 										Clear filters
 									</Link>
 								</div>
 							) : null}
 						</div>
 					) : (
-						<Table className="min-w-[720px]">
+						<Table className="min-w-[860px]">
 							<TableHeader>
 								<TableRow>
-									<TableHead>{t("label")}</TableHead>
-									<TableHead>{t("status")}</TableHead>
-									<TableHead>{t("approval")}</TableHead>
-									<TableHead>{t("battery")}</TableHead>
-									<TableHead>{t("firmware")}</TableHead>
-									<TableHead className="text-right">{t("actions")}</TableHead>
 									<TableHead>
 										<Link
 											href={sortHref("label")}
@@ -228,7 +230,7 @@ export default async function DevicesPage({
 											{sortIcon("approval")}
 										</Link>
 									</TableHead>
-									<TableHead>Status</TableHead>
+									<TableHead>{t("status")}</TableHead>
 									<TableHead>{t("firmware")}</TableHead>
 									<TableHead>
 										<Link
@@ -248,11 +250,11 @@ export default async function DevicesPage({
 											{sortIcon("battery")}
 										</Link>
 									</TableHead>
+									<TableHead className="text-right">{t("actions")}</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
 								{devices.map((device) => {
-									const state = deviceConnectionState(device.lastSeenAt);
 									const band = batteryBand(device.batteryV);
 									const percent =
 										device.batteryV == null
@@ -262,7 +264,6 @@ export default async function DevicesPage({
 													Math.max(0, ((device.batteryV - 10.5) / (13.2 - 10.5)) * 100),
 												);
 
-									const lowBattery = device.batteryV != null && device.batteryV < LOW_BATTERY_V;
 									return (
 										<TableRow key={device.id}>
 											<TableCell>
@@ -272,30 +273,27 @@ export default async function DevicesPage({
 												>
 													{device.label}
 												</Link>
-												<span className="mt-0.5 block font-mono text-meta text-fog-500">
-													{device.mac}
-												</span>
-												<span className="block text-meta text-fog-500">
-													{device.vehicle
-														? `${device.vehicle.plateNo} · ${device.vehicle.make} ${device.vehicle.model}`
-														: t("unassigned")}
-												</span>
 											</TableCell>
-											<TableCell>
-												<DeviceStatusBadge state={state} />
-												<span
-													className="mt-1 block text-meta text-fog-500"
-													title={formatDateTime(device.lastSeenAt, locale)}
-												>
-													{formatRelative(device.lastSeenAt)}
-												</span>
+											<TableCell className="font-mono text-meta text-fog-500">
+												{device.mac}
 											</TableCell>
-											<TableCell className="font-mono text-xs text-fog-500">{device.mac}</TableCell>
 											<TableCell className="text-fog-300">
-												{device.vehicle?.plateNo ?? "Unassigned"}
+												{device.vehicle?.plateNo ?? t("unassigned")}
 											</TableCell>
 											<TableCell>
 												<ApprovalBadge status={device.approvalStatus} />
+											</TableCell>
+											<TableCell>
+												<DeviceStatusBadge state={deviceConnectionState(device.lastSeenAt)} />
+											</TableCell>
+											<TableCell className="font-mono text-meta text-fog-500">
+												{device.firmwareVersion ?? "—"}
+											</TableCell>
+											<TableCell
+												className="text-meta text-fog-500"
+												title={formatDateTime(device.lastSeenAt, locale)}
+											>
+												{formatRelative(device.lastSeenAt)}
 											</TableCell>
 											<TableCell>
 												{device.batteryV == null ? (
@@ -323,9 +321,6 @@ export default async function DevicesPage({
 													</span>
 												)}
 											</TableCell>
-											<TableCell className="font-mono text-meta text-fog-500">
-												{device.firmwareVersion ?? "—"}
-											</TableCell>
 											<TableCell className="text-right">
 												<Link
 													href={`/devices/${device.id}`}
@@ -334,30 +329,6 @@ export default async function DevicesPage({
 													{t("open")}
 													<ChevronRight className="size-3.5" aria-hidden="true" />
 												</Link>
-												<DeviceStatusBadge state={deviceConnectionState(device.lastSeenAt)} />
-											</TableCell>
-											<TableCell className="text-xs text-fog-500">
-												{device.firmwareVersion ?? "—"}
-											</TableCell>
-											<TableCell
-												className="text-xs text-fog-500"
-												title={formatDateTime(device.lastSeenAt, locale)}
-											>
-												{formatRelative(device.lastSeenAt)}
-											</TableCell>
-											<TableCell className="text-xs">
-												{device.batteryV != null ? (
-													<span
-														className={lowBattery ? "font-medium text-alarm-300" : "text-fog-500"}
-													>
-														{device.batteryV.toFixed(1)} V
-														{lowBattery ? (
-															<span className="ml-1 text-[10px] uppercase">Low</span>
-														) : null}
-													</span>
-												) : (
-													<span className="text-fog-500">—</span>
-												)}
 											</TableCell>
 										</TableRow>
 									);
@@ -367,14 +338,14 @@ export default async function DevicesPage({
 					)}
 					{pageCount > 1 ? (
 						<div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-							<span className="text-xs text-fog-500">
+							<span className="text-meta text-fog-500">
 								Page {page} of {pageCount} · {total} trackers
 							</span>
 							<div className="flex gap-2">
 								{page > 1 ? (
 									<Link
 										href={buildDevicesHref(effectiveQuery, { page: page - 1 })}
-										className="inline-flex h-8 items-center rounded border border-ink-600 px-3 text-xs text-fog-300 hover:bg-ink-700/60"
+										className="inline-flex h-8 items-center rounded-panel border border-ink-600 px-3 text-meta text-fog-300 hover:bg-ink-700/60"
 									>
 										Previous
 									</Link>
@@ -382,7 +353,7 @@ export default async function DevicesPage({
 								{page < pageCount ? (
 									<Link
 										href={buildDevicesHref(effectiveQuery, { page: page + 1 })}
-										className="inline-flex h-8 items-center rounded border border-ink-600 px-3 text-xs text-fog-300 hover:bg-ink-700/60"
+										className="inline-flex h-8 items-center rounded-panel border border-ink-600 px-3 text-meta text-fog-300 hover:bg-ink-700/60"
 									>
 										Next
 									</Link>
