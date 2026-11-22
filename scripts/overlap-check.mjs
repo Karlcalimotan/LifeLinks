@@ -42,8 +42,14 @@ function printIssues(label, items) {
 		return;
 	}
 	for (const issue of items) {
-		const labels = (issue.labels ?? []).map((label) => label.name).filter(Boolean).join(", ");
-		const assignees = (issue.assignees ?? []).map((user) => user.login).filter(Boolean).join(", ");
+		const labels = (issue.labels ?? [])
+			.map((label) => label.name)
+			.filter(Boolean)
+			.join(", ");
+		const assignees = (issue.assignees ?? [])
+			.map((user) => user.login)
+			.filter(Boolean)
+			.join(", ");
 		console.log(`  #${issue.number} ${issue.title}`);
 		if (labels) console.log(`    labels: ${labels}`);
 		if (assignees) console.log(`    assignees: ${assignees}`);
@@ -53,7 +59,9 @@ function printIssues(label, items) {
 function main() {
 	const repo = gh(["repo", "view", "--json", "nameWithOwner", "--jq", ".nameWithOwner"]);
 	if (!repo.ok || !repo.stdout) {
-		fail(`cannot resolve the repository through gh: ${repo.stderr || repo.error?.message || "unknown error"}`);
+		fail(
+			`cannot resolve the repository through gh: ${repo.stderr || repo.error?.message || "unknown error"}`,
+		);
 		return;
 	}
 	const name = repo.stdout.split(/\r?\n/)[0].trim();
