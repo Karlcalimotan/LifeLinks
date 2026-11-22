@@ -4,12 +4,13 @@ import { Logo } from "@/components/brand/logo";
 import { Link, usePathname } from "@/i18n/routing";
 import { type MemberRoleName, canAdminister } from "@/lib/auth/roles";
 import { cn } from "@/lib/utils";
-import { Car, LayoutDashboard, Radio, Settings, TriangleAlert } from "lucide-react";
+import { Car, ChartColumn, LayoutDashboard, Radio, Settings, TriangleAlert } from "lucide-react";
 
 const items = [
 	{ href: "/dashboard", key: "dashboard", icon: LayoutDashboard, admin: false },
 	{ href: "/vehicles", key: "vehicles", icon: Car, admin: false },
 	{ href: "/incidents", key: "incidents", icon: TriangleAlert, admin: false },
+	{ href: "/analytics", key: "analytics", icon: ChartColumn, admin: false },
 	{ href: "/devices", key: "devices", icon: Radio, admin: true },
 	{ href: "/settings", key: "settings", icon: Settings, admin: true },
 ] as const;

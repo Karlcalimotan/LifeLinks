@@ -19,6 +19,7 @@ export default async function DashboardLayout({
 		dashboard: t("dashboard"),
 		vehicles: t("vehicles"),
 		incidents: t("incidents"),
+		analytics: t("analytics"),
 		devices: t("devices"),
 		settings: t("settings"),
 	};
