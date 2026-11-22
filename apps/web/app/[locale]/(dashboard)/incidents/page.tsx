@@ -1,4 +1,5 @@
 import { IncidentStatusBadge, SeverityBadge } from "@/components/domain/badges";
+import { IncidentCardList } from "@/components/incidents/incident-card-list";
 import { IncidentStatusChips } from "@/components/incidents/incident-status-chips";
 import { IncidentsToolbar } from "@/components/incidents/incidents-toolbar";
 import { Button } from "@/components/ui/button";
@@ -170,6 +171,7 @@ export default async function IncidentsPage({
 		dir: effectiveQuery.dir === "asc" ? "desc" : "asc",
 		page: 1,
 	});
+	const returnTo = buildIncidentsHref(effectiveQuery);
 	const from = (page - 1) * INCIDENT_PAGE_SIZE + 1;
 	const to = Math.min(page * INCIDENT_PAGE_SIZE, total);
 
@@ -218,123 +220,151 @@ export default async function IncidentsPage({
 							) : null}
 						</div>
 					) : (
-						<Table className="min-w-[960px]">
-							<TableHeader>
-								<TableRow>
-									<TableHead aria-sort={effectiveQuery.dir === "asc" ? "ascending" : "descending"}>
-										<Link
-											href={sortHref}
-											title={t("sortDetected")}
-											aria-label={effectiveQuery.dir === "asc" ? t("sortOldest") : t("sortNewest")}
-											className="inline-flex items-center gap-1 hover:text-fog-100"
-										>
-											{t("detected")}
-											{effectiveQuery.dir === "asc" ? (
-												<ChevronUp className="size-4" aria-hidden="true" />
-											) : (
-												<ChevronDown className="size-4" aria-hidden="true" />
-											)}
-										</Link>
-									</TableHead>
-									<TableHead>{t("vehicle")}</TableHead>
-									<TableHead>{t("severity")}</TableHead>
-									<TableHead>{t("status")}</TableHead>
-									<TableHead>{t("location")}</TableHead>
-									<TableHead>{t("alertDelivery")}</TableHead>
-									<TableHead>{t("timeToAcknowledge")}</TableHead>
-									<TableHead className="text-right">{t("actions")}</TableHead>
-								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{incidents.map((incident) => {
-									const delivered = incident.alerts.filter(
-										(alert) => alert.status === "SENT" || alert.status === "ACKNOWLEDGED",
-									).length;
-									const canAcknowledge =
-										canManageIncidents(current.role) &&
-										(incident.status === "CONFIRMED" || incident.status === "SUSPECTED");
-
-									return (
-										<TableRow key={incident.id}>
-											<TableCell>
+						<>
+							<div className="lg:hidden">
+								<div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+									<span className="text-meta text-fog-500">{t("sortDetected")}</span>
+									<Link
+										href={sortHref}
+										className="inline-flex h-8 items-center gap-1 rounded-control border border-ink-700 px-2 text-meta text-fog-300 hover:border-ink-600 hover:text-fog-100"
+									>
+										{effectiveQuery.dir === "asc" ? t("sortOldest") : t("sortNewest")}
+										{effectiveQuery.dir === "asc" ? (
+											<ChevronUp className="size-4" aria-hidden="true" />
+										) : (
+											<ChevronDown className="size-4" aria-hidden="true" />
+										)}
+									</Link>
+								</div>
+								<IncidentCardList
+									locale={locale}
+									incidents={incidents}
+									acknowledgedAt={acknowledgedAt}
+									now={now}
+									canManage={canManageIncidents(current.role)}
+									returnTo={returnTo}
+								/>
+							</div>
+							<div className="hidden lg:block">
+								<Table className="min-w-[960px]">
+									<TableHeader>
+										<TableRow>
+											<TableHead
+												aria-sort={effectiveQuery.dir === "asc" ? "ascending" : "descending"}
+											>
 												<Link
-													href={`/incidents/${incident.id}`}
-													aria-label={t("openIncident", {
-														time: formatDateTime(incident.detectedAt, locale),
-													})}
-													className="font-medium text-fog-100 hover:text-signal-300 hover:underline"
+													href={sortHref}
+													title={t("sortDetected")}
+													aria-label={
+														effectiveQuery.dir === "asc" ? t("sortOldest") : t("sortNewest")
+													}
+													className="inline-flex items-center gap-1 hover:text-fog-100"
 												>
-													{formatDateTime(incident.detectedAt, locale)}
+													{t("detected")}
+													{effectiveQuery.dir === "asc" ? (
+														<ChevronUp className="size-4" aria-hidden="true" />
+													) : (
+														<ChevronDown className="size-4" aria-hidden="true" />
+													)}
 												</Link>
-												<span className="mt-0.5 block font-mono text-meta text-fog-500">
-													{incident.id} · {formatRelative(incident.detectedAt)}
-												</span>
-											</TableCell>
-											<TableCell>
-												<Link
-													href={`/vehicles/${incident.vehicleId}`}
-													className="text-fog-100 hover:text-signal-300 hover:underline"
-												>
-													{incident.vehicle.plateNo}
-												</Link>
-												<span className="mt-0.5 block text-meta text-fog-500">
-													{incident.vehicle.driverName ?? "—"}
-												</span>
-											</TableCell>
-											<TableCell>
-												<SeverityBadge
-													peakAccelG={incident.peakAccelG}
-													tiltDeg={incident.tiltDeg}
-												/>
-											</TableCell>
-											<TableCell>
-												<IncidentStatusBadge status={incident.status} />
-											</TableCell>
-											<TableCell className="whitespace-nowrap font-mono text-meta text-fog-500">
-												{incident.lat != null && incident.lng != null
-													? `${incident.lat.toFixed(4)}, ${incident.lng.toFixed(4)}`
-													: "—"}
-											</TableCell>
-											<TableCell>
-												{incident.alerts.length === 0 ? (
-													<span className="text-fog-500">—</span>
-												) : (
-													<span className="tabular-nums text-fog-300">
-														{delivered} / {incident.alerts.length}
-													</span>
-												)}
-											</TableCell>
-											<TableCell className="whitespace-nowrap font-mono text-meta text-fog-300">
-												{acknowledgementDuration({
-													status: incident.status,
-													detectedAt: incident.detectedAt,
-													acknowledgedAt: acknowledgedAt.get(incident.id) ?? null,
-													now,
-												})}
-											</TableCell>
-											<TableCell className="text-right">
-												{canAcknowledge ? (
-													<form action={acknowledgeIncidentAction} className="inline-flex">
-														<input type="hidden" name="locale" value={locale} />
-														<input type="hidden" name="incidentId" value={incident.id} />
-														<input
-															type="hidden"
-															name="returnTo"
-															value={buildIncidentsHref(effectiveQuery)}
-														/>
-														<Button type="submit" size="sm" variant="secondary">
-															{t("acknowledge")}
-														</Button>
-													</form>
-												) : (
-													<span className="text-fog-500">—</span>
-												)}
-											</TableCell>
+											</TableHead>
+											<TableHead>{t("vehicle")}</TableHead>
+											<TableHead>{t("severity")}</TableHead>
+											<TableHead>{t("status")}</TableHead>
+											<TableHead>{t("location")}</TableHead>
+											<TableHead>{t("alertDelivery")}</TableHead>
+											<TableHead>{t("timeToAcknowledge")}</TableHead>
+											<TableHead className="text-right">{t("actions")}</TableHead>
 										</TableRow>
-									);
-								})}
-							</TableBody>
-						</Table>
+									</TableHeader>
+									<TableBody>
+										{incidents.map((incident) => {
+											const delivered = incident.alerts.filter(
+												(alert) => alert.status === "SENT" || alert.status === "ACKNOWLEDGED",
+											).length;
+											const canAcknowledge =
+												canManageIncidents(current.role) &&
+												(incident.status === "CONFIRMED" || incident.status === "SUSPECTED");
+
+											return (
+												<TableRow key={incident.id}>
+													<TableCell>
+														<Link
+															href={`/incidents/${incident.id}`}
+															aria-label={t("openIncident", {
+																time: formatDateTime(incident.detectedAt, locale),
+															})}
+															className="font-medium text-fog-100 hover:text-signal-300 hover:underline"
+														>
+															{formatDateTime(incident.detectedAt, locale)}
+														</Link>
+														<span className="mt-0.5 block font-mono text-meta text-fog-500">
+															{incident.id} · {formatRelative(incident.detectedAt)}
+														</span>
+													</TableCell>
+													<TableCell>
+														<Link
+															href={`/vehicles/${incident.vehicleId}`}
+															className="text-fog-100 hover:text-signal-300 hover:underline"
+														>
+															{incident.vehicle.plateNo}
+														</Link>
+														<span className="mt-0.5 block text-meta text-fog-500">
+															{incident.vehicle.driverName ?? "—"}
+														</span>
+													</TableCell>
+													<TableCell>
+														<SeverityBadge
+															peakAccelG={incident.peakAccelG}
+															tiltDeg={incident.tiltDeg}
+														/>
+													</TableCell>
+													<TableCell>
+														<IncidentStatusBadge status={incident.status} />
+													</TableCell>
+													<TableCell className="whitespace-nowrap font-mono text-meta text-fog-500">
+														{incident.lat != null && incident.lng != null
+															? `${incident.lat.toFixed(4)}, ${incident.lng.toFixed(4)}`
+															: "—"}
+													</TableCell>
+													<TableCell>
+														{incident.alerts.length === 0 ? (
+															<span className="text-fog-500">—</span>
+														) : (
+															<span className="tabular-nums text-fog-300">
+																{delivered} / {incident.alerts.length}
+															</span>
+														)}
+													</TableCell>
+													<TableCell className="whitespace-nowrap font-mono text-meta text-fog-300">
+														{acknowledgementDuration({
+															status: incident.status,
+															detectedAt: incident.detectedAt,
+															acknowledgedAt: acknowledgedAt.get(incident.id) ?? null,
+															now,
+														})}
+													</TableCell>
+													<TableCell className="text-right">
+														{canAcknowledge ? (
+															<form action={acknowledgeIncidentAction} className="inline-flex">
+																<input type="hidden" name="locale" value={locale} />
+																<input type="hidden" name="incidentId" value={incident.id} />
+																<input type="hidden" name="returnTo" value={returnTo} />
+																<Button type="submit" size="sm" variant="secondary">
+																	{t("acknowledge")}
+																</Button>
+															</form>
+														) : (
+															<span className="text-fog-500">—</span>
+														)}
+													</TableCell>
+												</TableRow>
+											);
+										})}
+									</TableBody>
+								</Table>
+							</div>
+						</>
 					)}
 
 					{total > 0 ? (
