@@ -31,7 +31,7 @@ jobs:
       DIRECT_URL: postgresql://ci:ci@localhost:5432/lifelink?schema=public
       RLS_TEST_DATABASE_URL: postgresql://ci:ci@localhost:5432/lifelink?schema=public
       RLS_TEST_ALLOW: "1"
-      AUTH_SECRET: ci-only-secret-0123456789abcdef
+      AUTH_SECRET: ci-only-secret-0123456789abcdefghijklmnop
       NEXT_PUBLIC_BASE_URL: http://localhost:3000
       NEXT_PUBLIC_SITE_URL: http://localhost:3000
     steps:

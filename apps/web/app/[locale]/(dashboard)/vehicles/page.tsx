@@ -13,11 +13,22 @@ import { Link } from "@/i18n/routing";
 import { vehicleScope } from "@/lib/auth/roles";
 import { requireUser } from "@/lib/auth/session";
 import { deviceConnectionState } from "@/lib/device/status";
+import { metadataForPage } from "@/lib/page-metadata";
 import prisma from "@/lib/prisma";
 import { formatRelative } from "@/lib/utils";
+import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+	params,
+}: {
+	params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+	const { locale } = await params;
+	return metadataForPage(locale, "vehicles");
+}
 
 export default async function VehiclesPage({ params }: { params: Promise<{ locale: string }> }) {
 	const { locale } = await params;

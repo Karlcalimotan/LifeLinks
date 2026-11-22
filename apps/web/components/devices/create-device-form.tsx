@@ -124,12 +124,12 @@ export function CreateDeviceForm({
 			) : null}
 
 			{state.ok && state.token ? (
-				<div className="rounded border border-clear-500/30 bg-clear-500/10 p-4">
-					<p className="text-xs font-semibold text-clear-200">
+				<div className="rounded border border-clear-400/30 bg-clear-400/10 p-4">
+					<p className="text-xs font-semibold text-clear-300">
 						Tracker registered. Copy this token now — it is shown once.
 					</p>
 					<div className="mt-2 flex items-center gap-2">
-						<code className="min-w-0 flex-1 overflow-x-auto rounded border border-clear-500/20 bg-ink-950/60 px-3 py-2 text-xs text-clear-200">
+						<code className="min-w-0 flex-1 overflow-x-auto rounded border border-clear-400/20 bg-ink-950/60 px-3 py-2 text-xs text-clear-300">
 							{state.token}
 						</code>
 						<Button type="button" size="sm" variant="outline" onClick={copyToken}>

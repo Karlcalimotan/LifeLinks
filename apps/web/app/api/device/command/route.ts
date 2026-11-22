@@ -1,9 +1,10 @@
 import { ok } from "@/lib/api/envelope";
-import { badRequest, forbidden } from "@/lib/api/errors";
+import { badRequest, forbidden, rateLimited } from "@/lib/api/errors";
 import { withApi } from "@/lib/api/instrumentation";
 import { isDeviceApproved, requireDevice } from "@/lib/device/auth";
 import { buildFirmwareConfig } from "@/lib/firmware/config";
 import prisma from "@/lib/prisma";
+import { rateLimit } from "@/lib/rate-limit";
 import { getOrgSettings, settingsToFirmwareValues } from "@/lib/settings/org";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,11 @@ export const GET = withApi(
 	async (request) => {
 		const device = await requireDevice(request);
 		if (!isDeviceApproved(device)) throw forbidden("Device is not approved.");
+
+		const limit = rateLimit(`device:${device.id}:command`, 120, 60_000);
+		if (!limit.allowed) {
+			throw rateLimited(`Too many command polls. Retry in ${limit.retryAfterSeconds} seconds.`);
+		}
 
 		const url = new URL(request.url);
 		const requested = url.searchParams.get("device_id");

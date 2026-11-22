@@ -30,12 +30,23 @@ import {
 } from "@/lib/analytics/aggregate";
 import { requireUser } from "@/lib/auth/session";
 import { type Severity, severityLabel } from "@/lib/incidents/severity";
+import { metadataForPage } from "@/lib/page-metadata";
 import prisma from "@/lib/prisma";
 import { formatDateTime } from "@/lib/utils";
 import { CircleSlash, Clock, ShieldAlert, Timer, TriangleAlert } from "lucide-react";
+import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+	params,
+}: {
+	params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+	const { locale } = await params;
+	return metadataForPage(locale, "analytics");
+}
 
 const SEVERITY_BAR: Record<Severity, string> = {
 	critical: "bg-alarm-500",

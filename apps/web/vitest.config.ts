@@ -4,6 +4,9 @@ import { defineConfig } from "vitest/config";
 const root = import.meta.dirname;
 
 export default defineConfig({
+	// Next keeps `jsx: preserve` for its own compiler; Vitest needs an explicit
+	// transform for the few component-level tests.
+	oxc: { jsx: { runtime: "automatic" } },
 	test: {
 		environment: "jsdom",
 		globals: true,

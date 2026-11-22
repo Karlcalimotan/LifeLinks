@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { hash } from "bcryptjs";
+import { assertSeedTarget } from "../lib/seed/guard";
 
 const prisma = new PrismaClient();
 const now = new Date();
@@ -16,13 +17,7 @@ function hashToken(token: string): string {
 }
 
 function assertDemoTarget() {
-	const url = process.env.DATABASE_URL ?? "";
-	const local = url.includes("localhost") || url.includes("127.0.0.1") || url.includes("@db:");
-	if (!local && process.env.SEED_DEMO !== "yes") {
-		throw new Error(
-			"Refusing to seed a non-local database. Set SEED_DEMO=yes to acknowledge the target.",
-		);
-	}
+	assertSeedTarget();
 }
 
 // --- Demo fleet -----------------------------------------------------------

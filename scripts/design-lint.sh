@@ -50,6 +50,9 @@ scan "glassmorphism" 'backdrop-blur'
 scan_i "marketing copy" 'seamless|unlock|elevate|streamline|empower|supercharge|revolutioni[sz]e|effortless|oops'
 scan_i "placeholder data" 'lorem|john doe|asdf|AA:BB:CC'
 scan "arbitrary colour utility" '(bg|text|border)-\[#[0-9a-fA-F]{3,8}\]'
+# These palette steps never existed in globals.css. A class that silently
+# renders as no colour is worse than a loud failure here.
+scan "non-existent palette utility" '(clear-(200|500)|caution-(200|500))'
 
 # Raw hex is allowed only in the token file and in files that must render
 # without the app stylesheet or that require literal colour values.

@@ -54,3 +54,16 @@ export function formatCoord(value: number | null | undefined): string {
 export function clamp(value: number, min: number, max: number): number {
 	return Math.min(max, Math.max(min, value));
 }
+
+/**
+ * A `tel:` link for a stored free-text phone number. Spaces and punctuation are
+ * removed, a leading `+` is kept and a value with fewer than seven digits is
+ * rejected instead of producing an unusable link.
+ */
+export function telHref(phone: string | null | undefined): string | null {
+	if (!phone) return null;
+	const trimmed = phone.trim();
+	const digits = trimmed.replace(/\D/g, "");
+	if (digits.length < 7) return null;
+	return `tel:${trimmed.startsWith("+") ? "+" : ""}${digits}`;
+}

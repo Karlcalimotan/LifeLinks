@@ -19,12 +19,23 @@ import {
 	vehiclesWithPosition,
 } from "@/lib/map/fleet";
 import { buildMapHref, hasActiveMapFilters, parseMapQuery } from "@/lib/map/query";
+import { metadataForPage } from "@/lib/page-metadata";
 import prisma from "@/lib/prisma";
 import { formatDateTime, formatRelative } from "@/lib/utils";
 import { Maximize2, TriangleAlert } from "lucide-react";
+import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+	params,
+}: {
+	params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+	const { locale } = await params;
+	return metadataForPage(locale, "map");
+}
 
 export default async function MapPage({
 	params,

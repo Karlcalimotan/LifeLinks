@@ -1,19 +1,25 @@
 "use client";
 
+import { ConfirmSubmit } from "@/components/devices/confirm-submit";
 import { Button } from "@/components/ui/button";
 import { type DeviceTokenState, rotateDeviceTokenAction } from "@/lib/actions/devices";
 import { Check, Copy, RefreshCw } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useActionState, useState } from "react";
 
 const initial: DeviceTokenState = { ok: false };
 
 export function RotateTokenButton({
 	deviceId,
+	label,
 	locale,
 }: {
 	deviceId: string;
+	label: string;
 	locale: string;
 }) {
+	const t = useTranslations("devices");
+	const common = useTranslations("common");
 	const [state, formAction, pending] = useActionState(rotateDeviceTokenAction, initial);
 	const [copied, setCopied] = useState(false);
 
@@ -29,10 +35,16 @@ export function RotateTokenButton({
 			<form action={formAction}>
 				<input type="hidden" name="locale" value={locale} />
 				<input type="hidden" name="deviceId" value={deviceId} />
-				<Button type="submit" size="sm" variant="outline" disabled={pending}>
-					<RefreshCw className="size-3.5" />
-					{pending ? "Rotating…" : "Rotate token"}
-				</Button>
+				<ConfirmSubmit
+					message={t("confirmRotateToken", { label })}
+					confirmLabel={t("rotateToken")}
+					cancelLabel={common("cancel")}
+					variant="outline"
+					disabled={pending}
+				>
+					<RefreshCw className="size-3.5" aria-hidden="true" />
+					{t("rotateToken")}
+				</ConfirmSubmit>
 			</form>
 
 			{state.error ? (
@@ -42,12 +54,12 @@ export function RotateTokenButton({
 			) : null}
 
 			{state.ok && state.token ? (
-				<div className="rounded border border-caution-500/30 bg-caution-500/10 p-4">
-					<p className="text-xs font-semibold text-caution-200">
+				<div className="rounded border border-caution-400/30 bg-caution-400/10 p-4">
+					<p className="text-xs font-semibold text-caution-300">
 						New token. Copy it now — the old token stopped working.
 					</p>
 					<div className="mt-2 flex items-center gap-2">
-						<code className="min-w-0 flex-1 overflow-x-auto rounded border border-caution-500/20 bg-ink-950/60 px-3 py-2 text-xs text-caution-200">
+						<code className="min-w-0 flex-1 overflow-x-auto rounded border border-caution-400/20 bg-ink-950/60 px-3 py-2 text-xs text-caution-300">
 							{state.token}
 						</code>
 						<Button type="button" size="sm" variant="outline" onClick={copyToken}>

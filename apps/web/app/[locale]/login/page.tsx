@@ -2,6 +2,7 @@ import { Logo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Label } from "@/components/ui/field";
 import { loginAction } from "@/lib/actions/auth";
+import { DEMO_ACCOUNTS, demoModeEnabled } from "@/lib/auth/demo";
 import { getCurrentUser } from "@/lib/auth/session";
 import { APP_NAME, APP_TAGLINE } from "@/lib/constants";
 import { Activity, Hand, Radio, Timer } from "lucide-react";
@@ -25,9 +26,7 @@ export default async function LoginPage({
 
 	const errorMessage =
 		error === "rate" ? t("rateLimited") : error === "invalid" ? t("invalid") : null;
-	const demoAccounts = t("demoHint")
-		.replace(/^Demo:\s*/, "")
-		.split(" · ");
+	const showDemoAccounts = demoModeEnabled();
 
 	const path = [
 		{ label: t("pathImpact"), icon: Activity },
@@ -126,16 +125,18 @@ export default async function LoginPage({
 						</div>
 					</div>
 
-					<div className="mt-4 border border-ink-700 bg-ink-900/60 p-3">
-						<p className="text-[11px] font-medium text-fog-300">{t("demoAccess")}</p>
-						<ul className="mt-1.5 flex flex-col gap-1">
-							{demoAccounts.map((account) => (
-								<li key={account} className="text-[11px] leading-relaxed text-fog-500">
-									{account}
-								</li>
-							))}
-						</ul>
-					</div>
+					{showDemoAccounts ? (
+						<div className="mt-4 border border-ink-700 bg-ink-900/60 p-3">
+							<p className="text-[11px] font-medium text-fog-300">{t("demoAccess")}</p>
+							<ul className="mt-1.5 flex flex-col gap-1">
+								{DEMO_ACCOUNTS.map((account) => (
+									<li key={account.email} className="text-[11px] leading-relaxed text-fog-500">
+										{account.role}: {account.email} / {account.password}
+									</li>
+								))}
+							</ul>
+						</div>
+					) : null}
 
 					<p className="mt-8 text-center text-[11px] text-fog-500">
 						{APP_NAME}. {APP_TAGLINE}
