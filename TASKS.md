@@ -5,7 +5,7 @@ Rule: claim a task by changing its status BEFORE starting. One task, one owner. 
 
 ## P0: Core product (start here)
 - [x] T1 DONE  Trackers: validate MAC format, block duplicates, show clear form errors
-- [ ] T2 CLAIMED:collaborator  Trackers: Approve / Reject / Edit / Delete actions with confirm dialogs and an audit log
+- [ ] T2 IN REVIEW  Trackers: Approve / Reject / Edit / Delete actions with confirm dialogs and an audit log
 - [ ] T3 TODO  Trackers: search, filter (status, vehicle, approval), sort, pagination
 - [ ] T4 TODO  Device ingestion API: POST /api/device/heartbeat and /api/device/incident, per-device auth token, idempotency key, rate limit, input validation (zod)
 - [ ] T5 TODO  Online/Offline logic from last heartbeat (configurable threshold) + low-battery flag; replace "4d ago" with live relative time
@@ -29,4 +29,5 @@ Rule: claim a task by changing its status BEFORE starting. One task, one owner. 
 
 - T1 verified done on `develop@6945ca2`: `apps/web/lib/device/validation.ts` (MAC format, label length), `apps/web/lib/actions/devices.ts` (normalize MAC, duplicate check, clear error), `apps/web/lib/device/validation.test.ts` (3 tests). No new work needed.
 - T2 claimed by collaborator on `feat/t2-tracker-actions`, worktree `C:\Users\Client\LifeLink-t2-trackers`, tracking issue #36.
-- T2 delete is a hard delete with a confirmation that warns trips, samples and incidents are removed. If the lead prefers a soft delete, say so here before review.
+- T2 implemented in `b0a0b11`: edit form, confirm dialogs for approve/reject/delete, and audit rows for all four actions. Checks: `pnpm lint`, `pnpm typecheck`, `pnpm test` (48 tests) pass. Full build deferred under red resources; CI covers it.
+- T2 delete is a hard delete with a typed-MAC confirmation that warns trips, samples and incidents are removed. If the lead prefers a soft delete, say so here before review.
