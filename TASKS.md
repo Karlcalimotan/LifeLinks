@@ -7,17 +7,30 @@ one branch, one PR. Commit this file with every queue change. The parent
 (orchestrator) reconciles this file when branches merge; collaborators report
 status and may update their own branch copy.
 
+## Cycle 0 (one time, before the loop starts)
+
+- [ ] **C0 CLAIMED:lead** — Baseline: design system, realistic seed, repeatable
+      desktop/mobile screenshots, axe/Lighthouse checks, current-state update
+      and the first scorecard. Issue #46.
+
 ## P0: Core product (start here)
 
 - [x] **T1 DONE** — Trackers: validate MAC format, block
       duplicates, show clear form errors. Issue #38.
+- [x] **T2 DONE** — Trackers: Approve / Reject / Edit / Delete actions with
+      confirm dialogs and an audit log. PR #40.
+- [ ] **T17 IN REVIEW** — Trackers page: drawer registration, summary counts,
+      combined status column, battery indicator, neutral labels and mono MACs.
+      Part of #46; first visible improvement.
+- [ ] **T3 TODO** — Trackers: search, filter (status, vehicle, approval), sort,
+      pagination.
 - [x] **T2 DONE** - Trackers: Approve / Reject / Edit / Delete actions with
       confirm dialogs and an audit log. PR #40.
 - [ ] **T3 IN REVIEW** - Trackers: search, filter (status, vehicle, approval), sort,
       pagination. Issue #45; PR #50.
 - [x] **T4 DONE** — Device ingestion API: `POST /api/device/heartbeat`
       and `/api/device/incident`, per-device auth token, idempotency key, rate
-      limit, input validation (zod). Issue #37; PR pending.
+      limit, input validation (zod). Issue #37, PR #39.
 - [ ] **T5 TODO** — Online/Offline logic from last heartbeat (configurable
       threshold) + low-battery flag; replace "4d ago" with live relative time.
 - [ ] **T6 TODO** — Incidents: data model + workflow (New -> Acknowledged ->

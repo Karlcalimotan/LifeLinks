@@ -10,8 +10,8 @@
 	--color-fog-50: #f4fbfc;
 	--color-fog-100: #e8f1f2;
 	--color-fog-300: #b8c9cb;
+	--color-fog-400: #a7b9bb;
 	--color-fog-500: #8fa3a6;
-	--color-fog-600: #657b7f;
 
 	--color-signal-300: #ffa07a;
 	--color-signal-400: #ff7a45;
@@ -33,6 +33,27 @@
 
 	--font-sans: var(--font-barlow), ui-sans-serif, system-ui, sans-serif;
 	--font-display: var(--font-barlow-condensed), "Arial Narrow", ui-sans-serif, sans-serif;
+	--font-mono: var(--font-jetbrains-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+
+	--radius-control: 3px;
+	--radius-panel: 4px;
+	--radius-overlay: 6px;
+
+	--text-meta: 12px;
+	--text-meta--line-height: 1.45;
+	--text-body: 14px;
+	--text-body--line-height: 1.5;
+	--text-emphasis: 16px;
+	--text-emphasis--line-height: 1.45;
+	--text-section: 20px;
+	--text-section--line-height: 1.3;
+	--text-title: 30px;
+	--text-title--line-height: 1.05;
+	--text-display: 36px;
+	--text-display--line-height: 0.95;
+
+	--shadow-panel: inset 0 1px 0 rgb(255 255 255 / 0.045);
+	--shadow-overlay: 0 18px 48px rgb(0 0 0 / 0.45);
 }
 
 :root {
@@ -67,7 +88,7 @@ body {
 /* A flat panel with a physical top highlight, not a soft drop shadow. */
 .card-sheen {
 	background: var(--color-ink-800);
-	box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.045);
+	box-shadow: var(--shadow-panel);
 }
 
 /* Reflective edge: used on primary plates and the sidebar only. */
