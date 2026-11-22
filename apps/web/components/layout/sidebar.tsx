@@ -4,12 +4,24 @@ import { Logo } from "@/components/brand/logo";
 import { Link, usePathname } from "@/i18n/routing";
 import { type MemberRoleName, canAdminister } from "@/lib/auth/roles";
 import { cn } from "@/lib/utils";
-import { Car, LayoutDashboard, Radio, Settings, TriangleAlert } from "lucide-react";
+import {
+	Bell,
+	Car,
+	ChartColumn,
+	LayoutDashboard,
+	Map as MapIcon,
+	Radio,
+	Settings,
+	TriangleAlert,
+} from "lucide-react";
 
 const items = [
 	{ href: "/dashboard", key: "dashboard", icon: LayoutDashboard, admin: false },
+	{ href: "/map", key: "map", icon: MapIcon, admin: false },
 	{ href: "/vehicles", key: "vehicles", icon: Car, admin: false },
 	{ href: "/incidents", key: "incidents", icon: TriangleAlert, admin: false },
+	{ href: "/analytics", key: "analytics", icon: ChartColumn, admin: false },
+	{ href: "/notifications", key: "notifications", icon: Bell, admin: false },
 	{ href: "/devices", key: "devices", icon: Radio, admin: true },
 	{ href: "/settings", key: "settings", icon: Settings, admin: true },
 ] as const;
@@ -17,7 +29,11 @@ const items = [
 const safetyPath = ["Impact detected", "Confirm window", "Driver cancel", "SMS + console"] as const;
 
 function visibleItems(role: MemberRoleName) {
-	return items.filter((item) => !item.admin || canAdminister(role));
+	return items.filter((item) => {
+		if (item.admin && !canAdminister(role)) return false;
+		if (item.key === "notifications") return role !== "USER";
+		return true;
+	});
 }
 
 export function Sidebar({
@@ -85,7 +101,7 @@ export function MobileNav({
 	const visible = visibleItems(role);
 
 	return (
-		<nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-ink-700 bg-ink-950 px-2 py-1 lg:hidden">
+		<nav className="fixed inset-x-0 bottom-0 z-30 flex overflow-x-auto border-t border-ink-700 bg-ink-950 px-2 py-1 lg:hidden">
 			{visible.map((item) => {
 				const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 				const Icon = item.icon;
@@ -94,12 +110,12 @@ export function MobileNav({
 						key={item.href}
 						href={item.href}
 						className={cn(
-							"flex flex-1 flex-col items-center gap-1 rounded-control px-1 py-2 text-meta",
+							"flex min-w-[72px] flex-none flex-col items-center gap-1 rounded-control px-1 py-2 text-meta",
 							active ? "text-signal-300" : "text-fog-500",
 						)}
 					>
 						<Icon className="size-4" />
-						{labels[item.key] ?? item.key}
+						<span className="w-full truncate text-center">{labels[item.key] ?? item.key}</span>
 					</Link>
 				);
 			})}

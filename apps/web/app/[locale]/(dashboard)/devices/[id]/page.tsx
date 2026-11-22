@@ -182,34 +182,34 @@ export default async function DeviceDetailPage({
 					</CardHeader>
 					<CardContent className="grid grid-cols-2 gap-3 text-xs">
 						<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
-							<p className="text-[11px] font-medium text-fog-500">Last seen</p>
+							<p className="text-meta font-medium text-fog-500">Last seen</p>
 							<p className="mt-1 text-sm text-fog-100">
 								{formatDateTime(device.lastSeenAt, locale)}
 							</p>
-							<p className="text-[10px] text-fog-500">{formatRelative(device.lastSeenAt)}</p>
+							<p className="text-meta text-fog-500">{formatRelative(device.lastSeenAt)}</p>
 						</div>
 						<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
-							<p className="text-[11px] font-medium text-fog-500">Battery</p>
+							<p className="text-meta font-medium text-fog-500">Battery</p>
 							<p className="mt-1 text-sm text-fog-100">
 								{device.batteryV != null ? `${device.batteryV.toFixed(1)} V` : "—"}
 							</p>
 						</div>
 						<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
-							<p className="text-[11px] font-medium text-fog-500">Signal</p>
+							<p className="text-meta font-medium text-fog-500">Signal</p>
 							<p className="mt-1 flex items-center gap-2 text-sm text-fog-100">
 								<Radio className="size-3.5 text-rescue-400" />
 								{device.rssiDbm != null ? `${device.rssiDbm} dBm` : "—"}
 							</p>
 						</div>
 						<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
-							<p className="text-[11px] font-medium text-fog-500">Satellites</p>
+							<p className="text-meta font-medium text-fog-500">Satellites</p>
 							<p className="mt-1 flex items-center gap-2 text-sm text-fog-100">
 								<Satellite className="size-3.5 text-rescue-400" />
 								{device.satellites ?? "—"}
 							</p>
 						</div>
 						<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
-							<p className="text-[11px] font-medium text-fog-500">GPS age</p>
+							<p className="text-meta font-medium text-fog-500">GPS age</p>
 							<p className="mt-1 text-sm text-fog-100">
 								{gpsAgeSeconds(device.lastFixAt) != null
 									? `${gpsAgeSeconds(device.lastFixAt)}s`
@@ -217,7 +217,7 @@ export default async function DeviceDetailPage({
 							</p>
 						</div>
 						<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
-							<p className="text-[11px] font-medium text-fog-500">Config revision</p>
+							<p className="text-meta font-medium text-fog-500">Config revision</p>
 							<p className="mt-1 text-sm text-fog-100">{device.configRev ?? "—"}</p>
 						</div>
 					</CardContent>
@@ -230,7 +230,7 @@ export default async function DeviceDetailPage({
 					</CardHeader>
 					<CardContent>
 						<p className="text-xs leading-relaxed text-fog-500">{t("tokenDescription")}</p>
-						<p className="mt-3 text-[11px] text-fog-500">
+						<p className="mt-3 text-meta text-fog-500">
 							Firmware {device.firmwareVersion ?? "unknown"} / variant{" "}
 							{device.hwVariant ?? "unknown"}
 						</p>
@@ -308,7 +308,7 @@ export default async function DeviceDetailPage({
 									</div>
 								))}
 						</div>
-						<p className="mt-3 text-[11px] text-fog-500">
+						<p className="mt-3 text-meta text-fog-500">
 							Config rev {config.rev} / version {config.version}
 						</p>
 					</CardContent>
@@ -334,7 +334,7 @@ export default async function DeviceDetailPage({
 										<p className="text-xs font-medium text-fog-300">
 											{event.type.replaceAll("_", " ").toLowerCase()}
 										</p>
-										<p className="text-[10px] text-fog-500">
+										<p className="text-meta text-fog-500">
 											{formatDateTime(event.createdAt, locale)}
 										</p>
 									</div>

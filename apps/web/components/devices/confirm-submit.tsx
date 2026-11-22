@@ -12,6 +12,7 @@ export function ConfirmSubmit({
 	message,
 	confirmLabel,
 	confirmText,
+	cancelLabel,
 	children,
 	variant = "primary",
 	size = "sm",
@@ -19,6 +20,7 @@ export function ConfirmSubmit({
 	message: string;
 	confirmLabel?: string;
 	confirmText?: string;
+	cancelLabel?: string;
 	children: ReactNode;
 	variant?: ButtonProps["variant"];
 	size?: ButtonProps["size"];
@@ -75,7 +77,7 @@ export function ConfirmSubmit({
 							size="sm"
 							onClick={() => dialogRef.current?.close()}
 						>
-							Cancel
+							{cancelLabel ?? "Cancel"}
 						</Button>
 						<Button
 							type="submit"

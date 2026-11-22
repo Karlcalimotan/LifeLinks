@@ -2,6 +2,7 @@
 
 import { canManageIncidents } from "@/lib/auth/roles";
 import { requireUser } from "@/lib/auth/session";
+import { incidentSuccessPath } from "@/lib/incidents/return-to";
 import { type ImpactStatusName, canTransition } from "@/lib/incidents/state";
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
@@ -14,23 +15,41 @@ function value(formData: FormData, key: string): string {
 async function transition(formData: FormData, to: ImpactStatusName) {
 	const locale = value(formData, "locale") === "tl" ? "tl" : "en";
 	const incidentId = value(formData, "incidentId");
+	const returnTo = value(formData, "returnTo");
+	const fromDashboard = returnTo === "dashboard";
 	const current = await requireUser();
 
 	if (!canManageIncidents(current.role)) {
-		redirect(`/${locale}/incidents/${incidentId}?error=forbidden`);
+		redirect(
+			fromDashboard
+				? `/${locale}/dashboard?error=forbidden`
+				: `/${locale}/incidents/${incidentId}?error=forbidden`,
+		);
 	}
 
 	const incident = await prisma.impactEvent.findFirst({
 		where: { id: incidentId, orgId: current.org.id },
 		include: { vehicle: { select: { ownerId: true } } },
 	});
-	if (!incident) redirect(`/${locale}/incidents?error=notfound`);
+	if (!incident) {
+		redirect(
+			fromDashboard ? `/${locale}/dashboard?error=notfound` : `/${locale}/incidents?error=notfound`,
+		);
+	}
 	if (current.role === "USER" && incident.vehicle.ownerId !== current.user.id) {
-		redirect(`/${locale}/incidents/${incidentId}?error=forbidden`);
+		redirect(
+			fromDashboard
+				? `/${locale}/dashboard?error=forbidden`
+				: `/${locale}/incidents/${incidentId}?error=forbidden`,
+		);
 	}
 
 	if (!canTransition(incident.status as ImpactStatusName, to)) {
-		redirect(`/${locale}/incidents/${incident.id}?error=transition`);
+		redirect(
+			fromDashboard
+				? `/${locale}/dashboard?error=transition`
+				: `/${locale}/incidents/${incident.id}?error=transition`,
+		);
 	}
 
 	const now = new Date();
@@ -67,7 +86,7 @@ async function transition(formData: FormData, to: ImpactStatusName) {
 	revalidatePath(`/${locale}/dashboard`);
 	revalidatePath(`/${locale}/incidents`);
 	revalidatePath(`/${locale}/incidents/${incident.id}`);
-	redirect(`/${locale}/incidents/${incident.id}?updated=1`);
+	redirect(incidentSuccessPath(locale, incident.id, returnTo));
 }
 
 export async function acknowledgeIncidentAction(formData: FormData) {

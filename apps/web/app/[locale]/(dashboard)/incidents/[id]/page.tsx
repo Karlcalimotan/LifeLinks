@@ -136,19 +136,19 @@ export default async function IncidentDetailPage({
 						<EvidenceChart points={points} />
 						<div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
 							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
-								<p className="text-[11px] font-medium text-fog-500">{t("peakAccel")}</p>
+								<p className="text-meta font-medium text-fog-500">{t("peakAccel")}</p>
 								<p className="mt-1 text-sm text-fog-100">{incident.peakAccelG.toFixed(2)} g</p>
 							</div>
 							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
-								<p className="text-[11px] font-medium text-fog-500">{t("tilt")}</p>
+								<p className="text-meta font-medium text-fog-500">{t("tilt")}</p>
 								<p className="mt-1 text-sm text-fog-100">{Math.round(incident.tiltDeg)}°</p>
 							</div>
 							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
-								<p className="text-[11px] font-medium text-fog-500">{t("vibration")}</p>
+								<p className="text-meta font-medium text-fog-500">{t("vibration")}</p>
 								<p className="mt-1 text-sm text-fog-100">{incident.vibrationCount}</p>
 							</div>
 							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
-								<p className="text-[11px] font-medium text-fog-500">{t("speed")}</p>
+								<p className="text-meta font-medium text-fog-500">{t("speed")}</p>
 								<p className="mt-1 text-sm text-fog-100">
 									{incident.speedKph != null ? `${Math.round(incident.speedKph)} kph` : "—"}
 								</p>
@@ -182,7 +182,7 @@ export default async function IncidentDetailPage({
 							<li className="relative">
 								<span className="absolute -left-[21px] top-1 size-2 rounded-full bg-alarm-400" />
 								<p className="text-xs font-medium text-fog-100">Incident detected</p>
-								<p className="text-[11px] text-fog-500">
+								<p className="text-meta text-fog-500">
 									{formatDateTime(incident.detectedAt, locale)}
 								</p>
 							</li>
@@ -190,7 +190,7 @@ export default async function IncidentDetailPage({
 								<li className="relative">
 									<span className="absolute -left-[21px] top-1 size-2 rounded-full bg-caution-400" />
 									<p className="text-xs font-medium text-fog-100">Driver cancel window closes</p>
-									<p className="text-[11px] text-fog-500">
+									<p className="text-meta text-fog-500">
 										{formatDateTime(incident.cancelDeadline, locale)}
 									</p>
 								</li>
@@ -199,7 +199,7 @@ export default async function IncidentDetailPage({
 								<li className="relative">
 									<span className="absolute -left-[21px] top-1 size-2 rounded-full bg-fog-500" />
 									<p className="text-xs font-medium text-fog-100">Cancelled by driver</p>
-									<p className="text-[11px] text-fog-500">
+									<p className="text-meta text-fog-500">
 										{formatDateTime(incident.cancelledAt, locale)}
 									</p>
 								</li>
@@ -210,7 +210,7 @@ export default async function IncidentDetailPage({
 									<p className="text-xs font-medium text-fog-100">
 										{event.type.replaceAll("_", " ").toLowerCase()}
 									</p>
-									<p className="text-[11px] text-fog-500">
+									<p className="text-meta text-fog-500">
 										{formatDateTime(event.createdAt, locale)}
 									</p>
 								</li>
@@ -262,7 +262,7 @@ export default async function IncidentDetailPage({
 					<CardContent className="flex flex-col gap-4">
 						{incident.resolution ? (
 							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
-								<p className="text-[11px] font-medium text-fog-500">{t("resolution")}</p>
+								<p className="text-meta font-medium text-fog-500">{t("resolution")}</p>
 								<p className="mt-1 text-xs text-fog-300">{incident.resolution}</p>
 							</div>
 						) : null}
