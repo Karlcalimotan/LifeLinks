@@ -104,25 +104,25 @@ export default async function DashboardPage({ params }: { params: Promise<{ loca
 						style={{ maskImage: "linear-gradient(to left, black, transparent)" }}
 					/>
 					<div className="relative flex flex-1 flex-col p-6">
-						<div className="flex items-center gap-2 text-[11px] font-medium text-fog-500">
+						<div className="flex items-center gap-2 text-meta font-medium text-fog-500">
 							<span className={`size-1.5 ${openTone}`} aria-hidden="true" />
 							{t("liveBoard")}
 						</div>
 						<div className="mt-3">
-							<p className="text-sm font-medium text-fog-100">
+							<p className="text-body font-medium text-fog-100">
 								{openIncidents > 0 ? t("attention") : t("allClear")}
 							</p>
-							<p className="mt-1 font-display text-7xl leading-none tracking-tight text-fog-50 tabular-nums">
+							<p className="mt-1 font-display text-display leading-none tracking-tight text-fog-50 tabular-nums">
 								{openIncidents}
 							</p>
-							<p className="mt-2 max-w-md text-xs leading-relaxed text-fog-500">
+							<p className="mt-2 max-w-md text-meta leading-relaxed text-fog-500">
 								{t("incidentBoardHint")}
 							</p>
 						</div>
 						<div className="mt-6">
 							<Link
 								href="/incidents"
-								className="inline-flex h-9 items-center gap-2 rounded bg-signal-500 px-4 text-sm font-medium text-ink-950 transition-colors hover:bg-signal-400"
+								className="inline-flex h-9 items-center gap-2 rounded bg-signal-500 px-4 text-body font-medium text-ink-950 transition-colors hover:bg-signal-400"
 							>
 								{t("openBoard")}
 								<ArrowUpRight className="size-4" aria-hidden="true" />
@@ -130,16 +130,16 @@ export default async function DashboardPage({ params }: { params: Promise<{ loca
 						</div>
 						<div className="mt-auto grid grid-cols-2 gap-4 border-t border-ink-700 pt-4">
 							<div>
-								<p className="font-display text-2xl leading-none text-fog-50 tabular-nums">
+								<p className="font-display text-section leading-none text-fog-50 tabular-nums">
 									{settings.cancelWindowS}s
 								</p>
-								<p className="mt-1 text-[11px] text-fog-500">{t("cancelWindow")}</p>
+								<p className="mt-1 text-meta text-fog-500">{t("cancelWindow")}</p>
 							</div>
 							<div>
-								<p className="font-display text-2xl leading-none text-fog-50 tabular-nums">
+								<p className="font-display text-section leading-none text-fog-50 tabular-nums">
 									{settings.sosRetryS}s
 								</p>
-								<p className="mt-1 text-[11px] text-fog-500">{t("sosRetry")}</p>
+								<p className="mt-1 text-meta text-fog-500">{t("sosRetry")}</p>
 							</div>
 						</div>
 					</div>
@@ -168,16 +168,23 @@ export default async function DashboardPage({ params }: { params: Promise<{ loca
 				<Card className="flex flex-col">
 					<CardHeader className="flex-row items-center justify-between gap-3">
 						<CardTitle>{t("recentIncidents")}</CardTitle>
-						<Link
-							href="/incidents"
-							className="text-xs font-medium text-signal-400 hover:text-signal-300"
-						>
+						<Link href="/incidents" className="text-meta text-fog-300 underline hover:text-fog-100">
 							{t("viewAll")}
 						</Link>
 					</CardHeader>
 					<CardContent className="flex flex-1 flex-col">
 						{recentIncidents.length === 0 ? (
-							<EmptyState title={t("noIncidents")} />
+							<div>
+								<EmptyState title={t("noIncidents")} />
+								<div className="mt-3 text-center">
+									<Link
+										href="/incidents"
+										className="text-meta text-fog-300 underline hover:text-fog-100"
+									>
+										{t("viewAll")}
+									</Link>
+								</div>
+							</div>
 						) : (
 							<Table>
 								<TableHeader>
@@ -195,7 +202,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ loca
 											<TableCell className="whitespace-nowrap">
 												<Link
 													href={`/incidents/${incident.id}`}
-													className="font-medium text-signal-400 hover:text-signal-300"
+													className="font-medium text-fog-100 hover:underline"
 												>
 													{formatDateTime(incident.detectedAt, locale)}
 												</Link>
@@ -212,7 +219,7 @@ export default async function DashboardPage({ params }: { params: Promise<{ loca
 											<TableCell className="whitespace-nowrap">
 												<IncidentStatusBadge status={incident.status} />
 											</TableCell>
-											<TableCell className="hidden text-xs text-fog-500 md:table-cell">
+											<TableCell className="hidden text-meta text-fog-500 md:table-cell">
 												{incident.alerts.length}
 											</TableCell>
 										</TableRow>
@@ -222,22 +229,22 @@ export default async function DashboardPage({ params }: { params: Promise<{ loca
 						)}
 						<div className="mt-4 grid grid-cols-3 gap-3 border-t border-ink-700 pt-4 xl:mt-auto">
 							<div>
-								<p className="font-display text-xl leading-none text-fog-50 tabular-nums">
+								<p className="font-display text-section leading-none text-fog-50 tabular-nums">
 									{openIncidents}
 								</p>
-								<p className="mt-1 text-[11px] text-fog-500">{t("open")}</p>
+								<p className="mt-1 text-meta text-fog-500">{t("open")}</p>
 							</div>
 							<div>
-								<p className="font-display text-xl leading-none text-fog-50 tabular-nums">
+								<p className="font-display text-section leading-none text-fog-50 tabular-nums">
 									{resolvedToday}
 								</p>
-								<p className="mt-1 text-[11px] text-fog-500">{t("resolvedToday")}</p>
+								<p className="mt-1 text-meta text-fog-500">{t("resolvedToday")}</p>
 							</div>
 							<div>
-								<p className="font-display text-xl leading-none text-fog-50 tabular-nums">
+								<p className="font-display text-section leading-none text-fog-50 tabular-nums">
 									{alertsToday}
 								</p>
-								<p className="mt-1 text-[11px] text-fog-500">{t("alertsToday")}</p>
+								<p className="mt-1 text-meta text-fog-500">{t("alertsToday")}</p>
 							</div>
 						</div>
 					</CardContent>
@@ -249,7 +256,17 @@ export default async function DashboardPage({ params }: { params: Promise<{ loca
 					</CardHeader>
 					<CardContent className="flex flex-col gap-2">
 						{vehicles.length === 0 ? (
-							<EmptyState title={v("empty")} />
+							<div>
+								<EmptyState title={v("empty")} />
+								<div className="mt-3 text-center">
+									<Link
+										href="/vehicles"
+										className="text-meta text-fog-300 underline hover:text-fog-100"
+									>
+										{t("viewAll")}
+									</Link>
+								</div>
+							</div>
 						) : (
 							vehicles.map((vehicle) => {
 								const device = vehicle.devices[0];
@@ -269,17 +286,19 @@ export default async function DashboardPage({ params }: { params: Promise<{ loca
 										className={`flex items-center justify-between gap-3 rounded-[3px] border border-l-2 border-ink-700 bg-ink-900/40 px-3 py-2.5 transition-colors hover:border-ink-600 hover:bg-ink-700/40 ${rail}`}
 									>
 										<div className="min-w-0">
-											<p className="truncate text-sm font-medium text-fog-100">{vehicle.plateNo}</p>
-											<p className="truncate text-[11px] text-fog-500">
+											<p className="truncate text-body font-medium text-fog-100">
+												{vehicle.plateNo}
+											</p>
+											<p className="truncate text-meta text-fog-500">
 												{vehicle.make} {vehicle.model}
 											</p>
-											<p className="truncate text-[11px] text-fog-500">
+											<p className="truncate text-meta text-fog-500">
 												{device ? device.label : "No tracker assigned"}
 											</p>
 										</div>
 										<div className="flex shrink-0 flex-col items-end gap-1">
 											<DeviceStatusBadge state={state} />
-											<span className="text-[10px] text-fog-500">
+											<span className="text-meta text-fog-500">
 												{formatRelative(device?.lastSeenAt)}
 											</span>
 										</div>
