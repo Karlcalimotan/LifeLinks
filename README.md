@@ -109,6 +109,18 @@ pnpm gen model MaintenanceLog
 See [`stack/README.md`](stack/README.md) for what the scaffold copies, what it
 rewrites and what it deliberately leaves behind.
 
+## Deployment
+
+Production deploys only from `main`; `develop` is the integration deployment.
+Every other branch, including pull-request previews, is ineligible. The version
+contract and the release process are in
+[`docs/deployment.md`](docs/deployment.md).
+
+```bash
+node scripts/release-check.mjs
+node scripts/deployment-check.mjs
+```
+
 ## License
 
 MIT. See [`LICENSE`](LICENSE) and [`ATTRIBUTIONS.md`](ATTRIBUTIONS.md).

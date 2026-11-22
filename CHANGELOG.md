@@ -28,6 +28,12 @@ All notable changes to this project are documented here. The format follows
 - Reusable `stack/` scaffold and generators for features, device routes, firmware
   modules and Prisma models.
 - Documentation: architecture, hardware, safety, API and ADRs.
+- Deployment policy: version-consistency and Vercel-allowlist checks, a
+  `Deployment policy` workflow, and `docs/deployment.md` with the release
+  process and manual dashboard checklist.
+- Branch protection on `main` and `develop`: pull requests, required CI
+  checks, conversation resolution, no force pushes and no branch deletion.
+  `main` additionally requires one approval and linear history.
 
 ### Changed
 

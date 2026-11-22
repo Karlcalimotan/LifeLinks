@@ -9,6 +9,7 @@
 | [api.md](api.md) | Device endpoints, payloads, error codes, idempotency |
 | [api-regulation.md](api-regulation.md) | Envelope, latency budget, Singapore region, test recipe |
 | [local-database.md](local-database.md) | Supabase setup, pooled/direct URLs, migrations and seed |
+| [deployment.md](deployment.md) | Allowlist, branch protection, version contract and release process |
 | [adr/](adr/) | Architecture decisions and the template |
 | [../stack/README.md](../stack/README.md) | Scaffold and generators |
 
