@@ -6,26 +6,6 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-### Added
-
-- Issue-first collaboration: issue and pull-request templates, an `Issue policy`
-  CI check, and `scripts/issue-policy.mjs`.
-- Mandatory overlap check against J-Akiru5's open issues and PRs before creating
-  a new task, with a `pnpm overlap:check` preflight. On an overlapping decision,
-  J-Akiru5's decision takes priority.
-- Multi-agent definitions for `integrator`, `release-manager` and `reviewer`,
-  plus `scripts/merge-pr.mjs` and `docs/agents.md`.
-
-### Changed
-
-- `develop` and `staging` merges are handled by the `integrator` subagent through
-  `scripts/merge-pr.mjs`, which refuses `main` and unfinished checks; `main`
-  remains human-merged.
-- `pnpm self-check` now includes the issue-policy tests.
-- Hardened the integrator merge helper against base/head races and unreadable
-  check lists; narrowed the reviewer and release-manager permissions; the issue
-  policy now runs from the trusted base branch.
-
 ## [0.2.0] - 2026-11-22
 
 ### Added
@@ -68,6 +48,13 @@ All notable changes to this project are documented here. The format follows
   `develop` promotes to `staging` (the preview deployment), and `staging`
   promotes a versioned release to `main`. `develop` is protected but is not a
   Vercel deployment target.
+- Issue-first collaboration: issue and pull-request templates, an `Issue policy`
+  CI check, and `scripts/issue-policy.mjs`.
+- Mandatory overlap check against J-Akiru5's open issues and PRs before creating
+  a new task, with a `pnpm overlap:check` preflight. On an overlapping decision,
+  J-Akiru5's decision takes priority.
+- Multi-agent definitions for `integrator`, `release-manager` and `reviewer`,
+  plus `scripts/merge-pr.mjs` and `docs/agents.md`.
 
 ### Changed
 
@@ -111,6 +98,13 @@ All notable changes to this project are documented here. The format follows
 - The native PlatformIO environment includes `firmware/include`, and cppcheck
   suppresses its known ArduinoJson preprocessor false positive.
 - `pnpm self-check` now includes the release and deployment policy checks.
+- `develop` and `staging` merges are handled by the `integrator` subagent through
+  `scripts/merge-pr.mjs`, which refuses `main` and unfinished checks; `main`
+  remains human-merged.
+- `pnpm self-check` now includes the issue-policy tests.
+- Hardened the integrator merge helper against base/head races and unreadable
+  check lists; narrowed the reviewer and release-manager permissions; the issue
+  policy now runs from the trusted base branch.
 
 ### Removed
 
