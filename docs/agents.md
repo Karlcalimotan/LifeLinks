@@ -9,8 +9,8 @@ independent check.
 | Agent | Mode | Responsibility | Hard limit |
 | --- | --- | --- | --- |
 | parent / orchestrator | primary | Owns the issue, scope, worktree, verification and final report | Does not bypass checks or merge `main` |
-| `reviewer` | subagent | Read-only review for correctness, safety, regressions and missing tests | Cannot edit, push or merge |
-| `release-manager` | subagent | Version bumps, changelog sections and release checks | Cannot push, tag, merge, deploy or touch `main` |
+| `reviewer` | subagent | Read-only review for correctness, safety, regressions and missing tests | Read/glob/grep only; no shell, edit, push or merge |
+| `release-manager` | subagent | Version bumps, changelog sections and release checks | Release files only; no push, tag, merge, deploy or `main` |
 | `integrator` | subagent | Merges PRs into `develop` and `staging` after every required check passes | Cannot merge `main` or bypass protection |
 
 The definitions live in `.opencode/agents/`. OpenCode discovers them from the
@@ -71,8 +71,14 @@ while his is open.
 - The helper allows only `develop` and `staging` as bases, requires every
   required check to be `SUCCESS`, and refuses drafts, conflicts, behind
   branches, `do-not-merge`/`wip`/`blocked` labels and any PR targeting `main`.
+- It re-fetches the PR immediately before merging and refuses if the base or
+  head commit changed; it verifies the base again after merging. A missing
+  branch-protection check list fails closed.
 - `develop` and `staging` require zero approvals so the integrator can promote
   them after checks. `main` requires one approval and is human-only.
+- `Issue policy` runs from the base branch with `pull_request_target` and does
+  not execute PR code. Add it to required checks after the workflow is on the
+  base branch.
 - Never use `--admin`, `--auto`, force-push or branch deletion to get around a
   refusal.
 

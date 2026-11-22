@@ -309,19 +309,52 @@ function printEvaluation(pr, evaluation, dryRun) {
 }
 
 function mergeOne(pr, repo) {
+	// Re-fetch immediately before merging. A PR can be retargeted from
+	// develop/staging to main between evaluation and merge; the base and head
+	// must still be the ones that were evaluated.
+	const fresh = fetchPr(repo, pr.number);
+	if (!fresh.ok) return { ok: false, error: `re-fetch failed: ${fresh.error}` };
+
+	const current = fresh.pr;
+	if (current.baseRefName !== pr.baseRefName || current.headRefOid !== pr.headRefOid) {
+		return {
+			ok: false,
+			error: `pull request changed after evaluation (base ${pr.baseRefName} -> ${current.baseRefName}, head ${pr.headRefOid} -> ${current.headRefOid}); refusing`,
+		};
+	}
+	if (!ALLOWED_BASES.has(current.baseRefName)) {
+		return {
+			ok: false,
+			error: `base ${current.baseRefName} is not allowed; main is forbidden`,
+		};
+	}
+
+	const recheck = evaluatePr(current, repo);
+	if (!recheck.eligible) {
+		return { ok: false, error: `re-evaluation failed: ${recheck.reasons.join("; ")}` };
+	}
+
 	const result = gh([
 		"pr",
 		"merge",
-		String(pr.number),
+		String(current.number),
 		"--repo",
 		repo,
 		"--merge",
 		"--match-head-commit",
-		pr.headRefOid,
+		current.headRefOid,
 	]);
 	if (!result.ok) return { ok: false, error: shortError(result) };
 
-	const verification = gh(["pr", "view", String(pr.number), "--json", "state,mergeCommit"]);
+	const verification = gh([
+		"pr",
+		"view",
+		String(current.number),
+		"--repo",
+		repo,
+		"--json",
+		"state,mergeCommit,baseRefName",
+	]);
 	if (!verification.ok) {
 		return { ok: false, error: `merge verification failed: ${shortError(verification)}` };
 	}
@@ -331,6 +364,12 @@ function mergeOne(pr, repo) {
 		data = JSON.parse(verification.stdout);
 	} catch {
 		return { ok: false, error: "merge verification returned invalid JSON" };
+	}
+	if (!ALLOWED_BASES.has(data.baseRefName)) {
+		return {
+			ok: false,
+			error: `PR merged into ${data.baseRefName ?? "UNKNOWN"}, not develop/staging`,
+		};
 	}
 	if (data.state !== "MERGED") {
 		return { ok: false, error: `PR state is ${data.state ?? "UNKNOWN"}, not MERGED` };
@@ -383,7 +422,7 @@ function listOpenPrs(repo, base) {
 		"--state",
 		"open",
 		"--limit",
-		"100",
+		"1000",
 		"--json",
 		"number,title,url",
 	]);
@@ -435,6 +474,14 @@ function runAll(repo, dryRun) {
 			const pr = fetched.pr;
 			const evaluation = evaluatePr(pr, repo);
 			printEvaluation(pr, evaluation, dryRun);
+
+			// A missing or unreadable branch-protection check list is a
+			// configuration failure, not an ordinary skip. Fail closed.
+			if (evaluation.checkError) {
+				hadFailure = true;
+				skipped += 1;
+				continue;
+			}
 
 			if (!evaluation.eligible) {
 				skipped += 1;

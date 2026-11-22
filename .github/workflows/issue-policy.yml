@@ -1,8 +1,10 @@
 name: issue-policy
 
+# pull_request_target runs the workflow from the base branch. Check out the base
+# ref explicitly and run only the trusted checker; never check out PR code here.
 on:
-  pull_request:
-    types: [opened, edited, reopened, synchronize, labeled, unlabeled]
+  pull_request_target:
+    types: [opened, edited, reopened, synchronize, labeled, unlabeled, ready_for_review]
 
 permissions:
   contents: read
@@ -16,6 +18,8 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22

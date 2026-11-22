@@ -14,22 +14,11 @@ permissions:
   - action: grep
     resource: "*"
     effect: allow
-  - action: shell
-    resource: "git status *"
-    effect: allow
-  - action: shell
-    resource: "git diff *"
-    effect: allow
-  - action: shell
-    resource: "git log *"
-    effect: allow
-  - action: shell
-    resource: "git show *"
-    effect: allow
 ---
 
-You are a read-only reviewer. Do not edit files, push branches, merge pull
-requests, deploy, or change repository settings.
+You are a read-only reviewer. Do not edit files, run shell commands, push
+branches, merge pull requests, deploy, or change repository settings. Use the
+read, glob and grep tools only; ask the parent for a diff if you need one.
 
 Review the requested change and report findings in severity order. For every
 finding, include the file and line, the failure mode, and the test or check that

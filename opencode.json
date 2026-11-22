@@ -24,6 +24,13 @@
 		{ "action": "shell", "resource": "git push * --force*", "effect": "deny" },
 		{ "action": "shell", "resource": "git push * -f*", "effect": "deny" },
 		{ "action": "shell", "resource": "git push * main*", "effect": "deny" },
-		{ "action": "shell", "resource": "git push origin main*", "effect": "deny" }
+		{ "action": "shell", "resource": "git push origin main*", "effect": "deny" },
+		{ "action": "shell", "resource": "git push origin HEAD:main*", "effect": "deny" },
+		{ "action": "shell", "resource": "git push * HEAD:main*", "effect": "deny" },
+		{ "action": "shell", "resource": "git push origin *:main*", "effect": "deny" },
+		{ "action": "shell", "resource": "git push * *:main*", "effect": "deny" },
+		{ "action": "shell", "resource": "git push origin :main*", "effect": "deny" },
+		{ "action": "shell", "resource": "git push * :main*", "effect": "deny" },
+		{ "action": "shell", "resource": "git push * refs/heads/main*", "effect": "deny" }
 	]
 }

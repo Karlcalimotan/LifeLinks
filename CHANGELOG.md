@@ -22,6 +22,9 @@ All notable changes to this project are documented here. The format follows
   `scripts/merge-pr.mjs`, which refuses `main` and unfinished checks; `main`
   remains human-merged.
 - `pnpm self-check` now includes the issue-policy tests.
+- Hardened the integrator merge helper against base/head races and unreadable
+  check lists; narrowed the reviewer and release-manager permissions; the issue
+  policy now runs from the trusted base branch.
 
 ## [0.2.0] - 2026-11-22
 
