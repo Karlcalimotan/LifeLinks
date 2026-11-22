@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Tracker detail: edit the label and vehicle, confirm approve/reject/delete, and audit every action.
+
 ## [0.2.0] - 2026-11-22
 
 ### Added
