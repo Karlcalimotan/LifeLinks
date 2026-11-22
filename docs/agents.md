@@ -44,6 +44,11 @@ of creating a duplicate. Do not take over an issue assigned to another person.
 J-Akiru5 currently owns the firmware lane 3 items (#14, #15, #16); do not
 duplicate that work.
 
+**Overlap priority:** when a decision overlaps, J-Akiru5's decision takes
+priority. Pause the conflicting work, comment on his issue or PR, and align with
+his design. Do not merge a competing deployment, branch or data-model decision
+while his is open.
+
 ## Worktrees and ownership
 
 - One task, one issue, one worktree, one branch.

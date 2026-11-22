@@ -11,7 +11,7 @@ All notable changes to this project are documented here. The format follows
 - Issue-first collaboration: issue and pull-request templates, an `Issue policy`
   CI check, and `scripts/issue-policy.mjs`.
 - Mandatory overlap check against J-Akiru5's open issues and PRs before creating
-  a new task.
+  a new task. On an overlapping decision, J-Akiru5's decision takes priority.
 - Multi-agent definitions for `integrator`, `release-manager` and `reviewer`,
   plus `scripts/merge-pr.mjs` and `docs/agents.md`.
 

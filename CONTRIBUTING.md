@@ -52,7 +52,8 @@ reading is uncertain.
 1. Check J-Akiru5's open issues and PRs for overlap before creating a new issue:
    `gh issue list --author J-Akiru5`, `gh issue list --assignee J-Akiru5` and
    `gh pr list --author J-Akiru5`. Coordinate on an existing item instead of
-   duplicating it.
+   duplicating it. If a decision overlaps, J-Akiru5's decision takes priority;
+   pause and align instead of merging a competing design.
 2. Create an issue from the task or bug template before starting work.
 3. Put the objective, scope, acceptance criteria and test plan in the issue.
 4. Link it in the pull request with `Closes #N`, `Fixes #N`, `Refs #N` or
