@@ -13,7 +13,7 @@ status and may update their own branch copy.
       duplicates, show clear form errors. Issue #38.
 - [x] **T2 DONE** - Trackers: Approve / Reject / Edit / Delete actions with
       confirm dialogs and an audit log. PR #40.
-- [ ] **T3 IN REVIEW** - Trackers: search, filter (status, vehicle, approval), sort,
+- [x] **T3 DONE** - Trackers: search, filter (status, vehicle, approval), sort,
       pagination. Issue #45; PR #50.
 - [x] **T4 DONE** — Device ingestion API: `POST /api/device/heartbeat`
       and `/api/device/incident`, per-device auth token, idempotency key, rate
