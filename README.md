@@ -28,8 +28,15 @@ pnpm install
 cp apps/web/.env.example apps/web/.env   # fill in the Supabase URLs
 pnpm prisma:deploy
 SEED_DEMO=yes pnpm seed                  # PowerShell: $env:SEED_DEMO="yes"; pnpm seed
+                                         # remote demo target also needs SEED_ALLOW_REMOTE=yes
 pnpm dev
 ```
+
+The local seed path above is allowed because `DATABASE_URL` points at a loopback
+host or the Docker service name `db`. A non-local target needs both
+`SEED_DEMO=yes` and `SEED_ALLOW_REMOTE=yes`, and must be a disposable demo
+database. Never seed the demo fleet or its known passwords into a shared or
+production database.
 
 Open http://localhost:3000 and sign in with one of the three demo roles:
 
@@ -38,6 +45,10 @@ Open http://localhost:3000 and sign in with one of the three demo roles:
 | Admin | `admin@lifelink.local` | `Admin123!` | The whole fleet, trackers and settings |
 | Vehicle owner | `owner@lifelink.local` | `Owner123!` | Only the vehicles owned by that user |
 | CDRRMO / Pulis | `responder@lifelink.local` | `Responder123!` | The whole fleet and every incident |
+
+The login page renders the demo-account panel only when `DEMO_MODE="true"` is set
+in `apps/web/.env`. Keep it false in shared or production environments; the
+credentials are not part of the message catalogs or the client bundle.
 
 The seed creates 11 vehicles (three owned by the demo owner plus unowned fleet
 units), 13 trackers (10 approved, 2 pending and 1 rejected), 26 trips,

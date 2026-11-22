@@ -82,8 +82,7 @@
 		"pathCancel": "Kanselasyon ng driver",
 		"pathAlert": "SMS at console",
 		"prototypeNote": "Prototype. Tumawag muna sa lokal na emergency services.",
-		"demoAccess": "Demo access",
-		"demoHint": "Demo: admin@lifelink.local / Admin123! · owner@lifelink.local / Owner123! · responder@lifelink.local / Responder123!"
+		"demoAccess": "Demo access"
 	},
 	"dashboard": {
 		"title": "Pangkalahatang tanawin ng fleet",
@@ -621,8 +620,8 @@
 	},
 	"privacy": {
 		"title": "Privacy notice",
-		"body": "LifeLink stores vehicle location and crash telemetry to deliver emergency alerts. Location data is available only to members of your organization and is retained for the period configured in Settings.",
-		"extra": "Ang telemetry ay itinatago sa panahong nakatakda sa Settings. Ang incident evidence ay hiwalay na itinatago dahil maaaring kailanganin para sa insurance o legal review. Hindi kayang i-query ng ibang organization ang iyong mga sasakyan o insidente."
+		"body": "Iniimbak ng LifeLink ang lokasyon ng sasakyan at crash telemetry para makapagpadala ng emergency alerts. Ang location data ay makikita lamang ng mga miyembro ng iyong organization. Nako-configure ang retention periods sa Settings, pero hindi pa naka-enable ang automatic deletion, kaya mananatili ang data hanggang sa tanggalin ito ng service operator.",
+		"extra": "Hiwalay ang retention settings ng telemetry at incident evidence. Hindi pa ipinapatupad ng automatic cleanup job ang mga panahong ito. Itinatago ang incident evidence dahil maaaring kailanganin para sa insurance o legal review. Hindi maaaring i-query ng mga miyembro ng ibang organization ang iyong mga sasakyan o insidente."
 	},
 	"terms": {
 		"title": "Terms of use",
