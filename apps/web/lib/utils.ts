@@ -1,5 +1,19 @@
 import { type ClassValue, clsx } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { extendTailwindMerge } from "tailwind-merge";
+
+/**
+ * The six-step type scale uses `text-{size}` names that are not Tailwind's
+ * defaults. Without registering them, tailwind-merge classifies `text-body`
+ * as a text colour and drops a real colour such as `text-ink-950` from the
+ * same element. Keep this list in sync with `--text-*` in globals.css.
+ */
+const twMerge = extendTailwindMerge({
+	extend: {
+		classGroups: {
+			"font-size": [{ text: ["meta", "body", "emphasis", "section", "title", "display"] }],
+		},
+	},
+});
 
 export function cn(...inputs: ClassValue[]) {
 	return twMerge(clsx(inputs));

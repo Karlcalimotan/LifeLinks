@@ -18,6 +18,12 @@ Production: unchanged. The staging preview is merged; `main` is not promoted.
 - Verification on `develop@d1f8f6d`: release check, deployment policy, 35
   policy tests, Biome, TypeScript, **266 unit tests** and the production build
   all pass.
+- Follow-up accessibility pass: Lighthouse accessibility **1.0** with zero
+  failures on dashboard, incidents, map, analytics, settings and trackers.
+  The suite is now **270 unit tests**. The contrast bug was systemic:
+  `tailwind-merge` treated the custom `text-body`/`text-meta` sizes as colours
+  and dropped `text-ink-950` from primary buttons; `lib/utils.ts` now registers
+  the six type-scale values as font sizes, with a regression test.
 - `pnpm self-check` in the main checkout trips the stack contract on the
   template's old product attribution inside stale `.worktrees/` copies. CI runs
   from a clean clone and passes; this is a local-worktree artifact, not a code
@@ -31,12 +37,12 @@ Production: unchanged. The staging preview is merged; `main` is not promoted.
 | Workflows / UX | 2 | 4 | Acknowledge from the dashboard or filtered list, global search, map selection, tracker bulk approve. |
 | Visual design | 3 | 4 | Consistent panels, dense tables and one accent; screenshots at both widths. |
 | States | 2 | 4 | Loading/error boundaries on every route; empty states for every panel. |
-| Accessibility | 2 | 3 | Labels, focus trap, keyboard palette, status text plus colour. No axe run yet. |
+| Accessibility | 2 | 4 | Lighthouse accessibility 1.0 with zero failures on dashboard, incidents, map, analytics, settings and trackers after fixing the primary-button contrast and the palette trigger name. |
 | Responsive | 3 | 3 | 390 px screenshots; tables scroll inside panels; bottom nav scrolls. No page-level horizontal scroll observed. |
-| Performance | 2 | 3 | Production build passes; no Lighthouse run. Lists are paginated. |
+| Performance | 2 | 3 | Production build passes; Lighthouse accessibility, best practices and SEO are 1.0 on six pages; no performance benchmark yet. Lists are paginated. |
 | Backend / data | 4 | 4 | Scoped queries, no schema or device API changes, bounded pagination. |
 | Reliability / observability | 3 | 3 | Health endpoint and device watch exist; no alert sender or retry worker. |
-| Code and tests | 3 | 4 | 266 tests, shared analytics aggregates, pure query/projection helpers. |
+| Code and tests | 3 | 4 | 270 tests, shared analytics aggregates, pure query/projection helpers, `cn` regression coverage. |
 
 ## Shipped in Cycle 1
 
@@ -96,8 +102,9 @@ Production: unchanged. The staging preview is merged; `main` is not promoted.
 3. **T11 tracker battery trend** from `TelemetrySample`, and a heading value on
    the map panel from the latest sample.
 4. **Seed execution** once the owner approves replacing the demo fleet.
-5. **Axe + Lighthouse** on dashboard, incidents, map and analytics; close the
-   remaining accessibility and performance evidence gaps.
+5. **Axe in CI + performance benchmark.** Lighthouse accessibility is 1.0 on
+   the six main pages; add an axe check to the repeatable gate and measure a
+   real performance budget rather than relying on the production build alone.
 6. **Consolidate the two schematic map implementations** (`components/map/
    fleet-map.tsx` and `components/map/schematic-map.tsx`) before they diverge
    further.

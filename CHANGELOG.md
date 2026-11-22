@@ -53,6 +53,11 @@ All notable changes to this project are documented here. The format follows
   were no longer pending, instead of counting both as skipped.
 - Copy MAC controls and route error copy are translated and distinguish each
   row.
+- Primary buttons keep the dark ink text colour at the design-system contrast
+  ratio. Custom type-scale utilities are now classified as font sizes by
+  `tailwind-merge`, so a colour such as `text-ink-950` is no longer dropped when
+  combined with `text-body` or `text-meta`.
+- The command-palette trigger's accessible name matches its visible label.
 
 ## [0.2.0] - 2026-11-22
 
