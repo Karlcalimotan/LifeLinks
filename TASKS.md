@@ -11,7 +11,7 @@ status and may update their own branch copy.
 
 - [x] **T1 DONE** — Trackers: validate MAC format, block
       duplicates, show clear form errors. Issue #38.
-- [ ] **T2 TODO** — Trackers: Approve / Reject / Edit / Delete actions with
+- [ ] **T2 IN REVIEW** — Trackers: Approve / Reject / Edit / Delete actions with
       confirm dialogs and an audit log.
 - [ ] **T3 TODO** — Trackers: search, filter (status, vehicle, approval), sort,
       pagination.
