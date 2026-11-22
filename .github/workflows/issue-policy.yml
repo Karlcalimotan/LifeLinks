@@ -4,9 +4,13 @@ name: issue-policy
 # when the workflow exists on the default branch. Until this workflow reaches
 # main, use pull_request with an explicit base-ref checkout so the checker and
 # its tests come from the trusted base, not from PR code.
+#
+# Issue-first applies to integration PRs. Release/promotion PRs to main are
+# exempt; this also avoids checking `main` for a script it does not have yet.
 on:
   pull_request:
     types: [opened, edited, reopened, synchronize, labeled, unlabeled, ready_for_review]
+    branches: [develop, staging]
 
 permissions:
   contents: read
