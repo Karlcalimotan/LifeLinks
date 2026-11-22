@@ -133,6 +133,10 @@ firmware tag. A tag, once pushed, is immutable: never move, delete or replace it
     commit.
 11. Run `node scripts/release-check.mjs --tag vX.Y.Z` against the tag before or
     during release verification.
+12. Back-merge after release: merge `main` back into `develop` and `staging`
+    through a pull request. This keeps the histories aligned so the next
+    promotion is not reported as `BEHIND`. `main` is never force-pushed or
+    rewritten.
 
 ### Firmware
 
@@ -235,7 +239,8 @@ needed for another reason; `pnpm build` is the normal local check.
 - [x] Branch protection enabled on `main`, `staging` and `develop`.
 - [x] `staging` created from `develop`, protected, and allowlisted for preview
       deployments.
-- [x] `refs/tags/v*` protected against update and deletion.
+- [x] `refs/tags/v*` and `refs/tags/fw-v*` protected against update and
+      deletion.
 - [x] Version sources of truth declared and checked: application/PWA and
       firmware are independent.
 - [ ] `Deployment policy` added to `main`'s required checks after promotion.
