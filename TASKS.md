@@ -9,13 +9,13 @@ status and may update their own branch copy.
 
 ## P0: Core product (start here)
 
-- [ ] **T1 IN REVIEW** — Trackers: validate MAC format, block
+- [x] **T1 DONE** — Trackers: validate MAC format, block
       duplicates, show clear form errors. Issue #38.
 - [ ] **T2 TODO** — Trackers: Approve / Reject / Edit / Delete actions with
       confirm dialogs and an audit log.
 - [ ] **T3 TODO** — Trackers: search, filter (status, vehicle, approval), sort,
       pagination.
-- [ ] **T4 IN REVIEW** — Device ingestion API: `POST /api/device/heartbeat`
+- [x] **T4 DONE** — Device ingestion API: `POST /api/device/heartbeat`
       and `/api/device/incident`, per-device auth token, idempotency key, rate
       limit, input validation (zod). Issue #37; PR pending.
 - [ ] **T5 TODO** — Online/Offline logic from last heartbeat (configurable
