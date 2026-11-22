@@ -158,8 +158,23 @@ The command poll carries a versioned `config` object. The firmware:
 2. rejects an unsupported version
 3. rejects the whole object if any field is outside its envelope or a
    whole-number field is fractional
-4. persists the accepted object in NVS (`cfg_json`, `cfg_rev`)
-5. echoes `config_rev` in the next heartbeat
+4. validates at **queue** time, then applies only while the alert state is
+   `Idle`; a config that arrives mid-countdown waits instead of changing the
+   window under an active alert
+5. persists the accepted object in NVS (`cfg_json`, `cfg_rev`) only after it is
+   applied
+6. echoes the applied `config_rev` in the next heartbeat; a rejected or queued
+   object does not move the rev
+7. falls back to the factory defaults on boot when the stored object is
+   missing, unparsable or out of envelope
+
+Serial controls for bench work:
+
+```
+CONFIG                 # print the active config JSON and whether one is queued
+SET_CONFIG <json>      # validate and queue a payload
+RESET_CONFIG           # clear NVS and return to factory defaults
+```
 
 The server table lives in `apps/web/lib/firmware/config.ts`. The test
 `apps/web/lib/firmware/config.test.ts` parses `config.h` and fails on drift.
