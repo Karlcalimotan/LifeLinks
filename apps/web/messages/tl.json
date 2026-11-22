@@ -225,6 +225,74 @@
 		"pendingCallout": "{count, plural, one {# tracker ang naghihintay ng aprubasyon.} other {# tracker ang naghihintay ng aprubasyon.}}",
 		"reviewPending": "Suriin"
 	},
+	"map": {
+		"title": "Live na mapa",
+		"subtitle": "Bawat sasakyang may posisyon, ang kalagayan ng tracker at ang bukas na insidente.",
+		"vehicles": "Mga sasakyan",
+		"searchLabel": "Hanapin ang sasakyan",
+		"searchPlaceholder": "Plaka, drayber, modelo o tracker",
+		"searchSubmit": "Hanapin",
+		"filterLabel": "Salain ang mga sasakyan ayon sa kalagayan",
+		"listCount": "{shown} sa {total}",
+		"mapTitle": "Mga posisyon",
+		"positionsSummary": "{positions} sa {total} ang may fix",
+		"fitAll": "Ipakita lahat",
+		"mapLabel": "Schematic na mapa ng {count, plural, one {# posisyon ng sasakyan} other {# posisyon ng sasakyan}}",
+		"schematicNote": "Schematic na posisyon, hindi street map.",
+		"legendTitle": "Gabay",
+		"legendStale": "May putol-putol na gilid: ang fix ay mas luma sa {minutes} min",
+		"filters": {
+			"all": "Lahat",
+			"online": "Online",
+			"offline": "Offline",
+			"lowBattery": "Mahinang baterya",
+			"incident": "Bukas na insidente"
+		},
+		"states": {
+			"online": "Online",
+			"weak": "Mahinang signal",
+			"lowBattery": "Mahinang baterya",
+			"offline": "Offline",
+			"neverSeen": "Wala pang ulat",
+			"incident": "Bukas na insidente"
+		},
+		"panel": {
+			"close": "Isara ang panel",
+			"driver": "Drayber",
+			"tracker": "Tracker",
+			"connection": "Koneksyon",
+			"lastSeen": "Huling ulat",
+			"battery": "Baterya",
+			"signal": "Signal",
+			"speed": "Bilis",
+			"coordinates": "Koordinasyon",
+			"lastFix": "Huling fix",
+			"satellites": "Satellite",
+			"lowBattery": "Mahinang baterya",
+			"staleFix": "Lumang fix",
+			"noPosition": "Wala pang posisyon. Nananatili rito ang huling detalye.",
+			"noTracker": "Walang nakatalagang tracker",
+			"noDriver": "Walang nakatalang drayber",
+			"stopped": "Nakatigil",
+			"openVehicle": "Buksan ang sasakyan",
+			"openIncident": "Buksan ang insidente"
+		},
+		"empty": {
+			"noPositionsTitle": "Wala pang posisyong naipadala",
+			"noPositionsBody": "Lalabas ang posisyon kapag nagpadala ang tracker ng unang GPS fix. Nananatili sa listahan ang tracker na wala pang fix.",
+			"noMatchesTitle": "Walang tugmang sasakyan",
+			"noMatchesBody": "Alisin ang paghahanap o ang filter para makita ang lahat.",
+			"clearFilters": "Alisin ang search at filter",
+			"noVehiclesTitle": "Wala pang sasakyan",
+			"noVehiclesBody": "Lalabas ang mga sasakyan kapag naidagdag na sila sa organisasyon."
+		},
+		"error": {
+			"title": "Hindi ma-load ang mapa.",
+			"body": "Hindi dumating ang mga posisyon. Subukan muli; kung paulit-ulit, tingnan ang health endpoint.",
+			"tryAgain": "Subukan muli",
+			"back": "Bumalik sa dashboard"
+		}
+	},
 	"settings": {
 		"title": "Mga Setting",
 		"subtitle": "Organisasyon, thresholds, mga tao at kalagayan ng sistema.",

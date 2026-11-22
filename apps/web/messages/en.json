@@ -225,6 +225,74 @@
 		"pendingCallout": "{count, plural, one {# tracker is waiting for approval.} other {# trackers are waiting for approval.}}",
 		"reviewPending": "Review"
 	},
+	"map": {
+		"title": "Live map",
+		"subtitle": "Every vehicle with a reported position, its tracker state and any open incident.",
+		"vehicles": "Vehicles",
+		"searchLabel": "Search vehicles",
+		"searchPlaceholder": "Plate, driver, model or tracker",
+		"searchSubmit": "Search",
+		"filterLabel": "Filter vehicles by state",
+		"listCount": "{shown} of {total}",
+		"mapTitle": "Fleet positions",
+		"positionsSummary": "{positions} of {total} with a fix",
+		"fitAll": "Fit all",
+		"mapLabel": "Schematic map of {count, plural, one {# vehicle position} other {# vehicle positions}}",
+		"schematicNote": "Schematic positions, not a street map.",
+		"legendTitle": "Legend",
+		"legendStale": "Dashed edge: fix older than {minutes} min",
+		"filters": {
+			"all": "All",
+			"online": "Online",
+			"offline": "Offline",
+			"lowBattery": "Low battery",
+			"incident": "Open incident"
+		},
+		"states": {
+			"online": "Online",
+			"weak": "Weak signal",
+			"lowBattery": "Low battery",
+			"offline": "Offline",
+			"neverSeen": "Never seen",
+			"incident": "Open incident"
+		},
+		"panel": {
+			"close": "Close panel",
+			"driver": "Driver",
+			"tracker": "Tracker",
+			"connection": "Connection",
+			"lastSeen": "Last seen",
+			"battery": "Battery",
+			"signal": "Signal",
+			"speed": "Speed",
+			"coordinates": "Coordinates",
+			"lastFix": "Last fix",
+			"satellites": "Satellites",
+			"lowBattery": "Low battery",
+			"staleFix": "Stale fix",
+			"noPosition": "No position reported yet. The last known details stay here.",
+			"noTracker": "No tracker assigned",
+			"noDriver": "No driver recorded",
+			"stopped": "Stopped",
+			"openVehicle": "Open vehicle",
+			"openIncident": "Open incident"
+		},
+		"empty": {
+			"noPositionsTitle": "No tracker has reported a position",
+			"noPositionsBody": "Positions appear after a tracker sends its first GPS fix. Trackers without a fix stay in the list.",
+			"noMatchesTitle": "No vehicles match these filters",
+			"noMatchesBody": "Clear the search or the filter to see every vehicle.",
+			"clearFilters": "Clear search and filters",
+			"noVehiclesTitle": "No vehicles yet",
+			"noVehiclesBody": "Vehicles appear here after they are added to the organization."
+		},
+		"error": {
+			"title": "The map could not load.",
+			"body": "The vehicle positions did not arrive. Try again, and if it keeps failing, check the health endpoint.",
+			"tryAgain": "Try again",
+			"back": "Back to the dashboard"
+		}
+	},
 	"settings": {
 		"title": "Settings",
 		"subtitle": "Organization, thresholds, people and system status.",
