@@ -19,8 +19,15 @@ import { getTranslations } from "next-intl/server";
 
 export const dynamic = "force-dynamic";
 
-export default async function DevicesPage({ params }: { params: Promise<{ locale: string }> }) {
+export default async function DevicesPage({
+	params,
+	searchParams,
+}: {
+	params: Promise<{ locale: string }>;
+	searchParams: Promise<{ deleted?: string; error?: string }>;
+}) {
 	const { locale } = await params;
+	const { deleted, error } = await searchParams;
 	const current = await requireRole("ADMIN");
 	const t = await getTranslations({ locale, namespace: "devices" });
 
@@ -40,6 +47,21 @@ export default async function DevicesPage({ params }: { params: Promise<{ locale
 	return (
 		<>
 			<PageHeader title={t("title")} subtitle={t("subtitle")} />
+
+			{deleted === "1" ? (
+				<p className="mb-4 rounded border border-clear-500/30 bg-clear-500/10 px-3 py-2 text-xs text-clear-300">
+					Tracker deleted.
+				</p>
+			) : null}
+			{error ? (
+				<p className="mb-4 rounded border border-alarm-500/30 bg-alarm-500/10 px-3 py-2 text-xs text-alarm-300">
+					{error === "forbidden"
+						? "Your role cannot change trackers."
+						: error === "notfound"
+							? "Tracker not found."
+							: "Tracker action failed."}
+				</p>
+			) : null}
 
 			{canAdminister(current.role) ? (
 				<Card className="mb-6">

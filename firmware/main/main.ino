@@ -77,6 +77,7 @@ uint32_t g_cancelledAt = 0;
 uint32_t g_postAlertAt = 0;
 uint32_t g_alertStartedAt = 0;
 uint32_t g_testAlertUntil = 0;
+bool g_allClearPending = false;
 
 String g_incidentId;
 uint32_t g_detectedAt = 0;
@@ -511,8 +512,34 @@ void sendSmsAlerts() {
 	const String phone2 = prefs.getString("alert_phone_2", "");
 	bool sent = false;
 	if (!phone1.isEmpty()) sent = sendSms(phone1, String(bodyBuffer)) || sent;
+
+	// A remote cancel can only be observed between blocking AT calls. If the
+	// operator cancelled while the first message was in flight, do not send the
+	// second one.
+	if (g_safety.state() != fw::AlertState::Alerting) {
+		Serial.println("[SOS] cancel observed; second recipient suppressed");
+		return;
+	}
+
 	if (!phone2.isEmpty()) sent = sendSms(phone2, String(bodyBuffer)) || sent;
 	Serial.println(sent ? "[SOS] SMS sent" : "[SOS] SMS failed or no phone configured");
+}
+
+/**
+ * All-clear for a cancelled incident. The device owns the modem and the
+ * recipient numbers, so the platform does not need an SMS provider. If the
+ * device is offline this cannot be delivered; the incident record still shows
+ * the false alarm.
+ */
+void sendAllClearSms() {
+	const String plate = prefs.getString("plate_no", "vehicle");
+	const String body = "LIFELINK ALL CLEAR " + plate +
+						" - false alarm. The earlier SOS was cancelled. No emergency.";
+	const String phone1 = prefs.getString("alert_phone_1", "");
+	const String phone2 = prefs.getString("alert_phone_2", "");
+	if (!phone1.isEmpty()) sendSms(phone1, body);
+	if (!phone2.isEmpty()) sendSms(phone2, body);
+	Serial.println("[SOS] all-clear sent");
 }
 
 void sendCommandAck(const String& commandId, const char* status, const char* detail) {
@@ -547,6 +574,25 @@ void handleCommands(JsonArray commands) {
 			g_armed = false;
 		} else if (kind == "SET_CONFIG") {
 			// The config object is applied from the same poll response.
+		} else if (kind == "CANCEL_ALERT") {
+			const String incidentId = command["payload"]["incident_id"] | "";
+			const bool allClear = command["payload"]["all_clear"] | false;
+
+			if (!incidentId.isEmpty() && !g_incidentId.isEmpty() && incidentId != g_incidentId) {
+				Serial.println("[CMD] CANCEL_ALERT for a different incident");
+				sendCommandAck(id, "ACKED", "unknown_incident");
+				continue;
+			}
+
+			if (g_safety.cancelFromRemote()) {
+				Serial.println("[CMD] CANCEL_ALERT accepted");
+				if (allClear) g_allClearPending = true;
+				sendCommandAck(id, "ACKED", "cancelled");
+			} else {
+				Serial.println("[CMD] CANCEL_ALERT too late");
+				sendCommandAck(id, "ACKED", "too_late");
+			}
+			continue;
 		}
 		sendCommandAck(id, "ACKED", nullptr);
 	}
@@ -787,6 +833,11 @@ void loop() {
 
 		if (state == fw::AlertState::PostAlert && (now - g_postAlertAt) > 5UL * 60UL * 1000UL) {
 			g_safety.reset();
+		}
+
+		if (g_allClearPending && state != fw::AlertState::Alerting) {
+			g_allClearPending = false;
+			sendAllClearSms();
 		}
 
 		g_lastState = state;
