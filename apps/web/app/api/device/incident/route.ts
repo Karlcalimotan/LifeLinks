@@ -1,12 +1,13 @@
 import { alertTargetsFromSettings } from "@/lib/alerts/templates";
 import { ok } from "@/lib/api/envelope";
-import { badRequest, conflict, forbidden } from "@/lib/api/errors";
+import { badRequest, conflict, forbidden, rateLimited } from "@/lib/api/errors";
 import { withApi } from "@/lib/api/instrumentation";
 import { isDeviceApproved, requireDevice } from "@/lib/device/auth";
 import { incidentSchema } from "@/lib/device/schema";
 import { resolveDeviceTime } from "@/lib/device/time";
 import { isValidCoordinate } from "@/lib/geo";
 import prisma from "@/lib/prisma";
+import { rateLimit } from "@/lib/rate-limit";
 import { getOrgSettings } from "@/lib/settings/org";
 import { Prisma } from "@prisma/client";
 
@@ -24,6 +25,11 @@ export const POST = withApi(
 	async (request) => {
 		const device = await requireDevice(request);
 		if (!isDeviceApproved(device)) throw forbidden("Device is not approved.");
+
+		const limit = rateLimit(`device:${device.id}:incident`, 30, 60_000);
+		if (!limit.allowed) {
+			throw rateLimited(`Too many incident reports. Retry in ${limit.retryAfterSeconds} seconds.`);
+		}
 
 		const parsed = incidentSchema.safeParse(await request.json().catch(() => null));
 		if (!parsed.success) throw badRequest("Invalid incident payload.", parsed.error.flatten());
