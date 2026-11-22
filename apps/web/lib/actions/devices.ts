@@ -46,6 +46,7 @@ export interface BulkApproveState {
 	ok: boolean;
 	approved?: number;
 	skipped?: number;
+	failed?: number;
 	error?: BulkApproveError;
 }
 
@@ -278,10 +279,18 @@ export async function bulkApproveDevicesAction(
 	});
 
 	if (pending.length === 0) {
-		return { ok: false, approved: 0, skipped: selection.ids.length, error: "none" };
+		return {
+			ok: false,
+			approved: 0,
+			skipped: selection.ids.length,
+			failed: 0,
+			error: "none",
+		};
 	}
 
 	let approved = 0;
+	let skipped = selection.ids.length - pending.length;
+	let failed = 0;
 	for (const device of pending) {
 		try {
 			const updated = await prisma.$transaction(async (tx) => {
@@ -306,19 +315,27 @@ export async function bulkApproveDevicesAction(
 				});
 				return 1;
 			});
-			approved += updated;
+			if (updated === 1) approved += 1;
+			else skipped += 1;
 		} catch {
-			// A failed device must not roll back approvals that already succeeded.
+			// A database failure is reported separately from an id that the
+			// candidate query filtered out. Other devices still proceed.
+			failed += 1;
 		}
 	}
 
-	const skipped = selection.ids.length - approved;
 	revalidatePath(`/${localeFrom(formData)}/devices`);
 
 	if (approved === 0) {
-		return { ok: false, approved, skipped, error: "failed" };
+		return {
+			ok: false,
+			approved,
+			skipped,
+			failed,
+			error: failed > 0 ? "failed" : "none",
+		};
 	}
-	return { ok: true, approved, skipped };
+	return { ok: true, approved, skipped, failed };
 }
 
 export async function rejectDeviceAction(formData: FormData) {

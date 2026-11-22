@@ -105,6 +105,12 @@ SemVer, but **does not compare them to the application version**. The firmware
 version is reported separately by the check and echoed in every heartbeat as
 `firmware_version`.
 
+The tracker list shows an “Update available” marker by comparing each installed
+version with `LIFELINK_FIRMWARE_VERSION`. When that variable is empty, the
+marker falls back to the repository `FW_VERSION`. The marker is display-only;
+OTA still requires the configured signed manifest (version, URL, SHA256 and
+signature).
+
 Application releases are annotated `vX.Y.Z`; firmware releases use `fw-vX.Y.Z`.
 The `immutable-release-tags` ruleset blocks deletion and update of
 `refs/tags/v*`; the owner should extend it to `refs/tags/fw-v*` before the first

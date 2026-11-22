@@ -1,4 +1,7 @@
-export const BULK_APPROVE_MAX = 50;
+import { BULK_APPROVE_MAX } from "./limits";
+
+export { BULK_APPROVE_MAX } from "./limits";
+
 export const DEVICE_ID_MAX_LENGTH = 64;
 
 export interface BulkDeviceSelection {

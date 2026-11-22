@@ -95,20 +95,17 @@ export function BulkApproveProvider({
 				? t("bulkInvalid")
 				: state.error === "too_many"
 					? t("bulkTooMany", { max: BULK_APPROVE_MAX })
-					: state.error === "none"
-						? t("bulkNone", { skipped: state.skipped ?? 0 })
-						: state.error === "failed"
-							? t("bulkFailed", { skipped: state.skipped ?? 0 })
-							: null;
-	const resultText =
-		state.approved != null && state.approved > 0
-			? state.skipped
-				? t("bulkApprovedPartial", { approved: state.approved, skipped: state.skipped })
-				: t("bulkApproved", { approved: state.approved })
-			: null;
-	const partial = !errorText && Boolean(state.skipped);
-	const warning = state.error === "none";
-	const alert = Boolean(errorText) && !warning;
+					: null;
+	const resultParts = [
+		state.approved ? t("bulkApproved", { approved: state.approved }) : null,
+		state.skipped ? t("bulkSkipped", { skipped: state.skipped }) : null,
+		state.failed ? t("bulkFailed", { failed: state.failed }) : null,
+	].filter((part): part is string => part != null);
+	const resultText = resultParts.length > 0 ? resultParts.join(" ") : null;
+	const failed = (state.failed ?? 0) > 0;
+	const skipped = (state.skipped ?? 0) > 0;
+	const alert = Boolean(errorText) || ((state.approved ?? 0) === 0 && failed);
+	const warning = !alert && (failed || skipped);
 
 	return (
 		<BulkSelectionContext.Provider value={{ pendingIds, selected, toggle, toggleAll }}>
@@ -123,7 +120,7 @@ export function BulkApproveProvider({
 								"rounded-panel border px-3 py-2 text-meta",
 								alert
 									? "border-alarm-400/30 bg-alarm-400/10 text-alarm-300"
-									: partial || warning
+									: warning
 										? "border-caution-400/30 bg-caution-400/10 text-caution-300"
 										: "border-clear-400/30 bg-clear-400/10 text-clear-300",
 							)}

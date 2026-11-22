@@ -37,14 +37,14 @@ export function CopyMac({ value }: { value: string }) {
 			<button
 				type="button"
 				onClick={copy}
-				aria-label={t("copyMac")}
+				aria-label={t("copyMacFor", { mac: value })}
 				title={t("copyMac")}
-				className="inline-flex size-7 shrink-0 items-center justify-center rounded-control text-fog-500 transition-colors hover:bg-ink-700 hover:text-fog-100"
+				className="inline-flex size-8 shrink-0 items-center justify-center rounded-control text-fog-500 transition-colors hover:bg-ink-700 hover:text-fog-100"
 			>
 				{status === "copied" ? (
-					<Check className="size-3.5" aria-hidden="true" />
+					<Check className="size-4" aria-hidden="true" />
 				) : (
-					<Copy className="size-3.5" aria-hidden="true" />
+					<Copy className="size-4" aria-hidden="true" />
 				)}
 			</button>
 			<span className="sr-only" aria-live="polite">

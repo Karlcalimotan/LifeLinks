@@ -56,8 +56,8 @@ describe("signal bands", () => {
 		expect(signalBand(-69)).toBe("strong");
 		expect(signalBand(-70)).toBe("good");
 		expect(signalBand(-79)).toBe("good");
-		expect(signalBand(-80)).toBe("weak");
-		expect(signalBand(-89)).toBe("weak");
+		expect(signalBand(-80)).toBe("fair");
+		expect(signalBand(-89)).toBe("fair");
 		expect(signalBand(-90)).toBe("poor");
 		expect(signalBand(-110)).toBe("poor");
 	});
@@ -71,7 +71,7 @@ describe("signal bands", () => {
 	it("maps bands to 0-4 bars", () => {
 		expect(signalBarCount("strong")).toBe(4);
 		expect(signalBarCount("good")).toBe(3);
-		expect(signalBarCount("weak")).toBe(2);
+		expect(signalBarCount("fair")).toBe(2);
 		expect(signalBarCount("poor")).toBe(1);
 		expect(signalBarCount("unknown")).toBe(0);
 	});

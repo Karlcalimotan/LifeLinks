@@ -129,7 +129,7 @@ export default async function DevicesPage({
 	const signalLabels = {
 		strong: t("signalStrong"),
 		good: t("signalGood"),
-		weak: t("signalWeak"),
+		fair: t("signalFair"),
 		poor: t("signalPoor"),
 		noSignal: t("noSignal"),
 		noReading: t("noReading"),
@@ -207,15 +207,13 @@ export default async function DevicesPage({
 						{devices.length === 0 ? (
 							<div>
 								<EmptyState
-									title={hasActiveFilters(query) ? "No trackers match these filters" : t("empty")}
-									body={
-										hasActiveFilters(query) ? "Clear the filters to see every tracker." : undefined
-									}
+									title={hasActiveFilters(query) ? t("emptyFiltered") : t("empty")}
+									body={hasActiveFilters(query) ? t("emptyFilteredBody") : undefined}
 								/>
 								{hasActiveFilters(query) ? (
 									<div className="mt-3 text-center">
 										<Link href="/devices" className="text-meta text-fog-300 hover:text-signal-300">
-											Clear filters
+											{t("clearFilters")}
 										</Link>
 									</div>
 								) : null}
@@ -394,7 +392,7 @@ export default async function DevicesPage({
 					{pageCount > 1 ? (
 						<div className="mt-4 flex flex-wrap items-center justify-between gap-2">
 							<span className="text-meta text-fog-500">
-								Page {page} of {pageCount} · {total} trackers
+								{t("pageSummary", { page, pages: pageCount, total })}
 							</span>
 							<div className="flex gap-2">
 								{page > 1 ? (
@@ -402,7 +400,7 @@ export default async function DevicesPage({
 										href={buildDevicesHref(effectiveQuery, { page: page - 1 })}
 										className="inline-flex h-8 items-center rounded-panel border border-ink-600 px-3 text-meta text-fog-300 hover:bg-ink-700/60"
 									>
-										Previous
+										{t("previous")}
 									</Link>
 								) : null}
 								{page < pageCount ? (
@@ -410,7 +408,7 @@ export default async function DevicesPage({
 										href={buildDevicesHref(effectiveQuery, { page: page + 1 })}
 										className="inline-flex h-8 items-center rounded-panel border border-ink-600 px-3 text-meta text-fog-300 hover:bg-ink-700/60"
 									>
-										Next
+										{t("next")}
 									</Link>
 								) : null}
 							</div>

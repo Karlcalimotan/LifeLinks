@@ -184,6 +184,10 @@ error. Destructive actions require confirmation and an audit entry.
 | | weak | caution | Weak signal |
 | | offline | alarm | Offline |
 | | never seen | muted | Never seen |
+| Tracker signal (RSSI) | strong (above −70 dBm) | clear | Strong |
+| | good (−79 to −70 dBm) | clear | Good |
+| | fair (−89 to −80 dBm) | caution | Fair |
+| | poor (−90 dBm and below) | alarm | Poor |
 | Approval | approved | clear | Approved |
 | | pending | caution | Pending |
 | | rejected | alarm | Rejected |
@@ -201,6 +205,11 @@ error. Destructive actions require confirmation and an audit entry.
 | Vehicle | active | clear | Active |
 | | maintenance | caution | Maintenance |
 | | retired | muted | Retired |
+
+The signal column is RSSI, independent of the heartbeat connection state. An
+offline or never-seen tracker shows “No signal” instead of a stale reading. The
+RSSI band never uses the connection label “Weak signal”; that label belongs to
+the 2–5 minute heartbeat window only.
 
 ## Layout and responsive
 

@@ -6,14 +6,14 @@ const barHeights = ["h-1", "h-2", "h-3", "h-4"] as const;
 const bandTones: Record<Exclude<SignalBand, "unknown">, string> = {
 	strong: "bg-clear-400",
 	good: "bg-clear-400",
-	weak: "bg-caution-400",
+	fair: "bg-caution-400",
 	poor: "bg-alarm-400",
 };
 
 export interface SignalLabels {
 	strong: string;
 	good: string;
-	weak: string;
+	fair: string;
 	poor: string;
 	noSignal: string;
 	noReading: string;
