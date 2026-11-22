@@ -47,12 +47,10 @@ export function FleetMap({
 	markers,
 	legend,
 	ariaLabel,
-	listLabel,
 }: {
 	markers: FleetMapMarker[];
 	legend: FleetMapLegendItem[];
 	ariaLabel: string;
-	listLabel: string;
 }) {
 	const bounds = fleetMapBounds(markers);
 	const points = markers.map((marker) => ({
@@ -134,15 +132,17 @@ export function FleetMap({
 				</div>
 			</div>
 
-			<ul className="mt-3 grid gap-1 sm:hidden">
+			<ul className="mt-3 grid gap-1 sm:sr-only">
 				{markers.map((marker) => (
-					<li key={`mobile-${marker.id}`}>
+					<li key={`state-${marker.id}`}>
 						<Link
 							href={marker.href}
+							title={`${marker.stateLabel} · ${marker.detail}`}
 							className="flex items-center justify-between gap-2 rounded-control border border-ink-700 bg-ink-900/40 px-2 py-1.5 text-meta transition-colors hover:border-ink-600 hover:bg-ink-700/40"
 						>
 							<span className="truncate font-medium text-fog-100">{marker.plateNo}</span>
 							<span className="shrink-0 text-fog-500">{marker.stateLabel}</span>
+							<span className="sr-only">{marker.detail}</span>
 						</Link>
 					</li>
 				))}
@@ -159,15 +159,6 @@ export function FleetMap({
 					</span>
 				))}
 			</div>
-
-			<p className="sr-only">{listLabel}</p>
-			<ul className="sr-only">
-				{markers.map((marker) => (
-					<li key={`state-${marker.id}`}>
-						{marker.plateNo}: {marker.stateLabel}. {marker.detail}
-					</li>
-				))}
-			</ul>
 		</div>
 	);
 }

@@ -1,18 +1,18 @@
 import "server-only";
 
+import {
+	type DayCount,
+	acknowledgementSamples,
+	analyticsWindow,
+	averageDuration,
+	countByManilaDay,
+} from "@/lib/analytics/aggregate";
 import { type MemberRoleName, vehicleScope } from "@/lib/auth/roles";
 import { DEVICE_OFFLINE_AFTER_MIN } from "@/lib/constants";
-import {
-	type AcknowledgementSample,
-	type TrendBucket,
-	averageAcknowledgementMs,
-	bucketByManilaDay,
-	lastManilaDays,
-} from "@/lib/dashboard/metrics";
 import { LOW_BATTERY_V } from "@/lib/device/query";
 import { isValidCoordinate } from "@/lib/geo";
 import prisma from "@/lib/prisma";
-import { manilaDayStart, minutesAgo } from "@/lib/time";
+import { minutesAgo } from "@/lib/time";
 
 const DAY_MS = 86_400_000;
 const ACTIVITY_DAYS = 7;
@@ -90,31 +90,26 @@ export interface DashboardData {
 	fleet: DashboardFleetVehicle[];
 	activity: DashboardActivity[];
 	trend: {
-		days: TrendBucket[];
+		days: DayCount[];
 		total: number;
 		falseAlarms: number;
 		cancelled: number;
 	};
-	now: Date;
 }
 
 /**
  * One dashboard load. Every filter starts from the organisation and, for a
  * vehicle owner, from the owned-vehicle relation, so no panel can widen the
- * scope on its own.
+ * scope on its own. `now` comes from the page so every panel shares one clock.
  */
-export async function loadDashboardData(
-	scope: DashboardScope,
-	now = new Date(),
-): Promise<DashboardData> {
+export async function loadDashboardData(scope: DashboardScope, now: Date): Promise<DashboardData> {
 	const ownedRelation = scope.role === "USER" ? { vehicle: { is: { ownerId: scope.userId } } } : {};
 	const vehicleWhere = vehicleScope(scope.role, scope.orgId, scope.userId);
 	const onlineCutoff = minutesAgo(DEVICE_OFFLINE_AFTER_MIN, now);
 	const alertsCutoff = new Date(now.getTime() - DAY_MS);
-	const acknowledgementCutoff = new Date(now.getTime() - 30 * DAY_MS);
 	const activityCutoff = new Date(now.getTime() - ACTIVITY_DAYS * DAY_MS);
-	const trendDays = lastManilaDays(now);
-	const trendStart = trendDays[0] ?? manilaDayStart(now);
+	const acknowledgementWindow = analyticsWindow(30, now);
+	const trendWindow = analyticsWindow(14, now);
 
 	const [
 		openIncidents,
@@ -125,7 +120,7 @@ export async function loadDashboardData(
 		onlineTrackers,
 		lowBattery,
 		alerts24h,
-		acknowledgements,
+		acknowledgementIncidents,
 		mapDevices,
 		fleetVehicles,
 		trendIncidents,
@@ -201,16 +196,22 @@ export async function loadDashboardData(
 				impact: { orgId: scope.orgId, ...ownedRelation },
 			},
 		}),
-		prisma.auditLog.findMany({
+		prisma.impactEvent.findMany({
 			where: {
 				orgId: scope.orgId,
-				action: "incident.acknowledged",
-				target: { not: null },
-				createdAt: { gte: acknowledgementCutoff },
+				...ownedRelation,
+				detectedAt: {
+					gte: acknowledgementWindow.start,
+					lte: acknowledgementWindow.end,
+				},
 			},
-			orderBy: { createdAt: "desc" },
-			take: 500,
-			select: { target: true, createdAt: true },
+			orderBy: { detectedAt: "asc" },
+			select: {
+				id: true,
+				detectedAt: true,
+				vehicleId: true,
+				vehicle: { select: { plateNo: true } },
+			},
 		}),
 		prisma.trackerDevice.findMany({
 			where: {
@@ -251,7 +252,7 @@ export async function loadDashboardData(
 			where: {
 				orgId: scope.orgId,
 				...ownedRelation,
-				detectedAt: { gte: trendStart },
+				detectedAt: { gte: trendWindow.start, lte: trendWindow.end },
 			},
 			select: { detectedAt: true, status: true },
 		}),
@@ -269,6 +270,7 @@ export async function loadDashboardData(
 			where: {
 				// Heartbeats arrive every 30 s and would crowd out every other event.
 				type: { not: "HEARTBEAT" },
+				createdAt: { gte: activityCutoff },
 				device: { is: { orgId: scope.orgId, ...ownedRelation } },
 			},
 			orderBy: { createdAt: "desc" },
@@ -287,33 +289,37 @@ export async function loadDashboardData(
 		}),
 	]);
 
-	const ackTargetIds = [
-		...new Set(
-			acknowledgements
-				.map((row) => row.target)
-				.filter((target): target is string => typeof target === "string"),
-		),
-	];
-	const ackIncidents =
-		ackTargetIds.length > 0
-			? await prisma.impactEvent.findMany({
-					where: { id: { in: ackTargetIds }, orgId: scope.orgId, ...ownedRelation },
-					select: { id: true, detectedAt: true },
-				})
-			: [];
-	const detectedAtById = new Map(
-		ackIncidents.map((incident) => [incident.id, incident.detectedAt]),
+	const acknowledgementIds = acknowledgementIncidents.map((incident) => incident.id);
+	const acknowledgementAudits =
+		acknowledgementIds.length === 0
+			? []
+			: await prisma.auditLog.findMany({
+					where: {
+						orgId: scope.orgId,
+						action: "incident.acknowledged",
+						target: { in: acknowledgementIds },
+						createdAt: {
+							gte: acknowledgementWindow.start,
+							lte: acknowledgementWindow.end,
+						},
+					},
+					orderBy: { createdAt: "asc" },
+					select: {
+						target: true,
+						createdAt: true,
+						actor: { select: { name: true } },
+					},
+				});
+	const acknowledgementAverage = averageDuration(
+		acknowledgementSamples(
+			acknowledgementAudits.map((audit) => ({
+				target: audit.target,
+				createdAt: audit.createdAt,
+				actorName: audit.actor?.name ?? null,
+			})),
+			acknowledgementIncidents,
+		).map((sample) => sample.elapsedMs),
 	);
-
-	const acknowledgementSamples: AcknowledgementSample[] = [];
-	const seenTargets = new Set<string>();
-	for (const row of acknowledgements) {
-		if (!row.target || seenTargets.has(row.target)) continue;
-		const detectedAt = detectedAtById.get(row.target);
-		if (!detectedAt) continue;
-		seenTargets.add(row.target);
-		acknowledgementSamples.push({ detectedAt, acknowledgedAt: row.createdAt });
-	}
 
 	const openVehicleIds = new Set(openIncidentVehicles.map((incident) => incident.vehicleId));
 	const map: DashboardMapVehicle[] = [];
@@ -379,10 +385,7 @@ export async function loadDashboardData(
 	}
 	activity.sort((a, b) => b.at.getTime() - a.at.getTime());
 
-	const days = bucketByManilaDay(
-		trendIncidents.map((incident) => incident.detectedAt),
-		trendDays,
-	);
+	const days = countByManilaDay(trendIncidents, trendWindow.days);
 
 	return {
 		kpis: {
@@ -393,7 +396,7 @@ export async function loadDashboardData(
 			onlineTrackers,
 			lowBattery,
 			alerts24h,
-			averageAcknowledgementMs: averageAcknowledgementMs(acknowledgementSamples),
+			averageAcknowledgementMs: acknowledgementAverage.averageMs,
 		},
 		queue,
 		queueTotal,
@@ -412,6 +415,5 @@ export async function loadDashboardData(
 			falseAlarms: trendIncidents.filter((incident) => incident.status === "FALSE_ALARM").length,
 			cancelled: trendIncidents.filter((incident) => incident.status === "CANCELLED").length,
 		},
-		now,
 	};
 }

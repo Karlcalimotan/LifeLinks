@@ -1,6 +1,6 @@
 "use client";
 
-import { formatDuration } from "@/lib/dashboard/metrics";
+import { formatDuration } from "@/lib/analytics/aggregate";
 import { useEffect, useState } from "react";
 
 /**

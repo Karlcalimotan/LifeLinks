@@ -2,6 +2,7 @@
 
 import { canManageIncidents } from "@/lib/auth/roles";
 import { requireUser } from "@/lib/auth/session";
+import { incidentSuccessPath } from "@/lib/incidents/return-to";
 import { type ImpactStatusName, canTransition } from "@/lib/incidents/state";
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
@@ -14,7 +15,8 @@ function value(formData: FormData, key: string): string {
 async function transition(formData: FormData, to: ImpactStatusName) {
 	const locale = value(formData, "locale") === "tl" ? "tl" : "en";
 	const incidentId = value(formData, "incidentId");
-	const fromDashboard = value(formData, "returnTo") === "dashboard";
+	const returnTo = value(formData, "returnTo");
+	const fromDashboard = returnTo === "dashboard";
 	const current = await requireUser();
 
 	if (!canManageIncidents(current.role)) {
@@ -84,10 +86,7 @@ async function transition(formData: FormData, to: ImpactStatusName) {
 	revalidatePath(`/${locale}/dashboard`);
 	revalidatePath(`/${locale}/incidents`);
 	revalidatePath(`/${locale}/incidents/${incident.id}`);
-	if (fromDashboard) {
-		redirect(`/${locale}/dashboard?updated=${to === "ACKNOWLEDGED" ? "acknowledged" : "1"}`);
-	}
-	redirect(`/${locale}/incidents/${incident.id}?updated=1`);
+	redirect(incidentSuccessPath(locale, incident.id, returnTo));
 }
 
 export async function acknowledgeIncidentAction(formData: FormData) {

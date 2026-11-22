@@ -1,18 +1,20 @@
+import { BarChart, type BarChartDatum } from "@/components/analytics/bar-chart";
 import { AcknowledgeButton } from "@/components/dashboard/acknowledge-button";
 import { ElapsedTime } from "@/components/dashboard/elapsed-time";
-import { IncidentTrend, type TrendBar } from "@/components/dashboard/incident-trend";
 import { DeviceStatusBadge, IncidentStatusBadge, SeverityBadge } from "@/components/domain/badges";
 import { FleetMap, type FleetMapLegendItem, type FleetMapMarker } from "@/components/map/fleet-map";
 import { Badge } from "@/components/ui/badge";
+import { buttonClasses } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState, PageHeader } from "@/components/ui/page-header";
 import { Link } from "@/i18n/routing";
 import { acknowledgeIncidentAction } from "@/lib/actions/incidents";
+import { formatDuration } from "@/lib/analytics/aggregate";
 import { canManageIncidents } from "@/lib/auth/roles";
 import { requireUser } from "@/lib/auth/session";
 import { DEVICE_OFFLINE_AFTER_MIN } from "@/lib/constants";
 import { loadDashboardData } from "@/lib/dashboard/data";
-import { type FleetMarkerState, fleetMarkerState, formatDuration } from "@/lib/dashboard/metrics";
+import { type FleetMarkerState, fleetMarkerState } from "@/lib/dashboard/metrics";
 import { LOW_BATTERY_V } from "@/lib/device/query";
 import { deviceConnectionState, isGpsStale } from "@/lib/device/status";
 import { formatDateTime, formatRelative } from "@/lib/utils";
@@ -146,7 +148,7 @@ export default async function DashboardPage({
 			case "DEVICE_OFFLINE":
 				return t("activityDeviceOffline");
 			default:
-				return t("activityUnknown");
+				return t("activityDeviceUnknown");
 		}
 	}
 
@@ -261,13 +263,13 @@ export default async function DashboardPage({
 		day: "numeric",
 		timeZone: "Asia/Manila",
 	});
-	const trendBars: TrendBar[] = data.trend.days.map((day) => {
-		const label = dayLabel.format(day.start);
+	const trendBars: BarChartDatum[] = data.trend.days.map((day) => {
+		const label = dayLabel.format(day.date);
 		return {
-			key: day.start.toISOString(),
+			key: day.key,
 			label,
-			count: day.count,
-			ariaLabel: t("incidentTrendDayAria", { day: label, count: day.count }),
+			value: day.count,
+			description: t("incidentTrendDayAria", { day: label, count: day.count }),
 		};
 	});
 
@@ -277,10 +279,7 @@ export default async function DashboardPage({
 				title={current.role === "USER" ? t("ownerTitle") : t("title")}
 				subtitle={current.role === "USER" ? t("ownerSubtitle") : t("subtitle")}
 				actions={
-					<Link
-						href="/incidents"
-						className="inline-flex h-9 items-center gap-2 rounded-panel bg-signal-500 px-4 text-body font-medium text-ink-950 transition-colors hover:bg-signal-400"
-					>
+					<Link href="/incidents" className={buttonClasses({ size: "md" })}>
 						{t("openBoard")}
 						<ArrowUpRight className="size-4" aria-hidden="true" />
 					</Link>
@@ -342,12 +341,7 @@ export default async function DashboardPage({
 						{markers.length === 0 ? (
 							<EmptyState title={t("emptyMap")} body={t("emptyMapBody")} />
 						) : (
-							<FleetMap
-								markers={markers}
-								legend={legend}
-								ariaLabel={t("mapAria")}
-								listLabel={t("mapListLabel")}
-							/>
+							<FleetMap markers={markers} legend={legend} ariaLabel={t("mapAria")} />
 						)}
 					</CardContent>
 				</Card>
@@ -572,7 +566,7 @@ export default async function DashboardPage({
 									<p className="text-meta text-fog-500">{t("incidentTrendTotalLabel")}</p>
 								</div>
 								<div className="mt-4">
-									<IncidentTrend bars={trendBars} ariaLabel={t("incidentTrendAria")} />
+									<BarChart title={t("incidentTrendAria")} data={trendBars} tickEvery={2} />
 								</div>
 								<div className="mt-auto flex flex-wrap gap-x-4 gap-y-1 border-t border-ink-700 pt-3 text-meta text-fog-500">
 									<span>{t("trendFalseAlarms", { count: data.trend.falseAlarms })}</span>
