@@ -11,7 +11,8 @@ All notable changes to this project are documented here. The format follows
 - Lean vehicle-alert console: dashboard, vehicles, incidents, trackers and settings.
 - Row-level security on every application table for the Supabase deployment.
 - Vercel deployment allowlist: automatic deployments are restricted to `main`
-  and `develop`; preview deployments from other branches are disabled. The
+  (production) and `staging` (preview); `develop` is integration only and does
+  not deploy. Preview deployments from every other branch are disabled. The
   allowlist is mirrored in `apps/web/vercel.json` for the monorepo root.
 - Night Highway Dispatch design system: emergency signal palette, Barlow
   display/UI type, signal-plate logo, favicon and responsive console shell.
@@ -31,13 +32,17 @@ All notable changes to this project are documented here. The format follows
 - Deployment policy: version-consistency and Vercel-allowlist checks, a
   `Deployment policy` workflow, and `docs/deployment.md` with the release
   process and manual dashboard checklist.
-- Branch protection on `main` and `develop`: pull requests, required CI
-  checks, conversation resolution, no force pushes and no branch deletion.
-  `main` additionally requires one approval and linear history.
+- Branch protection on `main`, `staging` and `develop`: pull requests, required
+  CI checks, conversation resolution, no force pushes and no branch deletion.
+  `main` and `staging` additionally require one approval and linear history.
 - Immutable `v*` release tags via a repository ruleset.
 
 ### Changed
 
+- Deployment policy names `staging` as the preview branch and removes automatic
+  deployments from `develop`. Promotion is `develop` -> `staging` -> `main`;
+  both `vercel.json` files, `deployment-check.mjs` and `docs/deployment.md`
+  changed together.
 - Adopt the global API regulation: matching request IDs, `error.request_id`,
   `X-Response-Time`, 2 s hot-route timeouts, SLOW/VIOLATION logs and no-store
   device responses.

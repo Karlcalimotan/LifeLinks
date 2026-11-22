@@ -19,8 +19,15 @@ Only two branches are eligible for automatic Vercel deployments:
 | Branch | Role | Automatic deployment |
 | --- | --- | --- |
 | `main` | Production | Allowed |
-| `develop` | Integration | Allowed |
+| `staging` | Preview / release candidate | Allowed |
+| `develop` | Integration and reconciliation | **Ineligible** |
 | Any other branch | Feature, fix, agent, experiment, Dependabot | **Ineligible** |
+
+`develop` remains the branch every change reconciles into, but it no longer
+deploys. Owners promote `develop` to `staging` for preview verification, then
+`staging` to `main` for production. This project deliberately replaces the
+default `develop` preview deployment with a named `staging` branch; the owner
+approved the deviation from the global allowlist.
 
 Pull-request previews are deployments. A preview from a non-allowlisted branch
 is prohibited. The allowlist is declared in both `vercel.json` files:
@@ -31,7 +38,7 @@ is prohibited. The allowlist is declared in both `vercel.json` files:
     "deploymentEnabled": {
       "**": false,
       "main": true,
-      "develop": true
+      "staging": true
     }
   }
 }
@@ -84,12 +91,14 @@ with a new PATCH release.
    `CHANGELOG.md`; add migration notes for breaking changes.
 5. Run `node scripts/release-check.mjs --require-release`.
 6. Open the release PR to `develop`; CI must be green.
-7. Promote to `main` through a pull request; the human owner merges.
-8. A human creates and pushes the annotated tag:
+7. Promote `develop` to `staging` through a pull request; verify the preview
+   deployment and the manual checklist.
+8. Promote `staging` to `main` through a pull request; the human owner merges.
+9. A human creates and pushes the annotated tag:
    `git tag -a vX.Y.Z -m "vX.Y.Z"` and `git push origin vX.Y.Z`.
-9. Confirm the Vercel production deployment came from the tagged `main`
-   commit.
-10. Run `node scripts/release-check.mjs --tag vX.Y.Z` against the tag before or
+10. Confirm the Vercel production deployment came from the tagged `main`
+    commit.
+11. Run `node scripts/release-check.mjs --tag vX.Y.Z` against the tag before or
     during release verification.
 
 Agents prepare the version, changelog and PR. Agents do not create or push
@@ -97,21 +106,22 @@ release tags, publish releases or promote to `main`.
 
 ## Branch protection
 
-The `main` and `develop` branches are protected by repository settings:
+The `main`, `staging` and `develop` branches are protected by repository
+settings:
 
-| Control | `main` | `develop` |
-| --- | --- | --- |
-| Pull request required | Yes | Yes |
-| Required approvals | 1 | 0 |
-| Dismiss stale approvals | Yes | Not applicable |
-| Require approval after last push | Yes | No |
-| Required checks | Web, Firmware | Web, Firmware |
-| Branch must be up to date | Yes | Yes |
-| Conversation resolution | Yes | Yes |
-| Linear history | Yes | No |
-| Force pushes | Denied | Denied |
-| Branch deletion | Denied | Denied |
-| Administrators enforced | Yes | Yes |
+| Control | `main` | `staging` | `develop` |
+| --- | --- | --- | --- |
+| Pull request required | Yes | Yes | Yes |
+| Required approvals | 1 | 1 | 0 |
+| Dismiss stale approvals | Yes | Yes | Not applicable |
+| Require approval after last push | Yes | Yes | No |
+| Required checks | Web, Firmware | Web, Firmware | Web, Firmware |
+| Branch must be up to date | Yes | Yes | Yes |
+| Conversation resolution | Yes | Yes | Yes |
+| Linear history | Yes | Yes | No |
+| Force pushes | Denied | Denied | Denied |
+| Branch deletion | Denied | Denied | Denied |
+| Administrators enforced | Yes | Yes | Yes |
 
 The `Deployment policy` check must be added to the required-check list on each
 branch after this workflow has been promoted to that branch. A required check
@@ -122,7 +132,7 @@ only after the workflow is present.
 
 Verified statically by `deployment-check.mjs`:
 
-- the `main`/`develop` allowlist in both `vercel.json` files;
+- the `main`/`staging` allowlist in both `vercel.json` files;
 - the allowlist uses `"**": false`, and the negative pattern actually matches
   branches containing a slash;
 - the `pnpm build` build command;
@@ -134,7 +144,7 @@ Verified statically by `deployment-check.mjs`:
 Manual checks that repository tooling cannot prove:
 
 - the Vercel project's **Production Branch** is `main`;
-- **Preview Deployments** are disabled for every branch except the allowlist;
+- **Preview Deployments** are enabled only for staging and disabled for every other branch;
 - no deploy hooks or third-party deployment integrations exist in the Vercel
   dashboard;
 - the allowlist configuration is loaded from the branch being deployed or from
@@ -167,14 +177,15 @@ needed for another reason; `pnpm build` is the normal local check.
 
 - [x] Repository, default branch and integration branch identified.
 - [x] Linked Vercel project identified (`lifelinks-web`).
-- [ ] Vercel production branch confirmed as `main` in the dashboard.
-- [ ] Vercel preview behavior inspected; non-allowlisted previews disabled.
+- [ ] Vercel production branch confirmed as `main` in the dashboard; `staging`
+      set as the preview branch.
+- [ ] Vercel preview behavior inspected; only `staging` may produce previews.
 - [x] `vercel.json` allowlist added at the repository root and app root.
 - [x] Feature, temporary and Dependabot branches made ineligible by config.
 - [ ] Duplicate deployment pathways checked in the dashboard; deploy hooks
       removed.
 - [x] Repository workflows and scripts checked by `deployment-check.mjs`.
-- [x] Branch protection enabled on `main` and `develop`.
+- [x] Branch protection enabled on `main`, `staging` and `develop`.
 - [x] `refs/tags/v*` protected against update and deletion.
 - [x] Version sources of truth declared and checked.
 - [ ] `Deployment policy` added to required checks after promotion.

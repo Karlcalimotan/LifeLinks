@@ -111,9 +111,10 @@ rewrites and what it deliberately leaves behind.
 
 ## Deployment
 
-Production deploys only from `main`; `develop` is the integration deployment.
-Every other branch, including pull-request previews, is ineligible. The version
-contract and the release process are in
+Production deploys only from `main`; `staging` is the preview deployment;
+`develop` is the integration branch and does not deploy. Every other branch,
+including pull-request previews, is ineligible. Promote `develop` to `staging`,
+then `staging` to `main`. The version contract and the release process are in
 [`docs/deployment.md`](docs/deployment.md).
 
 ```bash
