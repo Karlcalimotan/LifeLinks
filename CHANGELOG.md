@@ -26,6 +26,8 @@ All notable changes to this project are documented here. The format follows
   signed-release OTA check.
 - Dedicated `/api/device/heartbeat` endpoint with optional `Idempotency-Key` and
   per-device rate limits for heartbeat, ingest and incident.
+- Tracker registration now normalizes MAC addresses, blocks duplicates with a
+  field-level error, preserves submitted values and reports vehicle-scope errors.
 - Prisma schema, initial migration and idempotent demo seed.
 - Crash state machine, false-positive filters, countdown, cancel and retry logic.
 - Native Unity tests for the Arduino-free firmware headers.
