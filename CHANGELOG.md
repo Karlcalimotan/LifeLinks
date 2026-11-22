@@ -6,10 +6,6 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
-### Added
-
-- Tracker detail: edit the label and vehicle, confirm approve/reject/delete, and audit every action.
-
 ## [0.2.0] - 2026-11-22
 
 ### Added
@@ -32,6 +28,8 @@ All notable changes to this project are documented here. The format follows
   per-device rate limits for heartbeat, ingest and incident.
 - Tracker registration now normalizes MAC addresses, blocks duplicates with a
   field-level error, preserves submitted values and reports vehicle-scope errors.
+- Tracker detail: edit the label and vehicle, confirm approve/reject/delete, and
+  audit every action.
 - Prisma schema, initial migration and idempotent demo seed.
 - Crash state machine, false-positive filters, countdown, cancel and retry logic.
 - Native Unity tests for the Arduino-free firmware headers.
