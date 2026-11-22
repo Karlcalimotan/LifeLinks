@@ -21,6 +21,7 @@ const PR_FIELDS = [
 	"state",
 	"isDraft",
 	"baseRefName",
+	"baseRefOid",
 	"headRefName",
 	"headRefOid",
 	"mergeable",
@@ -316,10 +317,17 @@ function mergeOne(pr, repo) {
 	if (!fresh.ok) return { ok: false, error: `re-fetch failed: ${fresh.error}` };
 
 	const current = fresh.pr;
-	if (current.baseRefName !== pr.baseRefName || current.headRefOid !== pr.headRefOid) {
+	// baseRefOid pins the base commit, not just the branch name. A branch can
+	// advance without the PR being retargeted, leaving the evaluated checks
+	// stale for the new base.
+	if (
+		current.baseRefName !== pr.baseRefName ||
+		current.baseRefOid !== pr.baseRefOid ||
+		current.headRefOid !== pr.headRefOid
+	) {
 		return {
 			ok: false,
-			error: `pull request changed after evaluation (base ${pr.baseRefName} -> ${current.baseRefName}, head ${pr.headRefOid} -> ${current.headRefOid}); refusing`,
+			error: `pull request changed after evaluation (base ${pr.baseRefName}@${pr.baseRefOid} -> ${current.baseRefName}@${current.baseRefOid}, head ${pr.headRefOid} -> ${current.headRefOid}); refusing`,
 		};
 	}
 	if (!ALLOWED_BASES.has(current.baseRefName)) {
