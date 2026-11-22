@@ -108,8 +108,9 @@ NVS namespace `lifelink`:
 
 ### Boot reset (GPIO 33)
 
-The existing cancel button is also the commissioning reset. It is active only
-during the first 60 seconds after boot:
+The existing cancel button is also the commissioning reset. It accepts a new
+hold only during the first 60 seconds after boot (a hold that started inside the
+window may finish after it):
 
 - power on with the button **released**; the listener arms 5 s after boot and
   requires a 50 ms debounce;

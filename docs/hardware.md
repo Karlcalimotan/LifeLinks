@@ -58,10 +58,11 @@ boot-time reset:
 | button held from power-on | no reset (stuck-button guard) |
 | any alert leaves `Idle` | reset is disabled for the rest of the boot |
 
-The listener accepts a gesture only in the first 60 s after boot. The 5 s grace
-and the clean-release requirement are deliberate: a shorted or stuck button must
-never erase a working unit. A 5 s hold does not reboot immediately, so continuing
-to 10 s can still reach the factory clear.
+The listener accepts a new hold only in the first 60 s after boot; a hold that
+started inside the window may finish after it. The 5 s grace and the
+clean-release requirement are deliberate: a shorted or stuck button must never
+erase a working unit. A 5 s hold does not reboot immediately, so continuing to
+10 s can still reach the factory clear.
 
 WiFi does not change the A7670E wiring, the SOS path or the alert state machine.
 The modem is still the only uplink.
