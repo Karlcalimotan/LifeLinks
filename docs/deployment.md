@@ -29,7 +29,7 @@ is prohibited. The allowlist is declared in both `vercel.json` files:
 {
   "git": {
     "deploymentEnabled": {
-      "*": false,
+      "**": false,
       "main": true,
       "develop": true
     }
@@ -37,8 +37,15 @@ is prohibited. The allowlist is declared in both `vercel.json` files:
 }
 ```
 
-`deployment-check.mjs` fails if either file drifts from that allowlist, if the
-build command changes, or if a workflow/script adds a CLI or API deployment
+Minimatch splits branch names on `/`. A single `*` never crosses a slash, so
+`"*": false` does not cover `setup/agent-foundation` or
+`policy/strict-deployment`; Vercel treats those branches as unspecified and
+deploys them. `"**": false` matches at any depth. `deployment-check.mjs` asserts
+that the negative pattern matches a slash branch, so an ineffective glob fails
+CI.
+
+`deployment-check.mjs` also fails if either file drifts from that allowlist, if
+the build command changes, or if a workflow/script adds a CLI or API deployment
 pathway.
 
 ## Version sources of truth
@@ -116,6 +123,8 @@ only after the workflow is present.
 Verified statically by `deployment-check.mjs`:
 
 - the `main`/`develop` allowlist in both `vercel.json` files;
+- the allowlist uses `"**": false`, and the negative pattern actually matches
+  branches containing a slash;
 - the `pnpm build` build command;
 - no `vercel deploy`, `vercel --prod`, `vercel promote`, `vercel redeploy`,
   `vercel rollback`, `npx vercel`, deploy-hook or deployment-API invocation in
@@ -132,9 +141,13 @@ Manual checks that repository tooling cannot prove:
   `main`.
 
 A preview deployment was observed for a non-allowlisted feature branch on
-2026-11-22 despite the allowlist. Until the dashboard settings above are
-verified by the owner, treat the allowlist as **policy-only**, not verified
-platform enforcement.
+2026-11-22. The cause was the ineffective `"*": false` pattern: minimatch does
+not let `*` cross `/`. The config now uses `"**": false`, and the check asserts
+that the negative pattern covers slash branches. If Vercel reads configuration
+from `main` rather than from the branch being deployed, the fix takes effect
+only after it reaches `main`; until then a preview from a slash branch may still
+appear. The next slash-branch PR is the observation, not a test deployment. The
+dashboard settings above remain manual checks.
 
 Do not test the policy by deploying. Use `deployment-check.mjs` and static
 configuration inspection. Do not run `vercel build` unless a local build is

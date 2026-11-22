@@ -71,6 +71,13 @@ All notable changes to this project are documented here. The format follows
 
 - `docker-compose.yml` and the `db:up` / `db:down` scripts.
 
+### Fixed
+
+- Vercel allowlist used `"*": false`, which never crosses a slash, so feature
+  branches such as `setup/agent-foundation` still deployed. Both configs now use
+  `"**": false`, and `deployment-check.mjs` asserts that the negative glob
+  matches a slash branch.
+
 ## [0.1.0] - 2026-11-18
 
 ### Added

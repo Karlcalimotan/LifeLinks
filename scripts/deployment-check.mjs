@@ -6,6 +6,7 @@
 
   What this proves:
     - both vercel.json files allow only main and develop
+    - the negative glob actually matches branches that contain a slash
     - the build command is the repository build
     - no repository workflow or script contains a CLI/API deploy pathway
 
@@ -19,9 +20,14 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
+if (typeof path.matchesGlob !== "function") {
+	console.error("deployment-check: Node 22.5 or newer is required for path.matchesGlob");
+	process.exit(1);
+}
+
 const ROOT = path.resolve(import.meta.dirname, "..");
 const ALLOWED = new Map([
-	["*", false],
+	["**", false],
 	["main", true],
 	["develop", true],
 ]);
@@ -41,6 +47,22 @@ function sameAllowlist(actual) {
 	const expected = [...ALLOWED.keys()].sort();
 	if (keys.join(",") !== expected.join(",")) return false;
 	return keys.every((key) => actual[key] === ALLOWED.get(key));
+}
+
+const negativePatterns = [...ALLOWED.entries()]
+	.filter(([, enabled]) => !enabled)
+	.map(([pattern]) => pattern);
+if (negativePatterns.length !== 1) {
+	fail(`allowlist must contain exactly one negative pattern, found ${negativePatterns.length}`);
+}
+for (const pattern of negativePatterns) {
+	for (const branch of ["setup/agent-foundation", "policy/strict-deployment"]) {
+		if (!path.matchesGlob(branch, pattern)) {
+			fail(
+				`negative allowlist pattern "${pattern}" does not match "${branch}"; Vercel would deploy it`,
+			);
+		}
+	}
 }
 
 for (const file of ["vercel.json", "apps/web/vercel.json"]) {
@@ -141,5 +163,7 @@ if (failures.length > 0) {
 }
 
 console.log("deployment-check: PASS");
-console.log("  verified: main/develop-only allowlist, build command, no CLI/API deploy pathways");
+console.log(
+	"  verified: **:false covers slash branches, main/develop allowlist, build command, no CLI/API deploy pathways",
+);
 console.log("  manual: Vercel production branch, preview settings and dashboard deploy hooks");
