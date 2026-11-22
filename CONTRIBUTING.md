@@ -47,6 +47,16 @@ reading is uncertain.
 - Update `docs/` when a contract, a pin or a threshold changes.
 - The firmware configuration table and the server table must land together.
 
+## Branch and promotion flow
+
+1. Feature branch -> pull request to `develop`.
+2. `develop` -> pull request to `stage` once the integration checks pass.
+3. `stage` -> versioned pull request to `main`; only the human owner merges
+   `main`.
+
+Never push directly to `develop`, `stage` or `main`. `stage` is the
+release-candidate gate and is not a Vercel deployment target.
+
 ## Commit style
 
 Conventional commits are welcome: `feat(device): …`, `fix(safety): …`,
