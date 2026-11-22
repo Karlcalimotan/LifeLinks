@@ -61,6 +61,7 @@ Measured contrast (WCAG 2.1, sRGB):
 | `fog-500` on `ink-800` | 6.60:1 | AA |
 | `fog-500` on `ink-700` | 5.69:1 | AA |
 | `ink-950` on `signal-500` | 6.16:1 | AA |
+| `ink-950` on `alarm-400` | 6.89:1 | AA |
 | `signal-300` on `ink-950` | 9.67:1 | AAA |
 | `alarm-300` on `ink-950` | 10.05:1 | AAA |
 | `caution-300` on `ink-950` | 13.50:1 | AAA |

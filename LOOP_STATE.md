@@ -20,7 +20,8 @@ Production: unchanged. The staging preview is merged; `main` is not promoted.
   all pass.
 - Follow-up accessibility pass: Lighthouse accessibility **1.0** with zero
   failures on eleven routes, including the vehicle, incident and tracker detail
-  pages. The suite is now **270 unit tests**. The contrast bug was systemic:
+  pages. The suite is now **274 unit tests locally** (281 in CI with RLS
+  enabled). The contrast bug was systemic:
   `tailwind-merge` treated the custom `text-body`/`text-meta` sizes as colours
   and dropped `text-ink-950` from primary buttons; `lib/utils.ts` now registers
   the six type-scale values as font sizes, with a regression test. Destructive
@@ -40,10 +41,10 @@ Production: unchanged. The staging preview is merged; `main` is not promoted.
 | States | 2 | 4 | Loading/error boundaries on every route; empty states for every panel. |
 | Accessibility | 2 | 4 | Lighthouse accessibility 1.0 with zero failures on eleven routes, including detail pages, after fixing the primary and destructive button contrast and the palette trigger name. |
 | Responsive | 3 | 3 | 390 px screenshots; tables scroll inside panels; bottom nav scrolls. No page-level horizontal scroll observed. |
-| Performance | 2 | 3 | Production build passes; Lighthouse accessibility, best practices and SEO are 1.0 on six pages; no performance benchmark yet. Lists are paginated. |
+| Performance | 2 | 3 | Production build passes; Lighthouse accessibility, best practices and SEO are 1.0 on eleven audited routes; no performance benchmark yet. Lists are paginated. |
 | Backend / data | 4 | 4 | Scoped queries, no schema or device API changes, bounded pagination. |
 | Reliability / observability | 3 | 3 | Health endpoint and device watch exist; no alert sender or retry worker. |
-| Code and tests | 3 | 4 | 270 tests, shared analytics aggregates, pure query/projection helpers, `cn` regression coverage. |
+| Code and tests | 3 | 4 | 274 tests locally (281 in CI), shared analytics aggregates, pure query/projection helpers, `cn` regression coverage. |
 
 ## Shipped in Cycle 1
 
@@ -104,7 +105,7 @@ Production: unchanged. The staging preview is merged; `main` is not promoted.
    the map panel from the latest sample.
 4. **Seed execution** once the owner approves replacing the demo fleet.
 5. **Axe in CI + performance benchmark.** Lighthouse accessibility is 1.0 on
-   the six main pages; add an axe check to the repeatable gate and measure a
+   the eleven audited routes; add an axe check to the repeatable gate and measure a
    real performance budget rather than relying on the production build alone.
 6. **Consolidate the two schematic map implementations** (`components/map/
    fleet-map.tsx` and `components/map/schematic-map.tsx`) before they diverge
