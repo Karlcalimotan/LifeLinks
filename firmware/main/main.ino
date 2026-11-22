@@ -2,24 +2,24 @@
   LifeLink tracker firmware — ESP32 DevKit V1 (30-pin).
 
   Flow:
-    IMU + vibration + GPS -> ImpactFilter -> CrashSafety countdown
-      cancel button within the window  -> SMS/incident cancelled
-      window expires                   -> SMS to configured phones + HTTP incident
-    Heartbeat and command polling run on a non-blocking interval.
+	IMU + vibration + GPS -> ImpactFilter -> CrashSafety countdown
+	  cancel button within the window  -> SMS/incident cancelled
+	  window expires                   -> SMS to configured phones + HTTP incident
+	Heartbeat and command polling run on a non-blocking interval.
 
   This sketch is deliberately explicit about what is verified and what still
   needs a bench check:
   - the pure logic (filters, safety, power, SMS body) is covered by native tests
   - the A7670E AT sequence, SIM/APN, GPS cold start and 4G current spikes must
-    be verified on the actual hardware
+	be verified on the actual hardware
   - the API base URL and provisioning token are not compiled in
 
   Provision over USB serial (115200):
-    SET_ID AA:BB:CC:DD:EE:01
-    SET_TOKEN llk_...
-    SET_PHONE1 +639171234567
-    SET_PHONE2 +639181234567
-    STATUS
+	SET_ID AA:BB:CC:DD:EE:01
+	SET_TOKEN llk_...
+	SET_PHONE1 +639171234567
+	SET_PHONE2 +639181234567
+	STATUS
 */
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
@@ -38,6 +38,10 @@
 #include "power.h"
 #include "safety.h"
 #include "status.h"
+
+#if __has_include("secrets.h")
+#include "secrets.h"
+#endif
 
 #ifndef FW_VERSION
 #define FW_VERSION "0.1.0"
@@ -99,29 +103,17 @@ uint32_t g_lastGpsLogMs = 0;
 String chipMac() {
 	uint64_t mac = ESP.getEfuseMac();
 	char buffer[18];
-	snprintf(
-		buffer,
-		sizeof(buffer),
-		"%02X:%02X:%02X:%02X:%02X:%02X",
-		static_cast<uint8_t>((mac >> 40) & 0xFF),
-		static_cast<uint8_t>((mac >> 32) & 0xFF),
-		static_cast<uint8_t>((mac >> 24) & 0xFF),
-		static_cast<uint8_t>((mac >> 16) & 0xFF),
-		static_cast<uint8_t>((mac >> 8) & 0xFF),
-		static_cast<uint8_t>(mac & 0xFF)
-	);
+	snprintf(buffer, sizeof(buffer), "%02X:%02X:%02X:%02X:%02X:%02X",
+			 static_cast<uint8_t>((mac >> 40) & 0xFF), static_cast<uint8_t>((mac >> 32) & 0xFF),
+			 static_cast<uint8_t>((mac >> 24) & 0xFF), static_cast<uint8_t>((mac >> 16) & 0xFF),
+			 static_cast<uint8_t>((mac >> 8) & 0xFF), static_cast<uint8_t>(mac & 0xFF));
 	return String(buffer);
 }
 
 String newIncidentId() {
 	char buffer[40];
-	snprintf(
-		buffer,
-		sizeof(buffer),
-		"llk-%08lx-%08lx",
-		static_cast<unsigned long>(esp_random()),
-		static_cast<unsigned long>(millis())
-	);
+	snprintf(buffer, sizeof(buffer), "llk-%08lx-%08lx", static_cast<unsigned long>(esp_random()),
+			 static_cast<unsigned long>(millis()));
 	return String(buffer);
 }
 
@@ -359,7 +351,8 @@ bool applyConfigObject(JsonObject config, bool persist) {
 
 	g_config = next;
 	g_filter.setConfig(next);
-	g_heartbeatTimer = fw::MinInterval(static_cast<uint32_t>(g_config.heartbeatIntervalS * 1000.0f));
+	g_heartbeatTimer =
+		fw::MinInterval(static_cast<uint32_t>(g_config.heartbeatIntervalS * 1000.0f));
 	g_heartbeatTimer.mark(millis());
 
 	if (persist) {
@@ -391,7 +384,8 @@ void loadConfig() {
 // Payloads
 // ---------------------------------------------------------------------------
 
-String heartbeatPayload(float accelG, float tiltDeg, bool vibration, float speedKph, float batteryV, bool ignition) {
+String heartbeatPayload(float accelG, float tiltDeg, bool vibration, float speedKph, float batteryV,
+						bool ignition) {
 	const fw::GpsFix fix = {
 		gps.location.isValid(),
 		gps.location.lat(),
@@ -510,14 +504,8 @@ void sendSmsAlerts() {
 
 	char bodyBuffer[fw::kSmsMaxBytes];
 	const String callback = prefs.getString("alert_phone_1", "");
-	fw::buildSosSms(
-		bodyBuffer,
-		sizeof(bodyBuffer),
-		prefs.getString("plate_no", "vehicle").c_str(),
-		fix,
-		gps.speed.isValid() ? gps.speed.kmph() : 0,
-		callback.c_str()
-	);
+	fw::buildSosSms(bodyBuffer, sizeof(bodyBuffer), prefs.getString("plate_no", "vehicle").c_str(),
+					fix, gps.speed.isValid() ? gps.speed.kmph() : 0, callback.c_str());
 
 	const String phone1 = prefs.getString("alert_phone_1", "");
 	const String phone2 = prefs.getString("alert_phone_2", "");
@@ -643,13 +631,10 @@ void handleSerialProvisioning() {
 				prefs.putString("plate_no", line.substring(10));
 				Serial.println("[SETUP] plate saved");
 			} else if (line == "STATUS") {
-				Serial.printf(
-					"[STATUS] id=%s token=%s cfg_rev=%lu state=%d\n",
-					g_deviceId.c_str(),
-					g_deviceToken.isEmpty() ? "missing" : "set",
-					static_cast<unsigned long>(g_configRev),
-					static_cast<int>(g_safety.state())
-				);
+				Serial.printf("[STATUS] id=%s token=%s cfg_rev=%lu state=%d\n", g_deviceId.c_str(),
+							  g_deviceToken.isEmpty() ? "missing" : "set",
+							  static_cast<unsigned long>(g_configRev),
+							  static_cast<int>(g_safety.state()));
 			} else if (line == "REBOOT") {
 				ESP.restart();
 			}
@@ -754,12 +739,8 @@ void loop() {
 			if (g_peakAccel <= 0) g_peakAccel = accelG;
 			if (g_peakTilt <= 0) g_peakTilt = tiltDeg;
 
-			Serial.printf(
-				"[IMPACT] confirmed peak=%.2fg tilt=%.0f vib=%d\n",
-				g_peakAccel,
-				g_peakTilt,
-				g_vibrationCount
-			);
+			Serial.printf("[IMPACT] confirmed peak=%.2fg tilt=%.0f vib=%d\n", g_peakAccel,
+						  g_peakTilt, g_vibrationCount);
 			g_safety.startCountdown(now, g_config);
 			g_buzzer.setPattern(fw::BuzzerPattern::Countdown, now);
 			sendIncident("SUSPECTED", false);
@@ -767,7 +748,8 @@ void loop() {
 			Serial.println("[IMPACT] rejected as a false positive");
 		}
 
-		const bool cancelPressed = g_cancelDebouncer.update(digitalRead(hw::kCancelButton) == LOW, now);
+		const bool cancelPressed =
+			g_cancelDebouncer.update(digitalRead(hw::kCancelButton) == LOW, now);
 		const fw::AlertState state = g_safety.update(now, cancelPressed);
 
 		if (state == fw::AlertState::Cancelled && g_lastState != fw::AlertState::Cancelled) {
@@ -823,13 +805,7 @@ void loop() {
 			g_heartbeatTimer.mark(now);
 			const float batteryV = readBatteryVoltage();
 			const String body = heartbeatPayload(
-				0,
-				0,
-				false,
-				gps.speed.isValid() ? gps.speed.kmph() : 0,
-				batteryV,
-				readIgnition()
-			);
+				0, 0, false, gps.speed.isValid() ? gps.speed.kmph() : 0, batteryV, readIgnition());
 			modemHttpRequest("POST", "/api/device/ingest", body, nullptr);
 		}
 
@@ -841,13 +817,10 @@ void loop() {
 
 	if ((now - g_lastGpsLogMs) > 30000UL) {
 		g_lastGpsLogMs = now;
-		Serial.printf(
-			"[GPS] fix=%d sats=%u speed=%.0fkph age=%lus\n",
-			gps.location.isValid() ? 1 : 0,
-			static_cast<unsigned>(gps.satellites.value()),
-			gps.speed.isValid() ? gps.speed.kmph() : 0.0,
-			gps.location.isValid() ? gps.location.age() / 1000UL : 0UL
-		);
+		Serial.printf("[GPS] fix=%d sats=%u speed=%.0fkph age=%lus\n",
+					  gps.location.isValid() ? 1 : 0, static_cast<unsigned>(gps.satellites.value()),
+					  gps.speed.isValid() ? gps.speed.kmph() : 0.0,
+					  gps.location.isValid() ? gps.location.age() / 1000UL : 0UL);
 	}
 
 	delay(1);

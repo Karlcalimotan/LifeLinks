@@ -26,7 +26,7 @@ inline bool isValidCoordinate(double lat, double lng) {
  */
 inline bool hasUsableFix(const GpsFix& fix, uint32_t maxAgeMs = 120000) {
 	return fix.valid && fix.satellites >= 4 && fix.hdop > 0.0f && fix.hdop <= 5.0f &&
-	       fix.ageMs <= maxAgeMs && isValidCoordinate(fix.lat, fix.lng);
+		   fix.ageMs <= maxAgeMs && isValidCoordinate(fix.lat, fix.lng);
 }
 
 }  // namespace fw

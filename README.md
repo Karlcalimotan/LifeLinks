@@ -65,6 +65,7 @@ the `DIRECT_URL` used by migrations, and the seed guard.
 | `pnpm stack:check` | Static template checks + contract drift |
 | `pnpm api:latency` | Warm-up + p95/max latency check for API endpoints |
 | `pnpm self-check` | Full local gate |
+| `bash scripts/verify.sh` | Firmware build, native tests, static analysis, formatting |
 
 ## Structure
 
@@ -82,6 +83,7 @@ apps/web/                 Next.js console and device API
   lib/incidents/          severity and state transitions
   prisma/                 schema, migration, seed
 firmware/main/            PlatformIO sketch (main.ino), pure headers, native tests
+firmware/include/         canonical pin map and optional secrets template
 docs/                     architecture, hardware, safety, API, ADRs
 stack/                    reusable scaffold + generators (not copied to new projects)
 ```
@@ -89,7 +91,8 @@ stack/                    reusable scaffold + generators (not copied to new proj
 ## Documentation
 
 Start with [`docs/architecture.md`](docs/architecture.md), then
-[`docs/hardware.md`](docs/hardware.md), [`docs/safety.md`](docs/safety.md),
+[`docs/wiring.md`](docs/wiring.md), [`docs/hardware.md`](docs/hardware.md),
+[`docs/safety.md`](docs/safety.md), [`docs/runbook.md`](docs/runbook.md),
 [`docs/api.md`](docs/api.md), the [`API regulation`](API_REGULATION.md) and the
 [`design system`](docs/design.md). If you need a database, see
 [`docs/local-database.md`](docs/local-database.md).
@@ -108,6 +111,18 @@ pnpm gen model MaintenanceLog
 
 See [`stack/README.md`](stack/README.md) for what the scaffold copies, what it
 rewrites and what it deliberately leaves behind.
+
+## Deployment
+
+Production deploys only from `main`; `develop` is the integration deployment.
+Every other branch, including pull-request previews, is ineligible. The version
+contract and the release process are in
+[`docs/deployment.md`](docs/deployment.md).
+
+```bash
+node scripts/release-check.mjs
+node scripts/deployment-check.mjs
+```
 
 ## License
 
