@@ -3,7 +3,7 @@
 Status: **draft for decisions. No production code written.** 2026-11-22.
 Evidence base:
 - `S:\Dev\LifeLinks` @ `main` `4e71a36` (agent: incident/command map)
-- `S:\Dev\OptiFeed-src` @ `main` `d027ddb` (agent: provisioning/tenancy port spec)
+- reference implementation, commit `d027ddb` (agent: provisioning/tenancy port spec)
 - `S:\Dev\accident detection` @ `develop` (agent: modular firmware split)
 
 ---
@@ -135,7 +135,7 @@ Pick what WiFi is for:
 
 Recommendation: **B1**, then B2. B3 duplicates the modem path and doubles the failure surface.
 
-### 3.2 What to port from OptiFeed
+### 3.2 What to port from the reference implementation
 
 | Pattern | Why it matters | Tag |
 | --- | --- | --- |
@@ -146,7 +146,7 @@ Recommendation: **B1**, then B2. B3 duplicates the modem path and doubles the fa
 | Reset-button hygiene: 50 ms debounce, 5 s grace, factory beats WiFi | prevents stuck-button resets | port |
 | AP naming `PREFIX-XXXX` from eFuse MAC, drift-tested against the web | avoids sticker/device mismatch | port (new prefix) |
 | Device-ID field in the portal | LifeLinks already derives it from the MAC | drop |
-| Feed-button reset path | tied to OptiFeed's relay | drop |
+| Feed-button reset path | tied to the reference firmware's relay | drop |
 
 ### 3.3 Pin constraint
 
@@ -168,7 +168,7 @@ No WiFi columns required. Optional: `TrackerDevice.wifiConfiguredAt` to distingu
 RLS is **enabled** on all LifeLinks tables but **no policies exist** (`20261118000100_enable_rls`).
 Prisma connects as the owner and bypasses RLS. App-level `orgId` filters are the only boundary.
 
-OptiFeed's lesson, verbatim: *do not claim RLS is the tenant boundary until the app role changes*
+The reference implementation's lesson, verbatim: *do not claim RLS is the tenant boundary until the app role changes*
 (`docs/database-rls-retention.md:17,36-55`).
 
 ### 4.2 Minimum schema additions
@@ -178,7 +178,7 @@ OptiFeed's lesson, verbatim: *do not claim RLS is the tenant boundary until the 
 | 1 | `Membership.revokedAt`, `invitedBy` | soft revocation; every gate assumes it |
 | 2 | `MembershipPermission` | per-member grant/deny without new roles |
 | 3 | `Organization.status`, `suspendedAt`, `suspendedReason` | suspended org grants nothing |
-| 4 | `InvitationToken` (orgId, email, role, tokenHash, expiresAt, consumedAt) | real invite flow; LifeLinks has real emails, unlike OptiFeed |
+| 4 | `InvitationToken` (orgId, email, role, tokenHash, expiresAt, consumedAt) | real invite flow; LifeLinks has real emails, unlike the reference platform |
 | 5 | `PlatformAdmin` (userId unique, expiresAt, revokedAt, mfaEnrolledAt) | god mode separate from tenant ADMIN |
 | 6 | Platform audit fields or `PlatformAuditLog` | reason, step-up, before/after — one audit table, not two |
 
