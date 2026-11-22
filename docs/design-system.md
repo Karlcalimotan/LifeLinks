@@ -61,6 +61,7 @@ Measured contrast (WCAG 2.1, sRGB):
 | `fog-500` on `ink-800` | 6.60:1 | AA |
 | `fog-500` on `ink-700` | 5.69:1 | AA |
 | `ink-950` on `signal-500` | 6.16:1 | AA |
+| `ink-950` on `alarm-400` | 6.89:1 | AA |
 | `signal-300` on `ink-950` | 9.67:1 | AAA |
 | `alarm-300` on `ink-950` | 10.05:1 | AAA |
 | `caution-300` on `ink-950` | 13.50:1 | AAA |
@@ -108,6 +109,10 @@ Six sizes. New and touched screens use these tokens, not arbitrary pixel values.
   sentence case too.
 - Numbers use `tabular-nums` so counts and times do not jump.
 - Machine data uses `font-mono`, uppercase MAC addresses grouped with colons.
+- The custom `text-meta`/`text-body`/`text-emphasis`/`text-section`/`text-title`/
+  `text-display` utilities are registered as font sizes in `lib/utils.ts` so
+  tailwind-merge keeps them separate from text colours. Add any new scale value
+  to that list as well as `globals.css`.
 - Existing screens still contain 10, 11, 18, 24, 60 and 72 px values. They are
   debt: converge them to the scale as each page is touched. Do not add new
   sizes.
