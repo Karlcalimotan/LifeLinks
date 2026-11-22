@@ -62,3 +62,33 @@ export function connectionLabel(state: DeviceConnectionState): string {
 			return "Never seen";
 	}
 }
+
+export type SignalBand = "strong" | "good" | "weak" | "poor" | "unknown";
+
+/**
+ * RSSI bands for the tracker table, matching the prototype's four-bar scale.
+ * The cutoffs are deliberately coarse: this is a dispatch signal indicator, not
+ * a link-budget measurement.
+ */
+export function signalBand(rssiDbm: number | null | undefined): SignalBand {
+	if (rssiDbm == null || !Number.isFinite(rssiDbm)) return "unknown";
+	if (rssiDbm > -70) return "strong";
+	if (rssiDbm > -80) return "good";
+	if (rssiDbm > -90) return "weak";
+	return "poor";
+}
+
+export function signalBarCount(band: SignalBand): number {
+	switch (band) {
+		case "strong":
+			return 4;
+		case "good":
+			return 3;
+		case "weak":
+			return 2;
+		case "poor":
+			return 1;
+		default:
+			return 0;
+	}
+}

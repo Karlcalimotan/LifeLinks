@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+	$transaction: vi.fn(),
 	trackerDevice: {
 		findUnique: vi.fn(),
+		findMany: vi.fn(),
 		create: vi.fn(),
+		updateMany: vi.fn(),
 	},
 	vehicle: {
 		findFirst: vi.fn(),
@@ -20,6 +23,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/prisma", () => ({
 	default: {
+		$transaction: mocks.$transaction,
 		trackerDevice: mocks.trackerDevice,
 		vehicle: mocks.vehicle,
 		auditLog: mocks.auditLog,
@@ -44,9 +48,15 @@ vi.mock("next/navigation", () => ({
 	redirect: vi.fn(),
 }));
 
-import { type DeviceTokenState, createDeviceAction } from "./devices";
+import {
+	type BulkApproveState,
+	type DeviceTokenState,
+	bulkApproveDevicesAction,
+	createDeviceAction,
+} from "./devices";
 
 const initial: DeviceTokenState = { ok: false };
+const initialBulk: BulkApproveState = { ok: false };
 
 function registration(
 	values: Partial<Record<"mac" | "label" | "vehicleId", string>> = {},
@@ -56,6 +66,13 @@ function registration(
 	data.set("mac", values.mac ?? "AA:BB:CC:DD:EE:01");
 	data.set("label", values.label ?? "Navara tracker");
 	data.set("vehicleId", values.vehicleId ?? "");
+	return data;
+}
+
+function bulkForm(ids: readonly string[]): FormData {
+	const data = new FormData();
+	data.set("locale", "en");
+	for (const id of ids) data.append("deviceIds", id);
 	return data;
 }
 
@@ -71,8 +88,13 @@ beforeEach(() => {
 	mocks.hashDeviceToken.mockReturnValue("hash-raw-token");
 	mocks.trackerDevice.findUnique.mockResolvedValue(null);
 	mocks.trackerDevice.create.mockImplementation(async ({ data }) => ({ id: "device-1", ...data }));
+	mocks.trackerDevice.findMany.mockResolvedValue([]);
+	mocks.trackerDevice.updateMany.mockResolvedValue({ count: 1 });
 	mocks.vehicle.findFirst.mockResolvedValue({ id: "vehicle-1" });
 	mocks.auditLog.create.mockResolvedValue({});
+	mocks.$transaction.mockImplementation(async (callback: (tx: unknown) => unknown) =>
+		callback({ trackerDevice: mocks.trackerDevice, auditLog: mocks.auditLog }),
+	);
 });
 
 describe("createDeviceAction", () => {
@@ -202,5 +224,120 @@ describe("createDeviceAction", () => {
 
 		expect(state).toEqual({ ok: false, error: "Only admins can register trackers." });
 		expect(mocks.trackerDevice.findUnique).not.toHaveBeenCalled();
+	});
+});
+
+describe("bulkApproveDevicesAction", () => {
+	it("rejects a non-admin before reading the form", async () => {
+		mocks.canAdminister.mockReturnValue(false);
+
+		const state = await bulkApproveDevicesAction(initialBulk, bulkForm(["device-1"]));
+
+		expect(state).toEqual({ ok: false, error: "forbidden" });
+		expect(mocks.trackerDevice.findMany).not.toHaveBeenCalled();
+	});
+
+	it("rejects an empty or oversized selection before reading devices", async () => {
+		const empty = await bulkApproveDevicesAction(initialBulk, bulkForm([]));
+		const tooMany = await bulkApproveDevicesAction(
+			initialBulk,
+			bulkForm(Array.from({ length: 51 }, (_, index) => `device-${index}`)),
+		);
+
+		expect(empty).toEqual({ ok: false, error: "invalid" });
+		expect(tooMany).toEqual({ ok: false, error: "too_many" });
+		expect(mocks.trackerDevice.findMany).not.toHaveBeenCalled();
+	});
+
+	it("deduplicates ids and scopes the candidate query to pending devices in the org", async () => {
+		mocks.trackerDevice.findMany.mockResolvedValue([
+			{ id: "device-1", mac: "24:0A:C4:9F:2A:71" },
+			{ id: "device-2", mac: "24:0A:C4:9F:2A:72" },
+		]);
+
+		const state = await bulkApproveDevicesAction(
+			initialBulk,
+			bulkForm([" device-1 ", "device-2", "device-1"]),
+		);
+
+		expect(mocks.trackerDevice.findMany).toHaveBeenCalledWith({
+			where: {
+				id: { in: ["device-1", "device-2"] },
+				orgId: "org-1",
+				approvalStatus: "PENDING",
+			},
+			select: { id: true, mac: true },
+		});
+		expect(state).toEqual({ ok: true, approved: 2, skipped: 0 });
+		expect(mocks.trackerDevice.updateMany).toHaveBeenCalledTimes(2);
+		expect(mocks.trackerDevice.updateMany).toHaveBeenCalledWith({
+			where: { id: "device-1", orgId: "org-1", approvalStatus: "PENDING" },
+			data: { approvalStatus: "APPROVED" },
+		});
+		expect(mocks.auditLog.create).toHaveBeenCalledTimes(2);
+		expect(mocks.auditLog.create).toHaveBeenCalledWith({
+			data: expect.objectContaining({
+				orgId: "org-1",
+				actorId: "user-1",
+				action: "device.approved",
+				target: "device-1",
+				metadata: {
+					mac: "24:0A:C4:9F:2A:71",
+					previousStatus: "PENDING",
+					bulk: true,
+				},
+			}),
+		});
+		expect(mocks.revalidatePath).toHaveBeenCalledWith("/en/devices");
+	});
+
+	it("reports ids that are no longer pending as skipped", async () => {
+		mocks.trackerDevice.findMany.mockResolvedValue([{ id: "device-1", mac: "24:0A:C4:9F:2A:71" }]);
+
+		const state = await bulkApproveDevicesAction(
+			initialBulk,
+			bulkForm(["device-1", "device-stale", "device-rejected"]),
+		);
+
+		expect(state).toEqual({ ok: true, approved: 1, skipped: 2 });
+	});
+
+	it("returns none when no submitted tracker is still pending in the org", async () => {
+		mocks.trackerDevice.findMany.mockResolvedValue([]);
+
+		const state = await bulkApproveDevicesAction(
+			initialBulk,
+			bulkForm(["device-other-org", "device-rejected"]),
+		);
+
+		expect(state).toEqual({ ok: false, approved: 0, skipped: 2, error: "none" });
+		expect(mocks.auditLog.create).not.toHaveBeenCalled();
+	});
+
+	it("keeps successful approvals when one device fails", async () => {
+		mocks.trackerDevice.findMany.mockResolvedValue([
+			{ id: "device-1", mac: "24:0A:C4:9F:2A:71" },
+			{ id: "device-2", mac: "24:0A:C4:9F:2A:72" },
+		]);
+		mocks.$transaction
+			.mockImplementationOnce(async (callback: (tx: unknown) => unknown) =>
+				callback({ trackerDevice: mocks.trackerDevice, auditLog: mocks.auditLog }),
+			)
+			.mockRejectedValueOnce(new Error("database unavailable"));
+
+		const state = await bulkApproveDevicesAction(initialBulk, bulkForm(["device-1", "device-2"]));
+
+		expect(state).toEqual({ ok: true, approved: 1, skipped: 1 });
+		expect(mocks.auditLog.create).toHaveBeenCalledTimes(1);
+	});
+
+	it("reports a failure when every candidate update is no longer pending", async () => {
+		mocks.trackerDevice.findMany.mockResolvedValue([{ id: "device-1", mac: "24:0A:C4:9F:2A:71" }]);
+		mocks.trackerDevice.updateMany.mockResolvedValue({ count: 0 });
+
+		const state = await bulkApproveDevicesAction(initialBulk, bulkForm(["device-1"]));
+
+		expect(state).toEqual({ ok: false, approved: 0, skipped: 1, error: "failed" });
+		expect(mocks.auditLog.create).not.toHaveBeenCalled();
 	});
 });
