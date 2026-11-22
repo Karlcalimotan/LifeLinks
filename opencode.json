@@ -1,0 +1,20 @@
+{
+	"$schema": "https://opencode.ai/config.json",
+	"permissions": [
+		{ "action": "edit", "resource": "*", "effect": "allow" },
+		{ "action": "shell", "resource": "*", "effect": "ask" },
+		{ "action": "shell", "resource": "pio run*", "effect": "allow" },
+		{ "action": "shell", "resource": "pio test*", "effect": "allow" },
+		{ "action": "shell", "resource": "pio check*", "effect": "allow" },
+		{ "action": "shell", "resource": "pio run *upload*", "effect": "deny" },
+		{ "action": "shell", "resource": "pio run -t upload*", "effect": "deny" },
+		{ "action": "shell", "resource": "pio run --target upload*", "effect": "deny" },
+		{ "action": "shell", "resource": "git push*", "effect": "ask" },
+		{ "action": "shell", "resource": "git push --force*", "effect": "deny" },
+		{ "action": "shell", "resource": "git push -f*", "effect": "deny" },
+		{ "action": "shell", "resource": "git push * --force*", "effect": "deny" },
+		{ "action": "shell", "resource": "git push * -f*", "effect": "deny" },
+		{ "action": "shell", "resource": "git push * main*", "effect": "deny" },
+		{ "action": "shell", "resource": "git push origin main*", "effect": "deny" }
+	]
+}

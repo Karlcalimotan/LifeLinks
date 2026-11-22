@@ -15,14 +15,8 @@ static const size_t kSmsMaxBytes = 320;
  * Keep it short, include the age of the fix, and make the callback explicit.
  * The body is deliberately ASCII so a basic GSM handset renders it correctly.
  */
-inline size_t buildSosSms(
-	char* out,
-	size_t size,
-	const char* plateNo,
-	const GpsFix& fix,
-	float speedKph,
-	const char* callbackNumber
-) {
+inline size_t buildSosSms(char* out, size_t size, const char* plateNo, const GpsFix& fix,
+						  float speedKph, const char* callbackNumber) {
 	if (out == nullptr || size == 0) return 0;
 
 	char location[48];
@@ -33,17 +27,12 @@ inline size_t buildSosSms(
 	}
 
 	const unsigned long ageSeconds = static_cast<unsigned long>(fix.ageMs / 1000UL);
-	const int written = snprintf(
-		out,
-		size,
-		"LIFELINK SOS %s %s fix %lus %ukph%s%s",
-		(plateNo != nullptr && plateNo[0] != '\0') ? plateNo : "vehicle",
-		location,
-		ageSeconds,
-		static_cast<unsigned>(speedKph),
-		(callbackNumber != nullptr && callbackNumber[0] != '\0') ? " call " : "",
-		(callbackNumber != nullptr && callbackNumber[0] != '\0') ? callbackNumber : ""
-	);
+	const int written =
+		snprintf(out, size, "LIFELINK SOS %s %s fix %lus %ukph%s%s",
+				 (plateNo != nullptr && plateNo[0] != '\0') ? plateNo : "vehicle", location,
+				 ageSeconds, static_cast<unsigned>(speedKph),
+				 (callbackNumber != nullptr && callbackNumber[0] != '\0') ? " call " : "",
+				 (callbackNumber != nullptr && callbackNumber[0] != '\0') ? callbackNumber : "");
 	if (written < 0) {
 		out[0] = '\0';
 		return 0;
@@ -56,8 +45,6 @@ inline size_t buildSosSms(
 	return length;
 }
 
-inline bool smsFits(const char* body) {
-	return body != nullptr && strlen(body) <= kSmsMaxBytes;
-}
+inline bool smsFits(const char* body) { return body != nullptr && strlen(body) <= kSmsMaxBytes; }
 
 }  // namespace fw

@@ -28,6 +28,11 @@ All notable changes to this project are documented here. The format follows
 - Reusable `stack/` scaffold and generators for features, device routes, firmware
   modules and Prisma models.
 - Documentation: architecture, hardware, safety, API and ADRs.
+- Agent foundation: root `AGENTS.md`, project OpenCode permissions, Dependabot,
+  `scripts/verify.sh`, and clang-format configuration.
+- Canonical firmware pin map at `firmware/include/pins.h`, with
+  `firmware/main/hardware.h` aliasing it.
+- `docs/wiring.md`, `docs/runbook.md` and `docs/current-state.md`.
 - Deployment policy: version-consistency and Vercel-allowlist checks, a
   `Deployment policy` workflow, and `docs/deployment.md` with the release
   process and manual dashboard checklist.
@@ -65,6 +70,10 @@ All notable changes to this project are documented here. The format follows
 - Battery and ignition sensing are disabled by default because the wiring
   diagram does not include the dividers; enable `hw::kHasPowerSense` after
   fitting them.
+- The firmware gate now runs the ESP32 build, native tests, cppcheck and
+  clang-format through `scripts/verify.sh`; CI uses the same script.
+- The native PlatformIO environment includes `firmware/include`, and cppcheck
+  suppresses its known ArduinoJson preprocessor false positive.
 - `pnpm self-check` now includes the release and deployment policy checks.
 
 ### Removed

@@ -3,54 +3,13 @@
 Board: **ESP32 DevKit V1 (30-pin, DOIT layout)**. Check the silkscreen on your
 board; clones differ.
 
-## Pin map
-
-| Signal | ESP32 pin | Notes |
-| --- | --- | --- |
-| MPU-6050 SDA | GPIO 21 | I2C |
-| MPU-6050 SCL | GPIO 22 | I2C |
-| MPU-6050 INT | GPIO 23 | Optional; the sketch polls, so it works without it |
-| SW-420 DO | GPIO 32 | Digital input; LOW on vibration on the common module |
-| Cancel button | GPIO 33 | `INPUT_PULLUP`, active LOW, momentary to GND |
-| NEO-6M TX | GPIO 26 | ESP32 RX1 (`Serial1`) |
-| NEO-6M RX | GPIO 27 | ESP32 TX1 |
-| A7670E TX | GPIO 17 | ESP32 TX2 (`Serial2`) |
-| A7670E RX | GPIO 16 | ESP32 RX2 |
-| A7670E PWRKEY | GPIO 4 | Active LOW; the sketch pulses it low for 1.2 s, then releases it HIGH |
-| Buzzer NPN base | GPIO 25 | 1 kΩ to the base; active HIGH |
-| Battery sense | GPIO 34 | Optional; input-only, needs a divider. Disabled by default |
-| Ignition sense | GPIO 35 | Optional; input-only, needs a divider. Disabled by default |
+The canonical pin map, power chain and pre-power checklist live in
+[`wiring.md`](wiring.md). The code source of truth is
+[`firmware/include/pins.h`](../firmware/include/pins.h). Do not duplicate pin
+numbers here.
 
 The GPS and modem UARTs are **remapped** UART1/UART2, not the USB serial pins.
 GPIO 1/3 stay free for the USB monitor.
-
-## Power chain
-
-```
-Vehicle 12 V
-  └─ 2–3 A fuse + rocker switch
-       └─ LM2596S buck, set to 5.0–5.1 V with a meter BEFORE connecting the shield
-            └─ 18650 shield V8 (5V IN)
-                 └─ 5V OUT ── 1000 µF / 16 V ── GND
-                      ├─ ESP32 VIN (5 V)
-                      ├─ A7670E VIN (5 V)
-                      └─ 3.3 V regulator on the DevKit
-                           ├─ MPU-6050 VCC
-                           ├─ SW-420 VCC
-                           └─ NEO-6M VCC
-```
-
-- The 1000 µF capacitor is not decoration. The A7670E can pull amp-scale
-  bursts during registration and transmission. Mount it close to the modem,
-  stripe to GND.
-- The buck output must be set **before** the shield is connected. The shield's
-  switch must be ON for the backup path to work.
-- The buzzer is a 5 V load switched by an NPN (2N2222/S8050). The ESP32 pin
-  drives the base through 1 kΩ; the emitter goes to GND; the buzzer negative
-  goes to the collector; the buzzer positive goes to 5 V. Add a flyback diode
-  across the buzzer if it is magnetic.
-- All grounds are common. The buck, shield, ESP32, sensors and modem must share
-  GND.
 
 ## Sensor notes
 

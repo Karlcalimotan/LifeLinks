@@ -14,25 +14,27 @@
 */
 #pragma once
 
+#include <pins.h>
+
 namespace hw {
 
-constexpr int kI2cSda = 21;
-constexpr int kI2cScl = 22;
-constexpr int kMpuInterrupt = 23;
+constexpr int kI2cSda = PIN_MPU_SDA;
+constexpr int kI2cScl = PIN_MPU_SCL;
+constexpr int kMpuInterrupt = PIN_MPU_INT;
 
-constexpr int kVibrationSensor = 32;
-constexpr int kCancelButton = 33;
+constexpr int kVibrationSensor = PIN_SW420_DO;
+constexpr int kCancelButton = PIN_CANCEL_BTN;
 
-constexpr int kGpsRx = 26;
-constexpr int kGpsTx = 27;
+constexpr int kGpsRx = PIN_GPS_RX;
+constexpr int kGpsTx = PIN_GPS_TX;
 constexpr int kGpsBaud = 9600;
 
-constexpr int kModemRx = 16;
-constexpr int kModemTx = 17;
-constexpr int kModemPwrKey = 4;
+constexpr int kModemRx = PIN_MODEM_RX;
+constexpr int kModemTx = PIN_MODEM_TX;
+constexpr int kModemPwrKey = PIN_MODEM_PWRKEY;
 constexpr int kModemBaud = 115200;
 
-constexpr int kBuzzer = 25;
+constexpr int kBuzzer = PIN_BUZZER;
 constexpr bool kBuzzerActiveHigh = true;
 
 // Optional power sensing. The wiring diagram does not include the dividers, so
@@ -40,8 +42,9 @@ constexpr bool kBuzzerActiveHigh = true;
 // voltage and ignition state. Enable only after fitting the 10k/2.2k dividers.
 constexpr bool kHasPowerSense = false;
 
-constexpr int kBatteryAdc = 34;  // input-only pin, external divider required
-constexpr int kIgnitionAdc = 35; // input-only pin, external divider required
+// Input-only pins; both need an external divider before they are connected.
+constexpr int kBatteryAdc = PIN_BATTERY_ADC;
+constexpr int kIgnitionAdc = PIN_IGNITION_ADC;
 
 constexpr bool kCancelButtonActiveLow = true;
 

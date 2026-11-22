@@ -5,8 +5,8 @@
   - The driver can cancel inside the window.
   - If the window expires, the device alerts, and keeps retrying until acked.
   - Safe mode must never suppress an alert. Unlike an actuator, where refusing to
-    act is the safe direction, refusing to alert after a crash is the dangerous
-    direction.
+	act is the safe direction, refusing to alert after a crash is the dangerous
+	direction.
 */
 #pragma once
 
@@ -77,9 +77,7 @@ class CrashSafety {
  * Safe mode is a service policy, not an alert policy. It exists to stop
  * non-essential work after repeated resets. It must not gate the SOS path.
  */
-inline bool alertingAllowed(bool /*safeMode*/) {
-	return true;
-}
+inline bool alertingAllowed(bool /*safeMode*/) { return true; }
 
 enum class Fault : uint8_t {
 	None = 0,
@@ -93,17 +91,12 @@ enum class Fault : uint8_t {
 class FaultManager {
   public:
 	void raise(Fault fault) {
-		present_ = static_cast<Fault>(
-			static_cast<uint8_t>(present_) | static_cast<uint8_t>(fault)
-		);
-		latched_ = static_cast<Fault>(
-			static_cast<uint8_t>(latched_) | static_cast<uint8_t>(fault)
-		);
+		present_ = static_cast<Fault>(static_cast<uint8_t>(present_) | static_cast<uint8_t>(fault));
+		latched_ = static_cast<Fault>(static_cast<uint8_t>(latched_) | static_cast<uint8_t>(fault));
 	}
 	void clear(Fault fault) {
-		present_ = static_cast<Fault>(
-			static_cast<uint8_t>(present_) & static_cast<uint8_t>(~static_cast<uint8_t>(fault))
-		);
+		present_ = static_cast<Fault>(static_cast<uint8_t>(present_) &
+									  static_cast<uint8_t>(~static_cast<uint8_t>(fault)));
 	}
 	bool acknowledge() {
 		if (present_ != Fault::None) return false;
