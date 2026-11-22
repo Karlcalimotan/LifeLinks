@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cn } from "./utils";
+import { cn, telHref } from "./utils";
 
 const SIZES = ["meta", "body", "emphasis", "section", "title", "display"] as const;
 
@@ -16,4 +16,21 @@ describe("cn", () => {
 	it("still resolves a real text-colour conflict", () => {
 		expect(cn("text-fog-500", "text-fog-100")).toBe("text-fog-100");
 	});
+});
+
+describe("telHref", () => {
+	it.each([
+		["+63 917 123 4567", "tel:+639171234567"],
+		["(033) 321-1234", "tel:0333211234"],
+		["0917.123.4567", "tel:09171234567"],
+	])("turns %s into %s", (phone, href) => {
+		expect(telHref(phone)).toBe(href);
+	});
+
+	it.each([null, undefined, "", "   ", "call the desk", "12345"])(
+		"rejects %s instead of inventing a link",
+		(phone) => {
+			expect(telHref(phone)).toBeNull();
+		},
+	);
 });
