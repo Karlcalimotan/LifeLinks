@@ -18,7 +18,9 @@ const cycle = process.env.SNAPSHOT_CYCLE ?? "cycle-0";
 const outDir = process.env.SNAPSHOT_OUT ?? path.resolve(`reports/screens/${cycle}`);
 const email = process.env.SNAPSHOT_EMAIL ?? "admin@lifelink.local";
 const password = process.env.SNAPSHOT_PASSWORD ?? "Admin123!";
-const requested = (process.env.SNAPSHOT_PAGES ?? "login,dashboard,vehicles,incidents,devices,settings")
+const requested = (
+	process.env.SNAPSHOT_PAGES ?? "login,dashboard,vehicles,incidents,devices,settings"
+)
 	.split(",")
 	.map((page) => page.trim())
 	.filter(Boolean);
