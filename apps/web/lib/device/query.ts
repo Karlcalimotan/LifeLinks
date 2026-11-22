@@ -1,7 +1,9 @@
 import { DEVICE_OFFLINE_AFTER_MIN, DEVICE_WEAK_AFTER_MIN } from "@/lib/constants";
 import type { Prisma } from "@prisma/client";
+import { DEVICE_PAGE_SIZE } from "./limits";
 
-export const DEVICE_PAGE_SIZE = 20;
+export { DEVICE_PAGE_SIZE } from "./limits";
+
 export const LOW_BATTERY_V = 11.5;
 
 export const APPROVAL_FILTERS = ["PENDING", "APPROVED", "REJECTED"] as const;
