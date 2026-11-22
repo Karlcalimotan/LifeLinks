@@ -31,6 +31,41 @@ GPIO 1/3 stay free for the USB monitor.
   so `hw::kHasPowerSense` is `false` and the firmware omits those fields. Fit the
   dividers first, then enable the flag in `firmware/main/hardware.h`.
 
+## WiFi commissioning and the reset gesture
+
+The ESP32's 2.4 GHz radio is **commissioning-only**; the A7670E remains the
+telemetry, command and SOS uplink. The firmware starts a setup access point only
+when the unit has no verified provisioned network, or when three consecutive
+joins of the stored network fail. The AP is named `LifeLink-` plus the last four
+hex digits of the eFuse MAC (uppercase, zero padded, for example
+`LifeLink-EEFF`). Join it and open `http://192.168.4.1`; the DNS catch-all also
+opens the page from a captive-portal prompt.
+
+The page scans 2.4 GHz networks asynchronously and also accepts a manual SSID.
+It tests the submitted network for up to 20 s (6 s quick-fail) and writes NVS
+only after the station has an IP. A wrong password leaves the stored credentials
+alone and the portal stays open with the reason. The portal closes about 2 s
+after a verified save or after 10 minutes, then the radio is switched off.
+
+The existing cancel button (GPIO 33, INPUT_PULLUP, active LOW) is also the
+boot-time reset:
+
+| Gesture | Result |
+| --- | --- |
+| power on with the button released, wait 5 s | listener arms (50 ms debounce) |
+| hold 5 s | clears WiFi, keeps device identity; reboots on release |
+| hold 10 s | clears WiFi, `device_id`, `device_token`, `provisioned`; reboots |
+| button held from power-on | no reset (stuck-button guard) |
+| any alert leaves `Idle` | reset is disabled for the rest of the boot |
+
+The listener accepts a gesture only in the first 60 s after boot. The 5 s grace
+and the clean-release requirement are deliberate: a shorted or stuck button must
+never erase a working unit. A 5 s hold does not reboot immediately, so continuing
+to 10 s can still reach the factory clear.
+
+WiFi does not change the A7670E wiring, the SOS path or the alert state machine.
+The modem is still the only uplink.
+
 ## Bench checklist
 
 These are **not** software-verified. Run them on the actual hardware and record
@@ -56,6 +91,32 @@ the result.
    fault is visible in the event log on the next successful heartbeat.
 10. **Range**: repeat the SMS test at the edge of coverage; confirm the retry
     behavior.
+11. **Portal boot**: factory-reset the unit (10 s hold, see above), reboot, and
+    confirm the AP `LifeLink-XXXX` matches the last four hex digits of the
+    eFuse MAC printed at boot. Join from a phone; confirm `192.168.4.1` loads
+    and the captive-portal prompt works on both iOS and Android.
+12. **Scan and manual entry**: confirm the page lists nearby 2.4 GHz networks
+    with plausible signal strength, and that a manually typed SSID also works.
+    The ESP32 is 2.4 GHz only; 5 GHz networks must not appear.
+13. **Wrong password**: with the stored router switched off, boot until the
+    portal opens (three failed joins). Submit a deliberately wrong password.
+    Confirm the portal stays open with a readable reason. Switch the router back
+    on and reboot; the unit must rejoin the previously stored network, proving
+    the wrong password did not overwrite it.
+14. **Correct password**: submit the real SSID and password. Confirm the status
+    page shows the IP, the AP closes within a few seconds, and the next boot
+    does not reopen the portal. Confirm the Device ID/Token stored are the ones
+    the dashboard expects.
+15. **Reset timing**: release after 4 s (nothing), hold 5 s and release (WiFi
+    only; identity survives), hold 10 s (identity and `provisioned` also gone).
+    Hold the button from power-on: nothing must be erased. Start a countdown and
+    hold the button: the boot reset must be disabled and the alert must continue.
+16. **Radio current**: with the portal open, watch the 5 V rail while the modem
+    transmits. WiFi association and an AP scan add current spikes; the ESP32
+    must not brown out.
+17. **Portal lifetime**: leave the portal open without saving. Confirm it closes
+    after 10 minutes and the tracker returns to normal monitoring and modem
+    operation without a reboot.
 
 ## Bill of materials
 
