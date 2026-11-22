@@ -27,6 +27,7 @@ blob-report/
 # firmware
 firmware/.pio/
 firmware/.vscode/
+firmware/include/secrets.h
 *.bin
 *.elf
 *.map
