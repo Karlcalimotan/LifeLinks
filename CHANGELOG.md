@@ -20,6 +20,8 @@ All notable changes to this project are documented here. The format follows
   `scripts/design-lint.sh`.
 - Dashboard loading, error and type-scale states.
 - WiFi provisioning portal and runtime provisioning on the tracker firmware.
+- Firmware: queue configuration changes until idle and expose serial
+  configuration controls (#66).
 
 ### Fixed
 
