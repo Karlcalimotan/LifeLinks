@@ -1,5 +1,30 @@
 # Current state
 
+## Product state (2026-11-22)
+
+- **Stack:** Next.js 16 App Router + React 19, Supabase Postgres + Prisma,
+  next-intl (English/Tagalog), Tailwind 4, Biome, Vitest and Playwright.
+- **Roles:** `USER` (own vehicles), `RESPONDER` (whole fleet, incidents) and
+  `ADMIN` (members, trackers, settings). Org scope comes from the membership row;
+  the app-level orgId filters are authoritative.
+- **Pages:** dashboard, devices (trackers), vehicles, incidents, settings, login
+  and public legal pages. Tracker detail and incident detail exist.
+- **Device API:** `/api/device/ingest` (heartbeat + batched telemetry),
+  `/api/device/incident`, `/api/device/incident/cancel`, `/api/device/command`,
+  `/api/device/command/ack`, plus the signed firmware check. Device tokens are
+  SHA-256 hashed, approved-only, and the incident route already deduplicates on
+  `(deviceId, clientIncidentId)`.
+- **Product gaps:** tracker registration errors/duplicates (T1), a dedicated
+  heartbeat endpoint and per-device rate limits (T4), tracker actions (T2/T3),
+  incident workflow/map/timeline (T6), alert delivery status (T7), live KPIs
+  and maps (T8/T9), and API/workflow tests (T15). The shared queue is
+  [`../TASKS.md`](../TASKS.md).
+- **Verification:** `pnpm self-check` is the local gate; the web job runs lint,
+  typecheck, Vitest, the RLS test against a disposable Postgres service and the
+  production build. Firmware has its own `scripts/verify.sh` gate.
+
+## Firmware setup baseline (2026-11-22)
+
 Snapshot: 2026-11-22, branch `develop` at `feb8297`, firmware version `0.1.0`.
 
 This note is the baseline for the agent setup. It records what exists before the
