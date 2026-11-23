@@ -22,7 +22,7 @@ countdown.
 - NEO-6M GPS (GY-GPS6MV2), UART1
 - A7670E 4G LTE Cat-1 core board, UART2, nano SIM
 - Cancel button (12 mm panel mount, active LOW)
-- Active buzzer 5 V, switched by NPN (2N2222 / S8050) + 1 kΩ base resistor
+- Active buzzer 5 V, driven directly from GPIO 25 on the first board (NPN for a louder harness)
 - Vehicle 12 V, then fuse + rocker switch, then LM2596S buck (set to 5.0-5.1 V),
   then 18650 shield V8 (2 x 3200 mAh) giving the 5 V rail
 - 1000 µF 16 V capacitor across V8 5V OUT and GND (close to the A7670E)
@@ -31,19 +31,22 @@ countdown.
 
 | Function | ESP32 GPIO | Notes |
 |---|---|---|
-| SW-420 DO | 32 | digital in |
+| SW-420 DO | 27 | digital in, active HIGH (idles LOW) |
 | Cancel button | 33 | INPUT_PULLUP, active LOW |
-| Buzzer driver (NPN base via 1 kΩ) | 25 | active HIGH |
-| GPS RX (GPS TXD to ESP32) | 26 | UART1 remap |
-| GPS TX (ESP32 to GPS RXD) | 27 | UART1 remap |
-| A7670E RX (A7670E TXD to ESP32) | 16 | UART2 RX2 |
-| A7670E TX (ESP32 to A7670E RXD) | 17 | UART2 TX2 |
+| Status LED | 26 | active HIGH |
+| Buzzer + (direct on this board) | 25 | active HIGH |
+| GPS RX (GPS TXD to ESP32) | 16 | UART1 remap |
+| GPS TX (ESP32 to GPS RXD) | 17 | UART1 remap |
+| A7670E RX (A7670E TXD to ESP32) | 18 | UART2 RX2 |
+| A7670E TX (ESP32 to A7670E RXD) | 19 | UART2 TX2 |
 | A7670E PWRKEY | 4 | optional |
 | MPU-6050 SDA | 21 | I2C |
 | MPU-6050 SCL | 22 | I2C |
 | MPU-6050 INT | 23 | optional |
 | Battery sense | 34 | optional; input-only, external divider required |
 | Ignition sense | 35 | optional; input-only, external divider required |
+| WiFi reset button | 13 | INPUT_PULLUP, active LOW, boot-only 5 s |
+| Factory reset button | 14 | INPUT_PULLUP, active LOW, boot-only 10 s |
 
 Power: ESP32 VIN = 5 V rail. MPU-6050, SW-420 and NEO-6M VCC = 3V3. A7670E
 VIN = 5 V rail. All grounds common.

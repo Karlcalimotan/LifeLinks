@@ -252,6 +252,22 @@ void test_abort_drops_a_pending_restart(void) {
 	TEST_ASSERT_FALSE(reset.active());
 }
 
+void test_factory_button_ignores_the_wifi_threshold(void) {
+	BootResetSequence reset;
+	reset.beginFactory(0);
+	reset.update(100, false);
+	reset.update(5050, false);
+	TEST_ASSERT_TRUE(reset.armed());
+
+	reset.update(6000, true);
+	// 5 s of hold: the WiFi threshold must not fire on the factory button.
+	TEST_ASSERT_EQUAL_INT(actionOf(BootResetAction::None), actionOf(reset.update(11000, true)));
+	TEST_ASSERT_FALSE(reset.restartPending());
+	// 10 s of hold: factory clear.
+	TEST_ASSERT_EQUAL_INT(actionOf(BootResetAction::ClearAll), actionOf(reset.update(16000, true)));
+	TEST_ASSERT_TRUE(reset.restartPending());
+}
+
 int main(int, char**) {
 	UNITY_BEGIN();
 	RUN_TEST(test_ap_name_uses_last_four_hex_digits);
@@ -275,5 +291,6 @@ int main(int, char**) {
 	RUN_TEST(test_a_press_after_an_unsampled_window_is_rejected);
 	RUN_TEST(test_disable_stops_the_gesture);
 	RUN_TEST(test_abort_drops_a_pending_restart);
+	RUN_TEST(test_factory_button_ignores_the_wifi_threshold);
 	return UNITY_END();
 }
