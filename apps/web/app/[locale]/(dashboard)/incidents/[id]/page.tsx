@@ -14,6 +14,7 @@ import {
 import { Link } from "@/i18n/routing";
 import { requireUser } from "@/lib/auth/session";
 import { mapLink } from "@/lib/geo";
+import { readCancelAlertState } from "@/lib/incidents/cancel-alert";
 import {
 	incidentAuditLabelKey,
 	mergeIncidentTimeline,
@@ -57,10 +58,10 @@ export default async function IncidentDetailPage({
 	searchParams,
 }: {
 	params: Promise<{ locale: string; id: string }>;
-	searchParams: Promise<{ updated?: string; error?: string }>;
+	searchParams: Promise<{ updated?: string; error?: string; cancel?: string }>;
 }) {
 	const { locale, id } = await params;
-	const { updated, error } = await searchParams;
+	const { updated, error, cancel } = await searchParams;
 	const current = await requireUser();
 	const t = await getTranslations({ locale, namespace: "incidents" });
 
@@ -101,6 +102,32 @@ export default async function IncidentDetailPage({
 			createdAt: true,
 			actor: { select: { name: true } },
 		},
+	});
+
+	const cancelCommands = await prisma.deviceCommand.findMany({
+		where: {
+			impactEventId: incident.id,
+			kind: "CANCEL_ALERT",
+		},
+		orderBy: { createdAt: "desc" },
+		take: 20,
+		select: {
+			id: true,
+			kind: true,
+			status: true,
+			payload: true,
+			impactEventId: true,
+			createdAt: true,
+			expiresAt: true,
+		},
+	});
+	const now = new Date();
+	const cancelAlert = readCancelAlertState({
+		incidentId: incident.id,
+		status: incident.status,
+		cancelRequestedAt: incident.cancelRequestedAt,
+		commands: cancelCommands,
+		now,
 	});
 
 	const timeline = mergeIncidentTimeline(
@@ -159,11 +186,18 @@ export default async function IncidentDetailPage({
 					{t("statusUpdated")}
 				</p>
 			) : null}
+			{cancel === "requested" && cancelAlert.state === "waiting" ? (
+				<p className="mb-4 rounded border border-caution-400/30 bg-caution-400/10 px-3 py-2 text-xs text-caution-300">
+					{t("cancelRequested")}
+				</p>
+			) : null}
 			{error ? (
 				<p className="mb-4 rounded border border-alarm-500/30 bg-alarm-500/10 px-3 py-2 text-xs text-alarm-300">
 					{error === "forbidden"
 						? "Your role cannot change incidents."
-						: "That status transition is not allowed."}
+						: error === "tracker_required"
+							? t("errorTrackerRequired")
+							: "That status transition is not allowed."}
 				</p>
 			) : null}
 
@@ -341,6 +375,7 @@ export default async function IncidentDetailPage({
 							locale={locale}
 							status={incident.status}
 							role={current.role}
+							cancelAlert={cancelAlert}
 						/>
 					</CardContent>
 				</Card>

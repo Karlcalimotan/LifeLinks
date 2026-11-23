@@ -113,6 +113,9 @@ export const commandAckSchema = z.object({
 	command_id: z.string().min(1).max(64),
 	status: z.enum(["ACKED", "FAILED"]),
 	detail: z.string().max(500).optional(),
+	// The contract names the ACK state `result`; the firmware sends it as
+	// `detail`. Accept both and prefer `detail` when a device sends both.
+	result: z.string().max(500).optional(),
 });
 
 export type HeartbeatInput = z.infer<typeof heartbeatRequestSchema>;

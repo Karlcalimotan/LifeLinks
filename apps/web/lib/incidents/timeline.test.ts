@@ -11,6 +11,10 @@ describe("incidentAuditLabelKey", () => {
 		["incident.resolved", "timelineResolved"],
 		["incident.false_alarm", "timelineFalseAlarm"],
 		["incident.cancelled", "timelineCancelled"],
+		["incident.cancel_requested", "timelineCancelRequested"],
+		["incident.false_alarm_requested", "timelineFalseAlarmRequested"],
+		["incident.cancel_unconfirmed", "timelineCancelUnconfirmed"],
+		["incident.cancel_ack_ignored", "timelineCancelIgnored"],
 	])("maps %s to %s", (action, key) => {
 		expect(incidentAuditLabelKey(action)).toBe(key);
 	});
