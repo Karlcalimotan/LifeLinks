@@ -1,17 +1,18 @@
-import { alertTargetsFromSettings } from "@/lib/alerts/templates";
+import { type AlertTargets, alertTargetsFromSettings } from "@/lib/alerts/templates";
 import { ok } from "@/lib/api/envelope";
 import { badRequest, conflict, forbidden, rateLimited } from "@/lib/api/errors";
 import { withApi } from "@/lib/api/instrumentation";
 import { isDeviceApproved, requireDevice } from "@/lib/device/auth";
-import { incidentSchema } from "@/lib/device/schema";
+import { type IncidentInput, incidentSchema } from "@/lib/device/schema";
 import { resolveDeviceTime } from "@/lib/device/time";
 import { isValidCoordinate } from "@/lib/geo";
+import { readAckIncidentDetail } from "@/lib/incidents/bureau-ack";
 import prisma from "@/lib/prisma";
 import { notifyIncidentPush } from "@/lib/push/send";
 import { rateLimit } from "@/lib/rate-limit";
 import { getDeviceConfig } from "@/lib/settings/device-config";
 import { getOrgSettings } from "@/lib/settings/org";
-import { Prisma } from "@prisma/client";
+import { type ImpactStatus, Prisma } from "@prisma/client";
 import { after } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,102 @@ function scheduleIncidentPush(input: {
 			console.warn("[push] notification dispatch failed after commit.");
 		}
 	});
+}
+
+interface ExistingIncident {
+	id: string;
+	status: ImpactStatus;
+	lat: number | null;
+	lng: number | null;
+	gpsAgeS: number | null;
+	evidence: Prisma.JsonValue | null;
+}
+
+/**
+ * A tracker-confirmed acknowledgement is the only proof that the latched alarm
+ * stopped. A legacy or local ACKNOWLEDGED has no such command, so the next
+ * CONFIRMED report must reopen it.
+ */
+async function hasDeviceAcknowledgement(
+	tx: Prisma.TransactionClient,
+	incidentId: string,
+): Promise<boolean> {
+	const commands = await tx.deviceCommand.findMany({
+		where: { impactEventId: incidentId, kind: "ACK_INCIDENT", status: "ACKED" },
+		orderBy: { createdAt: "desc" },
+		take: 5,
+		select: { payload: true },
+	});
+	return commands.some((command) => readAckIncidentDetail(command.payload) === "acknowledged");
+}
+
+/**
+ * Move an existing incident to CONFIRMED and queue the first alerts once. The
+ * conditional update keeps a concurrent terminal transition from being
+ * overwritten. Used both for the normal SUSPECTED -> CONFIRMED transition and
+ * for reopening a legacy ACKNOWLEDGED incident whose tracker is still latched.
+ */
+async function confirmExistingIncident({
+	tx,
+	incident,
+	deviceId,
+	input,
+	hasFix,
+	targets,
+}: {
+	tx: Prisma.TransactionClient;
+	incident: ExistingIncident;
+	deviceId: string;
+	input: IncidentInput;
+	hasFix: boolean;
+	targets: AlertTargets;
+}): Promise<{ transitioned: boolean; queued: number }> {
+	const updated = await tx.impactEvent.updateMany({
+		where: { id: incident.id, status: incident.status, resolution: null },
+		data: {
+			status: "CONFIRMED",
+			ackRequestedAt: null,
+			lat: hasFix ? input.lat : incident.lat,
+			lng: hasFix ? input.lng : incident.lng,
+			gpsAgeS: input.gps_age_s ?? incident.gpsAgeS,
+			evidence: (input.evidence ?? incident.evidence ?? {}) as Prisma.InputJsonValue,
+		},
+	});
+	if (updated.count === 0) return { transitioned: false, queued: 0 };
+
+	let queued = 0;
+	const existingAlerts = await tx.alertDelivery.count({
+		where: { impactEventId: incident.id },
+	});
+	if (existingAlerts === 0) {
+		const deliveries = [
+			...targets.phones.map((target) => ({ channel: "SMS" as const, target })),
+			...targets.emails.map((target) => ({ channel: "EMAIL" as const, target })),
+		];
+		if (deliveries.length > 0) {
+			await tx.alertDelivery.createMany({
+				data: deliveries.map((delivery) => ({
+					impactEventId: incident.id,
+					channel: delivery.channel,
+					target: delivery.target,
+					status: "QUEUED" as const,
+				})),
+			});
+			queued = deliveries.length;
+		}
+	}
+	await tx.deviceStateEvent.create({
+		data: {
+			deviceId,
+			type: "INCIDENT_CONFIRMED",
+			metadata: {
+				incidentId: incident.id,
+				clientIncidentId: input.incident_id,
+				reopened: incident.status === "ACKNOWLEDGED",
+			},
+		},
+	});
+	return { transitioned: true, queued };
 }
 
 /**
@@ -86,57 +183,37 @@ export const POST = withApi(
 			},
 		});
 		if (existing) {
-			if (existing.status === "SUSPECTED" && status === "CONFIRMED") {
+			if (
+				status === "CONFIRMED" &&
+				(existing.status === "SUSPECTED" || existing.status === "ACKNOWLEDGED")
+			) {
 				const settingsForUpdate = await getOrgSettings(device.orgId);
 				const targets = alertTargetsFromSettings(settingsForUpdate);
 				let queued = 0;
 				let transitioned = false;
 				await prisma.$transaction(async (tx) => {
-					// Only the request that actually flips SUSPECTED to CONFIRMED
-					// queues alerts, records the event and sends the one push.
-					const updated = await tx.impactEvent.updateMany({
-						where: { id: existing.id, status: "SUSPECTED" },
-						data: {
-							status: "CONFIRMED",
-							lat: hasFix ? input.lat : existing.lat,
-							lng: hasFix ? input.lng : existing.lng,
-							gpsAgeS: input.gps_age_s ?? existing.gpsAgeS,
-							evidence: (input.evidence ?? existing.evidence ?? {}) as Prisma.InputJsonValue,
-						},
-					});
-					if (updated.count === 0) return;
-					transitioned = true;
-					const existingAlerts = await tx.alertDelivery.count({
-						where: { impactEventId: existing.id },
-					});
-					if (existingAlerts === 0) {
-						const deliveries = [
-							...targets.phones.map((target) => ({ channel: "SMS" as const, target })),
-							...targets.emails.map((target) => ({ channel: "EMAIL" as const, target })),
-						];
-						if (deliveries.length > 0) {
-							await tx.alertDelivery.createMany({
-								data: deliveries.map((delivery) => ({
-									impactEventId: existing.id,
-									channel: delivery.channel,
-									target: delivery.target,
-									status: "QUEUED" as const,
-								})),
-							});
-							queued = deliveries.length;
-						}
+					if (existing.status === "ACKNOWLEDGED") {
+						// A tracker-confirmed acknowledgement already stopped the alarm;
+						// a repeated CONFIRMED report must not reopen it. A legacy or
+						// local ACKNOWLEDGED has no device confirmation, so the live
+						// alarm wins and the bureau must acknowledge it again.
+						if (await hasDeviceAcknowledgement(tx, existing.id)) return;
 					}
-					await tx.deviceStateEvent.create({
-						data: {
-							deviceId: device.id,
-							type: "INCIDENT_CONFIRMED",
-							metadata: { incidentId: existing.id, clientIncidentId: input.incident_id },
-						},
+					const result = await confirmExistingIncident({
+						tx,
+						incident: existing,
+						deviceId: device.id,
+						input,
+						hasFix,
+						targets,
 					});
+					queued = result.queued;
+					transitioned = result.transitioned;
 				});
 				if (transitioned) {
 					// A suspected report sent nothing; this transition is the one
-					// confirmed notification for the incident.
+					// confirmed notification for the incident. A reopen is a new live
+					// alarm, so it also gets one push.
 					scheduleIncidentPush({
 						orgId: device.orgId,
 						incidentId: existing.id,
@@ -146,7 +223,11 @@ export const POST = withApi(
 				return ok({
 					received: true,
 					incident_id: existing.id,
-					status: "CONFIRMED",
+					// The SUSPECTED branch has always reported CONFIRMED even when a
+					// concurrent request won the transition. A device-confirmed
+					// ACKNOWLEDGED incident stays acknowledged.
+					status:
+						existing.status === "ACKNOWLEDGED" && !transitioned ? "ACKNOWLEDGED" : "CONFIRMED",
 					duplicate: true,
 					alerts_queued: queued,
 				});

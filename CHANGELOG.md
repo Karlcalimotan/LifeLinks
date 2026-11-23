@@ -34,6 +34,11 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- A device-backed `SUSPECTED` incident can no longer be acknowledged locally;
+  the bureau waits for dispatch. A legacy local `ACKNOWLEDGED` is reopened when
+  the tracker reports `CONFIRMED`, and an ADMIN-only recovery path can resolve
+  a dispatched incident after its acknowledgement command expired or failed,
+  with an audit row and honest copy that the alarm may still sound (#105).
 - `CANCEL_ALERT` acknowledgements decide the incident: only `cancelled` sets
   `FALSE_ALARM`. `too_late`, `unknown_incident`, a missing detail, an expired
   command or a failed command keep the status and record the reason. A

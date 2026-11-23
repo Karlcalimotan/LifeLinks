@@ -6,6 +6,7 @@ import {
 	falseAlarmAction,
 	requestCancelAlertAction,
 	resolveIncidentAction,
+	resolveWithoutTrackerAction,
 } from "@/lib/actions/incidents";
 import { type MemberRoleName, canAcknowledgeAsBureau, canManageIncidents } from "@/lib/auth/roles";
 import { type BureauAckView, bureauAckCopyKey } from "@/lib/incidents/bureau-ack";
@@ -27,6 +28,8 @@ export async function IncidentActions({
 	cancelAlert,
 	bureauAck,
 	acknowledgementRequired,
+	deviceBacked,
+	resolveWithoutTrackerAvailable,
 	focusCancel = false,
 }: {
 	incidentId: string;
@@ -36,6 +39,8 @@ export async function IncidentActions({
 	cancelAlert: CancelAlertView;
 	bureauAck: BureauAckView;
 	acknowledgementRequired: boolean;
+	deviceBacked: boolean;
+	resolveWithoutTrackerAvailable: boolean;
 	focusCancel?: boolean;
 }) {
 	if (!canManageIncidents(role)) return null;
@@ -51,12 +56,18 @@ export async function IncidentActions({
 	const ackWaiting = bureauAck.state === "waiting";
 	const ackAcknowledged = bureauAck.state === "acknowledged";
 	const ackFailed = bureauAck.state === "not_confirmed" || bureauAck.state === "failed";
+	// A device-backed SUSPECTED incident is still in the tracker's cancel
+	// window; the firmware rejects ACK_INCIDENT during Countdown. Only a local
+	// incident can be acknowledged before dispatch.
+	const ackNotDispatched = deviceBacked && status === "SUSPECTED";
 	const canAcknowledge =
-		canAcknowledgeAsBureau(role) && (status === "SUSPECTED" || status === "CONFIRMED");
+		canAcknowledgeAsBureau(role) &&
+		(status === "CONFIRMED" || (status === "SUSPECTED" && !deviceBacked));
 	// A pending request already reached the tracker; a second submit is coalesced
 	// by the action but hiding the button makes the wait explicit.
 	const showAcknowledge = canAcknowledge && !ackWaiting;
 	const acknowledgeLabel = ackFailed ? t("ackRetry") : t("acknowledge");
+	const showResolveWithoutTracker = resolveWithoutTrackerAvailable && role === "ADMIN";
 
 	return (
 		<div className="flex flex-col gap-3">
@@ -96,6 +107,13 @@ export async function IncidentActions({
 							</p>
 						) : null}
 					</div>
+				</div>
+			) : null}
+
+			{ackNotDispatched ? (
+				<div className="rounded-panel border border-caution-400/30 bg-caution-400/10 px-3 py-2.5">
+					<p className="text-body font-medium text-caution-300">{t("ackNotDispatchedTitle")}</p>
+					<p className="mt-1 text-meta leading-relaxed text-fog-300">{t("ackNotDispatchedBody")}</p>
 				</div>
 			) : null}
 
@@ -207,6 +225,36 @@ export async function IncidentActions({
 					</Button>
 				</form>
 			)}
+
+			{showResolveWithoutTracker ? (
+				<form
+					action={resolveWithoutTrackerAction}
+					className="flex flex-col gap-2 rounded-panel border border-alarm-500/30 bg-alarm-500/10 p-3"
+				>
+					<input type="hidden" name="locale" value={locale} />
+					<input type="hidden" name="incidentId" value={incidentId} />
+					<div>
+						<p className="text-body font-medium text-alarm-300">{t("resolveUnconfirmedTitle")}</p>
+						<p className="mt-1 text-meta leading-relaxed text-fog-300">
+							{t("resolveUnconfirmedBody")}
+						</p>
+					</div>
+					<Input
+						name="resolution"
+						placeholder={t("resolveUnconfirmedNote")}
+						className="h-9 max-w-sm"
+					/>
+					<ConfirmSubmit
+						message={t("resolveUnconfirmedConfirm")}
+						confirmLabel={t("resolveUnconfirmedAction")}
+						confirmText="RESOLVE"
+						cancelLabel={common("cancel")}
+						variant="danger"
+					>
+						{t("resolveUnconfirmedAction")}
+					</ConfirmSubmit>
+				</form>
+			) : null}
 		</div>
 	);
 }

@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
 	alertCount: vi.fn(),
 	alertCreateMany: vi.fn(),
 	stateCreate: vi.fn(),
+	commandFindMany: vi.fn(),
 	notifyIncidentPush: vi.fn(),
 	after: vi.fn(),
 }));
@@ -97,6 +98,7 @@ describe("POST /api/device/incident", () => {
 		mocks.alertCount.mockReset();
 		mocks.alertCreateMany.mockReset();
 		mocks.stateCreate.mockReset();
+		mocks.commandFindMany.mockReset();
 		mocks.notifyIncidentPush.mockReset();
 		mocks.after.mockReset();
 		afterTasks.splice(0);
@@ -132,11 +134,13 @@ describe("POST /api/device/incident", () => {
 		mocks.alertCount.mockResolvedValue(0);
 		mocks.alertCreateMany.mockResolvedValue({ count: 2 });
 		mocks.stateCreate.mockResolvedValue({});
+		mocks.commandFindMany.mockResolvedValue([]);
 		mocks.transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
 			fn({
 				impactEvent: { create: mocks.impactCreate, updateMany: mocks.impactUpdate },
 				alertDelivery: { createMany: mocks.alertCreateMany, count: mocks.alertCount },
 				deviceStateEvent: { create: mocks.stateCreate },
+				deviceCommand: { findMany: mocks.commandFindMany },
 			}),
 		);
 		mocks.notifyIncidentPush.mockResolvedValue({
@@ -282,6 +286,7 @@ describe("POST /api/device/incident", () => {
 		expect(mocks.notifyIncidentPush).not.toHaveBeenCalled();
 	});
 
+<<<<<<< HEAD
 	it("uses the organisation cancel window when the tracker has no override", async () => {
 		await POST(request());
 
@@ -312,5 +317,97 @@ describe("POST /api/device/incident", () => {
 		expect(mocks.overrideFindFirst).toHaveBeenCalledWith({
 			where: { deviceId: "dev-1", orgId: "org-1" },
 		});
+	});
+
+	it("reopens a legacy acknowledged incident when the tracker confirms the alarm", async () => {
+		mocks.findUnique.mockResolvedValue({
+			id: "inc-1",
+			status: "ACKNOWLEDGED",
+			lat: null,
+			lng: null,
+			gpsAgeS: null,
+			evidence: {},
+		});
+
+		const response = await POST(request());
+		const body = await response.json();
+
+		expect(response.status).toBe(200);
+		expect(body.data).toMatchObject({
+			incident_id: "inc-1",
+			status: "CONFIRMED",
+			duplicate: true,
+			alerts_queued: 2,
+		});
+		expect(mocks.commandFindMany).toHaveBeenCalledWith({
+			where: { impactEventId: "inc-1", kind: "ACK_INCIDENT", status: "ACKED" },
+			orderBy: { createdAt: "desc" },
+			take: 5,
+			select: { payload: true },
+		});
+		expect(mocks.impactUpdate).toHaveBeenCalledWith({
+			where: { id: "inc-1", status: "ACKNOWLEDGED", resolution: null },
+			data: expect.objectContaining({
+				status: "CONFIRMED",
+				ackRequestedAt: null,
+			}),
+		});
+		expect(mocks.stateCreate).toHaveBeenCalledWith({
+			data: expect.objectContaining({
+				type: "INCIDENT_CONFIRMED",
+				metadata: expect.objectContaining({ reopened: true }),
+			}),
+		});
+		expect(afterTasks).toHaveLength(1);
+
+		await flushAfter();
+
+		expect(mocks.notifyIncidentPush).toHaveBeenCalledOnce();
+	});
+
+	it("does not reopen a device-confirmed acknowledgement", async () => {
+		mocks.findUnique.mockResolvedValue({
+			id: "inc-1",
+			status: "ACKNOWLEDGED",
+			lat: null,
+			lng: null,
+			gpsAgeS: null,
+			evidence: {},
+		});
+		mocks.commandFindMany.mockResolvedValue([
+			{ payload: { incident_id: "client-1", ackDetail: "acknowledged" } },
+		]);
+
+		const response = await POST(request());
+		const body = await response.json();
+
+		expect(response.status).toBe(200);
+		expect(body.data).toMatchObject({
+			status: "ACKNOWLEDGED",
+			duplicate: true,
+			alerts_queued: 0,
+		});
+		expect(mocks.impactUpdate).not.toHaveBeenCalled();
+		expect(afterTasks).toHaveLength(0);
+	});
+
+	it("reopens an acknowledgement that was not confirmed by the device", async () => {
+		mocks.findUnique.mockResolvedValue({
+			id: "inc-1",
+			status: "ACKNOWLEDGED",
+			lat: null,
+			lng: null,
+			gpsAgeS: null,
+			evidence: {},
+		});
+		mocks.commandFindMany.mockResolvedValue([
+			{ payload: { incident_id: "client-1", ackDetail: "unknown_incident" } },
+		]);
+
+		const response = await POST(request());
+		const body = await response.json();
+
+		expect(body.data).toMatchObject({ status: "CONFIRMED", duplicate: true });
+		expect(mocks.impactUpdate).toHaveBeenCalledOnce();
 	});
 });

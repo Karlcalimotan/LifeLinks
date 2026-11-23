@@ -189,6 +189,11 @@ export default async function IncidentsPage({
 					{t("errorNotFound")}
 				</p>
 			) : null}
+			{error === "ack_not_dispatched" ? (
+				<p className="mb-4 rounded-panel border border-alarm-400/30 bg-alarm-400/10 px-3 py-2 text-meta text-alarm-300">
+					{t("errorAckNotDispatched")}
+				</p>
+			) : null}
 
 			<Card className="min-w-0 overflow-hidden">
 				<CardContent className="min-w-0 pt-5">

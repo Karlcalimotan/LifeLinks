@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
 	ACK_INCIDENT_DETAILS,
 	type AckIncidentCommandView,
+	UNCONFIRMED_RESOLUTION,
 	acknowledgementRequiredBeforeResolve,
 	buildAckIncidentPayload,
 	bureauAckCopyKey,
 	canAcknowledgeIncidentStatus,
 	canConfirmAckIncident,
+	canResolveWithoutTracker,
 	classifyAckIncident,
 	latestAckIncidentCommand,
 	readBureauAckState,
@@ -87,6 +89,84 @@ describe("acknowledgementRequiredBeforeResolve", () => {
 		expect(acknowledgementRequiredBeforeResolve({ status: "SUSPECTED", deviceBacked: true })).toBe(
 			false,
 		);
+	});
+});
+
+describe("canResolveWithoutTracker", () => {
+	const view = (overrides: Partial<ReturnType<typeof readBureauAckState>> = {}) => ({
+		state: "not_confirmed" as const,
+		detail: "expired",
+		commandId: "cmd-ack-1",
+		requestedAt: at(1),
+		...overrides,
+	});
+
+	it("allows the recovery path only for a dispatched device incident", () => {
+		expect(canResolveWithoutTracker({ status: "CONFIRMED", deviceBacked: true, ack: view() })).toBe(
+			true,
+		);
+		expect(
+			canResolveWithoutTracker({ status: "CONFIRMED", deviceBacked: false, ack: view() }),
+		).toBe(false);
+		expect(canResolveWithoutTracker({ status: "SUSPECTED", deviceBacked: true, ack: view() })).toBe(
+			false,
+		);
+		expect(
+			canResolveWithoutTracker({ status: "ACKNOWLEDGED", deviceBacked: true, ack: view() }),
+		).toBe(false);
+	});
+
+	it("allows an expired command and a failed command", () => {
+		expect(canResolveWithoutTracker({ status: "CONFIRMED", deviceBacked: true, ack: view() })).toBe(
+			true,
+		);
+		expect(
+			canResolveWithoutTracker({
+				status: "CONFIRMED",
+				deviceBacked: true,
+				ack: view({ state: "failed", detail: "modem_fault" }),
+			}),
+		).toBe(true);
+	});
+
+	it("does not offer the recovery path while a command is pending or acknowledged", () => {
+		expect(
+			canResolveWithoutTracker({
+				status: "CONFIRMED",
+				deviceBacked: true,
+				ack: view({ state: "waiting", detail: null }),
+			}),
+		).toBe(false);
+		expect(
+			canResolveWithoutTracker({
+				status: "CONFIRMED",
+				deviceBacked: true,
+				ack: view({ state: "acknowledged", detail: "device" }),
+			}),
+		).toBe(false);
+		expect(
+			canResolveWithoutTracker({
+				status: "CONFIRMED",
+				deviceBacked: true,
+				ack: view({ state: "idle", detail: null }),
+			}),
+		).toBe(false);
+	});
+
+	it("does not treat an unknown incident as an expired command", () => {
+		expect(
+			canResolveWithoutTracker({
+				status: "CONFIRMED",
+				deviceBacked: true,
+				ack: view({ state: "not_confirmed", detail: "unknown_incident" }),
+			}),
+		).toBe(false);
+	});
+});
+
+describe("UNCONFIRMED_RESOLUTION", () => {
+	it("records that the tracker did not confirm", () => {
+		expect(UNCONFIRMED_RESOLUTION).toBe("Resolved without tracker confirmation");
 	});
 });
 

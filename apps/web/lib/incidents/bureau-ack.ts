@@ -78,6 +78,28 @@ export function acknowledgementRequiredBeforeResolve({
 	return deviceBacked && status === "CONFIRMED";
 }
 
+/** Stored when an admin closes an incident without a tracker confirmation. */
+export const UNCONFIRMED_RESOLUTION = "Resolved without tracker confirmation";
+
+/**
+ * The ADMIN recovery path is deliberately narrow: only a dispatched device
+ * incident whose acknowledgement command expired or failed. A fresh PENDING
+ * command may still reach the tracker, and an acknowledged incident uses the
+ * normal resolve path. A non-device incident has no tracker to wait for.
+ */
+export function canResolveWithoutTracker({
+	status,
+	deviceBacked,
+	ack,
+}: {
+	status: string;
+	deviceBacked: boolean;
+	ack: BureauAckView;
+}): boolean {
+	if (!deviceBacked || status !== "CONFIRMED") return false;
+	return ack.state === "failed" || (ack.state === "not_confirmed" && ack.detail === "expired");
+}
+
 function payloadRecord(value: unknown): Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value)
 		? (value as Record<string, unknown>)

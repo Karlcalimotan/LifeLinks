@@ -101,6 +101,24 @@ The acknowledgement command carries the device client incident id:
 - A reboot or power loss ends the latch. The unit boots to `Idle` and the
   incident must be resolved from the portal.
 
+### Portal recovery when the tracker cannot confirm
+
+The portal requires a tracker acknowledgement before a dispatched incident can
+be resolved. If the acknowledgement command expired or failed and the tracker
+cannot be reached, an ADMIN may use **Resolve without tracker confirmation** on
+the incident detail page. The path is deliberately narrow:
+
+- only an ADMIN sees it, and only for a device-backed `CONFIRMED` incident;
+- it is not offered while a fresh acknowledgement command is still pending;
+- the UI requires a typed `RESOLVE` confirmation, not a single click;
+- the action audits `incident.resolved_unconfirmed` with the actor and the last
+  command state, sets `RESOLVED`, and clears the pending acknowledgement.
+
+This recovery does **not** stop the device. The alarm may keep sounding until
+the unit is powered off or the tracker acknowledges. That is the same
+power-loss limit described above: the portal can close its record, but it cannot
+silence a tracker it cannot reach.
+
 The pure latch/ack decision is covered by native tests. The physical bench run
 (synthetic impact, wait past the countdown, ACK, silence) is issue #54 and stays
 a human task; no flashing or hardware result is claimed here.

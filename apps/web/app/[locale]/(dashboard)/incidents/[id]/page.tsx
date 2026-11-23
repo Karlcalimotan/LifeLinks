@@ -16,6 +16,7 @@ import { requireUser } from "@/lib/auth/session";
 import { mapLink } from "@/lib/geo";
 import {
 	acknowledgementRequiredBeforeResolve,
+	canResolveWithoutTracker,
 	readBureauAckState,
 } from "@/lib/incidents/bureau-ack";
 import { readCancelAlertState } from "@/lib/incidents/cancel-alert";
@@ -159,6 +160,11 @@ export default async function IncidentDetailPage({
 		commands: ackCommands,
 		now,
 	});
+	const resolveWithoutTrackerAvailable = canResolveWithoutTracker({
+		status: incident.status,
+		deviceBacked: Boolean(incident.device),
+		ack: bureauAck,
+	});
 
 	const timeline = mergeIncidentTimeline(
 		auditRows.map((row) => ({
@@ -229,7 +235,11 @@ export default async function IncidentDetailPage({
 							? t("errorTrackerRequired")
 							: error === "ack_required"
 								? t("errorAckRequired")
-								: "That status transition is not allowed."}
+								: error === "ack_not_dispatched"
+									? t("errorAckNotDispatched")
+									: error === "ack_recovery_unavailable"
+										? t("errorAckRecoveryUnavailable")
+										: "That status transition is not allowed."}
 				</p>
 			) : null}
 
@@ -413,6 +423,8 @@ export default async function IncidentDetailPage({
 								status: incident.status,
 								deviceBacked: Boolean(incident.device),
 							})}
+							deviceBacked={Boolean(incident.device)}
+							resolveWithoutTrackerAvailable={resolveWithoutTrackerAvailable}
 							focusCancel={isCancelActionFocus(action)}
 						/>
 					</CardContent>

@@ -5,8 +5,13 @@ import { requireUser } from "@/lib/auth/session";
 import {
 	ACK_INCIDENT_COMMAND_TTL_MS,
 	ACK_INCIDENT_KIND,
+	UNCONFIRMED_RESOLUTION,
 	acknowledgementRequiredBeforeResolve,
 	buildAckIncidentPayload,
+	canResolveWithoutTracker,
+	latestAckIncidentCommand,
+	readAckIncidentDetail,
+	readBureauAckState,
 } from "@/lib/incidents/bureau-ack";
 import {
 	CANCEL_ALERT_COMMAND_TTL_MS,
@@ -191,9 +196,8 @@ export async function acknowledgeIncidentAction(formData: FormData) {
 
 	const now = new Date();
 	const deviceBacked = Boolean(incident.device);
-	const dispatched = incident.status === "CONFIRMED";
 
-	if (!deviceBacked || !dispatched) {
+	if (!deviceBacked) {
 		// No tracker to ask: record the acknowledgement locally. The conditional
 		// update keeps a concurrent terminal transition from being overwritten.
 		const claimed = await prisma.$transaction(async (tx) => {
@@ -231,6 +235,19 @@ export async function acknowledgeIncidentAction(formData: FormData) {
 		redirect(incidentSuccessPath(locale, incident.id, returnTo));
 	}
 
+	// A device-backed SUSPECTED incident is still in the tracker's cancel
+	// window. The firmware rejects ACK_INCIDENT during Countdown, so setting
+	// ACKNOWLEDGED locally would be a lie. Refuse and explain.
+	if (incident.status === "SUSPECTED") {
+		redirect(
+			fromDashboard
+				? `/${locale}/dashboard?error=ack_not_dispatched`
+				: `/${locale}/incidents/${incident.id}?error=ack_not_dispatched`,
+		);
+	}
+
+	// The remaining eligible status is a dispatched CONFIRMED incident. Queue
+	// ACK_INCIDENT; only the tracker may move it to ACKNOWLEDGED.
 	const result = await prisma.$transaction(async (tx) => {
 		// Claim the request in the same write that records it. A terminal status
 		// from a concurrent operator wins instead of receiving a stale command.
@@ -296,6 +313,125 @@ export async function acknowledgeIncidentAction(formData: FormData) {
 
 export async function resolveIncidentAction(formData: FormData) {
 	await transition(formData, "RESOLVED");
+}
+
+/**
+ * ADMIN-only recovery for a tracker that cannot confirm.
+ *
+ * The normal resolve path requires ACKNOWLEDGED for a device-backed incident.
+ * When the acknowledgement command expired or failed and the tracker cannot be
+ * reached, an admin may close the incident anyway. This never claims the alarm
+ * stopped: the audit row records the last command state and the copy warns that
+ * the alarm may keep sounding until the device is powered off or acknowledges.
+ */
+export async function resolveWithoutTrackerAction(formData: FormData) {
+	const locale = value(formData, "locale") === "tl" ? "tl" : "en";
+	const incidentId = value(formData, "incidentId");
+	const returnTo = value(formData, "returnTo");
+	const fromDashboard = returnTo === "dashboard";
+	const current = await requireUser();
+
+	const forbiddenPath = fromDashboard
+		? `/${locale}/dashboard?error=forbidden`
+		: `/${locale}/incidents/${incidentId}?error=forbidden`;
+	if (current.role !== "ADMIN") redirect(forbiddenPath);
+
+	const incident = await prisma.impactEvent.findFirst({
+		where: { id: incidentId, orgId: current.org.id },
+		include: {
+			vehicle: { select: { ownerId: true } },
+			device: { select: { id: true } },
+		},
+	});
+	if (!incident) {
+		redirect(
+			fromDashboard ? `/${locale}/dashboard?error=notfound` : `/${locale}/incidents?error=notfound`,
+		);
+	}
+
+	const transitionPath = fromDashboard
+		? `/${locale}/dashboard?error=transition`
+		: `/${locale}/incidents/${incident.id}?error=transition`;
+	const recoveryPath = fromDashboard
+		? `/${locale}/dashboard?error=ack_recovery_unavailable`
+		: `/${locale}/incidents/${incident.id}?error=ack_recovery_unavailable`;
+	if (!incident.device || incident.status !== "CONFIRMED") redirect(recoveryPath);
+
+	const commands = await prisma.deviceCommand.findMany({
+		where: { impactEventId: incident.id, kind: ACK_INCIDENT_KIND },
+		orderBy: { createdAt: "desc" },
+		take: 20,
+		select: {
+			id: true,
+			kind: true,
+			status: true,
+			payload: true,
+			impactEventId: true,
+			createdAt: true,
+			expiresAt: true,
+		},
+	});
+	const ack = readBureauAckState({
+		incidentId: incident.id,
+		status: incident.status,
+		ackRequestedAt: incident.ackRequestedAt,
+		commands,
+	});
+	if (
+		!canResolveWithoutTracker({
+			status: incident.status,
+			deviceBacked: Boolean(incident.device),
+			ack,
+		})
+	) {
+		redirect(recoveryPath);
+	}
+
+	const lastCommand = latestAckIncidentCommand(incident.id, commands);
+	const now = new Date();
+	const resolution = value(formData, "resolution") || UNCONFIRMED_RESOLUTION;
+	const resolved = await prisma.$transaction(async (tx) => {
+		const updated = await tx.impactEvent.updateMany({
+			where: {
+				id: incident.id,
+				orgId: current.org.id,
+				status: "CONFIRMED",
+				resolution: null,
+			},
+			data: {
+				status: "RESOLVED",
+				resolution,
+				resolvedAt: now,
+				ackRequestedAt: null,
+			},
+		});
+		if (updated.count !== 1) return false;
+		await tx.auditLog.create({
+			data: {
+				orgId: current.org.id,
+				actorId: current.user.id,
+				action: "incident.resolved_unconfirmed",
+				target: incident.id,
+				metadata: {
+					from: incident.status,
+					to: "RESOLVED",
+					source: "admin_recovery",
+					lastCommandId: lastCommand?.id ?? null,
+					lastCommandStatus: lastCommand?.status ?? null,
+					lastCommandDetail: lastCommand ? readAckIncidentDetail(lastCommand.payload) : null,
+					lastCommandExpiresAt: lastCommand?.expiresAt?.toISOString() ?? null,
+					resolution,
+				},
+			},
+		});
+		return true;
+	});
+	if (!resolved) redirect(transitionPath);
+
+	revalidatePath(`/${locale}/dashboard`);
+	revalidatePath(`/${locale}/incidents`);
+	revalidatePath(`/${locale}/incidents/${incident.id}`);
+	redirect(incidentSuccessPath(locale, incident.id, returnTo));
 }
 
 export async function falseAlarmAction(formData: FormData) {

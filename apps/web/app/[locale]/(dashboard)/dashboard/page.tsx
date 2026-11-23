@@ -170,9 +170,11 @@ export default async function DashboardPage({
 				? { tone: "error" as const, text: t("errorForbidden") }
 				: error === "transition"
 					? { tone: "error" as const, text: t("errorTransition") }
-					: error === "notfound"
-						? { tone: "error" as const, text: t("errorNotFound") }
-						: null;
+					: error === "ack_not_dispatched"
+						? { tone: "error" as const, text: t("errorAckNotDispatched") }
+						: error === "notfound"
+							? { tone: "error" as const, text: t("errorNotFound") }
+							: null;
 
 	const stateLabels: Record<FleetMarkerState, string> = {
 		incident: t("legendIncident"),
