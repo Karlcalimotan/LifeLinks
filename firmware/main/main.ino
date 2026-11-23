@@ -5,6 +5,9 @@
 	IMU + vibration + GPS -> ImpactFilter -> CrashSafety countdown
 	  cancel button within the window  -> SMS/incident cancelled
 	  window expires                   -> SMS to configured phones + HTTP incident
+	  ACK_INCIDENT for this incident   -> alarm stops and the tracker returns to idle
+	Alerting is latched: it never stops on a timer. After ten minutes the buzzer
+	drops to a slower reminder pattern and the LED stays solid.
 	Heartbeat and command polling run on a non-blocking interval.
 
   This sketch is deliberately explicit about what is verified and what still
@@ -1730,6 +1733,24 @@ void handleCommands(JsonArray commands) {
 				sendCommandAck(id, "ACKED", "too_late");
 			}
 			continue;
+		} else if (kind == "ACK_INCIDENT") {
+			// The portal acknowledges the dispatch alarm with the device client
+			// incident id (llk-...), not the server ImpactEvent id. A different
+			// or missing id changes nothing: the alarm keeps running.
+			const String incidentId = command["payload"]["incident_id"] | "";
+			const fw::IncidentAck result =
+				g_safety.acknowledgeIncident(incidentId.c_str(), g_incidentId.c_str());
+			if (result == fw::IncidentAck::Acknowledged) {
+				Serial.println("[CMD] ACK_INCIDENT accepted");
+				g_buzzer.setPattern(fw::BuzzerPattern::Off, millis());
+				g_incidentId = "";
+				g_lastState = fw::AlertState::Idle;
+				sendCommandAck(id, "ACKED", "acknowledged");
+			} else {
+				Serial.println("[CMD] ACK_INCIDENT for an unknown incident");
+				sendCommandAck(id, "ACKED", "unknown_incident");
+			}
+			continue;
 		}
 		sendCommandAck(id, "ACKED", nullptr);
 	}
@@ -2002,9 +2023,12 @@ void loop() {
 			g_safety.markAlertSent(now);
 		}
 
-		if (state == fw::AlertState::Alerting && (now - g_alertStartedAt) > 10UL * 60UL * 1000UL) {
-			Serial.println("[SOS] retry window elapsed; keeping the incident open");
-			g_safety.stopAlerting();
+		// Alerting is latched until ACK_INCIDENT, so the alarm has no timed
+		// exit. After ten minutes it falls back to a slower reminder pattern
+		// instead of going silent.
+		if (state == fw::AlertState::Alerting) {
+			const fw::BuzzerPattern pattern = fw::alertingPattern(now - g_alertStartedAt);
+			if (g_buzzer.pattern() != pattern) g_buzzer.setPattern(pattern, now);
 		}
 
 		if (state == fw::AlertState::Cancelled && (now - g_cancelledAt) > 5000UL) {

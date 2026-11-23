@@ -23,7 +23,7 @@ test/
   test_config/        envelope and defaults
   test_filters/       pothole, crash, rollover, door slam, debounce
   test_provisioning/  AP name, form/NVS limits, boot reset gesture
-  test_safety/        countdown, cancel, retry, faults, power, GPS, SMS
+  test_safety/        countdown, cancel, retry, latch/ack, faults, power, GPS, SMS
 ```
 
 The PlatformIO project root is `firmware/`, not the repository root. Run the
@@ -150,6 +150,60 @@ leaving the Device Token field blank.
 The server command poll also sends `alert_phones`; the firmware caches the first
 two numbers in NVS so the SMS path keeps working if the backend is unreachable.
 
+## Acknowledgement latch (`ACK_INCIDENT`)
+
+A dispatched incident is latched. The device stays in `Alerting` until the
+portal acknowledges that incident; there is no timed silence.
+
+Command from the server:
+
+```json
+{
+  "kind": "ACK_INCIDENT",
+  "payload": { "incident_id": "llk-1a2b3c4d-00001234" }
+}
+```
+
+- `payload.incident_id` is the **device client incident id** (`llk-...`, the
+  value the device generated and sent as `incident_id`). It is compared with the
+  device's own active id, not with the server `ImpactEvent.id`.
+- Matching id while `Alerting`: the buzzer stops, the ACK carries
+  `{ "detail": "acknowledged" }`, the active incident is cleared, and the device
+  returns to `Idle`.
+- Different or missing id, a countdown that has not expired, or no active
+  incident: the ACK carries `{ "detail": "unknown_incident" }` and the current
+  state is unchanged. An acknowledgement can never suppress a countdown.
+- `CANCEL_ALERT` is unchanged and still works for the false-alarm path.
+- The LED is solid for the whole of `Alerting`. The buzzer uses a long beep
+  (2 s on / 1 s off) for the first 10 minutes, then a slower reminder
+  (1 s on / 5 s off). It never goes silent on a timer.
+- SMS and HTTP retries continue on the configured `sos_retry_s` interval until
+  the acknowledgement arrives. Budget for that when a unit is left alerting.
+
+The pure decision lives in `main/safety.h` (`acknowledgeIncident`,
+`incidentIdsMatch`) and `main/status.h` (`alertingPattern`) and is covered by
+`test_safety`.
+
+### Bench steps (human, issue #54)
+
+Do not treat these as done until they run on a real unit with a test SIM.
+
+1. Trigger a synthetic impact and let the countdown expire.
+2. Confirm the LED is solid, the buzzer is the 2 s / 1 s long beep, and the
+   incident appears on the portal.
+3. Wait past 10 minutes. Confirm the buzzer changes to 1 s / 5 s, never goes
+   silent, and `STATUS` still reports `Alerting`.
+4. Send `ACK_INCIDENT` with the `llk-...` id from the portal. Confirm the buzzer
+   stops, the LED goes off, the ACK detail is `acknowledged`, and the portal
+   records the acknowledgement.
+5. Send a second `ACK_INCIDENT` with a wrong or empty id while alerting. Confirm
+   `unknown_incident` and that the alarm continues.
+6. Send `CANCEL_ALERT` and confirm the existing cancel and all-clear path still
+   works.
+7. Power-cycle during `Alerting`. The unit boots to `Idle`; the alarm does not
+   resume and the portal must resolve the incident manually. Record that
+   behavior as the accepted power-loss limit.
+
 ## Configuration sync
 
 The command poll carries a versioned `config` object. The firmware:
@@ -198,7 +252,10 @@ the integration, not as a formality.
 
 - The buzzer starts at confirmation, before the SMS.
 - The cancel button is debounced and only accepted during the countdown.
-- The SOS retries until the retry window elapses; the incident stays open.
+- `Alerting` is latched until `ACK_INCIDENT` for the active incident; there is
+  no timed silence. After 10 minutes the buzzer slows to a reminder pattern and
+  the LED stays solid.
+- `CANCEL_ALERT` and the driver-cancel path are unchanged.
 - Safe mode never suppresses the SOS.
 - A stale GPS fix is sent with its age.
 - See [`../docs/safety.md`](../docs/safety.md) for the full model and the bench
@@ -207,8 +264,11 @@ the integration, not as a formality.
 ## Known limitations
 
 - **No persistent event queue.** A dropped cancel or incident is retried by the
-  alert path, but it is not replayed after a reboot. The dashboard can still
-  resolve the incident manually.
+  alert path, but it is not replayed after a reboot. A reboot or power loss also
+  ends the latched alarm; the unit boots to `Idle` and the portal must resolve
+  the incident manually.
+- **SMS cost while latched.** The retry ladder runs until the acknowledgement
+  arrives, so an unacknowledged unit keeps sending on the configured interval.
 - **The AT transport is blocking.** A slow network can delay the loop. The
   watchdog and the retry ladder bound the damage, but a non-blocking state
   machine is the next step. A blocking heartbeat can also delay a portal

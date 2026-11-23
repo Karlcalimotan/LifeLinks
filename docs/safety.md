@@ -33,7 +33,7 @@ BOOT
        ├─ SMS to configured phones
        ├─ HTTP incident to the dashboard
        ├─ retry every 60 s (configurable)
-       └─ stop retrying after 10 min; the incident stays open
+       └─ stay in ALERTING until ACK_INCIDENT; after 10 min a slower reminder beep, never silence
 ```
 
 The server records a `SUSPECTED` incident at confirmation and upgrades it to
@@ -65,6 +65,45 @@ cover the matrix above; the vehicle bench test is what proves it.
   not stop the SMS; the dashboard can still mark the incident a false alarm.
 - The cancel is sent to the backend as an event, not treated as "nothing
   happened".
+
+## Acknowledgement latch
+
+`ALERTING` has no timed exit. The device stays in that state, with a solid LED
+and an audible buzzer, until the portal acknowledges the active incident or the
+unit loses power.
+
+After ten minutes the buzzer changes from the long beep (2 s on / 1 s off) to a
+slower reminder (1 s on / 5 s off). The LED stays solid. The change is a
+comfort decision, not a safety timeout: the alarm never goes silent on a timer.
+
+The acknowledgement command carries the device client incident id:
+
+```json
+{
+  "kind": "ACK_INCIDENT",
+  "payload": { "incident_id": "llk-1a2b3c4d-00001234" }
+}
+```
+
+- The id is the `llk-...` value the device generated and sent as `incident_id`.
+  It is not the server `ImpactEvent.id`.
+- A matching id while `Alerting` stops the buzzer, clears the active incident,
+  returns the device to `Idle`, and ACKs with `{ "detail": "acknowledged" }`.
+- A different or missing id, an acknowledgement during the countdown, or one
+  with no active incident changes nothing and ACKs with
+  `{ "detail": "unknown_incident" }`. An acknowledgement can never suppress a
+  countdown that has not expired.
+- `CANCEL_ALERT` keeps its existing behavior for the false-alarm path. The
+  driver button remains the only way to stop the countdown locally.
+- SMS and HTTP retries continue on `sos_retry_s` until the acknowledgement, so
+  an unattended unit keeps using the SIM. That is deliberate: a missed alert is
+  worse than the cost.
+- A reboot or power loss ends the latch. The unit boots to `Idle` and the
+  incident must be resolved from the portal.
+
+The pure latch/ack decision is covered by native tests. The physical bench run
+(synthetic impact, wait past the countdown, ACK, silence) is issue #54 and stays
+a human task; no flashing or hardware result is claimed here.
 
 ## Alert channels
 
@@ -119,7 +158,8 @@ recovered on boot: the incident id is persisted before the countdown starts.
 
 Verified in this repository:
 
-- the pure filters, state machine, retry, fault and power logic (native tests)
+- the pure filters, state machine, retry, latch/ack, fault and power logic
+  (native tests)
 - the server/firmware configuration contract (Vitest + `pnpm stack:check`)
 - the three-role permission model and vehicle-owner scoping (Vitest)
 - the web build, typecheck, unit tests and the API envelope
