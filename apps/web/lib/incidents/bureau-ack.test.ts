@@ -6,7 +6,6 @@ import {
 	acknowledgementRequiredBeforeResolve,
 	buildAckIncidentPayload,
 	bureauAckCopyKey,
-	canAcknowledgeIncidentStatus,
 	canConfirmAckIncident,
 	canResolveWithoutTracker,
 	classifyAckIncident,
@@ -50,18 +49,6 @@ describe("buildAckIncidentPayload", () => {
 });
 
 describe("status eligibility", () => {
-	it("allows acknowledgement while the incident is being worked", () => {
-		expect(canAcknowledgeIncidentStatus("SUSPECTED")).toBe(true);
-		expect(canAcknowledgeIncidentStatus("CONFIRMED")).toBe(true);
-	});
-
-	it("does not acknowledge a closed incident", () => {
-		expect(canAcknowledgeIncidentStatus("ACKNOWLEDGED")).toBe(false);
-		expect(canAcknowledgeIncidentStatus("CANCELLED")).toBe(false);
-		expect(canAcknowledgeIncidentStatus("RESOLVED")).toBe(false);
-		expect(canAcknowledgeIncidentStatus("FALSE_ALARM")).toBe(false);
-	});
-
 	it("confirms a device ACK without overwriting terminal statuses", () => {
 		expect(canConfirmAckIncident("SUSPECTED")).toBe(true);
 		expect(canConfirmAckIncident("CONFIRMED")).toBe(true);

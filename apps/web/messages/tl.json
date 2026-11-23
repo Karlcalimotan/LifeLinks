@@ -372,7 +372,7 @@
 		"ackFailedBody": "Iniulat ng tracker na nabigo ang pagkilala. Tingnan ang tracker.",
 		"ackAcknowledgedTitle": "Kinilala ng bureau",
 		"ackAcknowledgedBody": "Kinumpirma ng tracker na tumigil ang alarm.",
-		"ackAcknowledgedLocalBody": "Naitala ng bureau. Walang alarm ng tracker na kumpirmahin.",
+		"ackAcknowledgedLocalBody": "Naitala ng bureau, ngunit hindi ito kinumpirma ng tracker. Maaaring tumutunog pa ang alarm.",
 		"ackRequiredTitle": "Kilalanin muna bago resolbahin",
 		"ackRequiredBody": "Naka-latch ang alarm ng tracker sa insidenteng ito. Kilalanin muna ito; kukumpirmahin ng tracker kapag tumigil ang alarm.",
 		"ackWaitingForBureauTitle": "Hinihintay ang pagkilala ng bureau",

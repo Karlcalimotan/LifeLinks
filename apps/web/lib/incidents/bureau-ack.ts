@@ -21,16 +21,6 @@ export const ACK_INCIDENT_DETAILS: readonly AckIncidentDetail[] = [
 ];
 
 /**
- * A bureau acknowledgement applies while the incident is still being worked.
- * `SUSPECTED` is before dispatch and keeps the local path; a device-backed
- * `CONFIRMED` incident must go through the tracker.
- */
-export const ACK_INCIDENT_ELIGIBLE_STATUSES = [
-	"SUSPECTED",
-	"CONFIRMED",
-] as const satisfies readonly ImpactStatusName[];
-
-/**
  * Statuses a device acknowledgement may move to `ACKNOWLEDGED`. Terminal
  * statuses are deliberately absent: a concurrent resolve or false alarm wins
  * and a late tracker reply must not resurrect the incident.
@@ -51,11 +41,6 @@ export type AckIncidentPayload = {
  */
 export function buildAckIncidentPayload(clientIncidentId: string): AckIncidentPayload {
 	return { incident_id: clientIncidentId };
-}
-
-/** Whether the incident status can be acknowledged at all. */
-export function canAcknowledgeIncidentStatus(status: ImpactStatusName): boolean {
-	return (ACK_INCIDENT_ELIGIBLE_STATUSES as readonly string[]).includes(status);
 }
 
 /** Whether a device acknowledgement may confirm this status. */

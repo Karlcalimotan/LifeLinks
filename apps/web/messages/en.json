@@ -372,7 +372,7 @@
 		"ackFailedBody": "The tracker reported that the acknowledgement failed. Check the tracker.",
 		"ackAcknowledgedTitle": "Acknowledged by bureau",
 		"ackAcknowledgedBody": "The tracker confirmed the alarm stopped.",
-		"ackAcknowledgedLocalBody": "Recorded by the bureau. There was no tracker alarm to confirm.",
+		"ackAcknowledgedLocalBody": "Recorded by the bureau, but the tracker did not confirm it. The alarm may still be sounding.",
 		"ackRequiredTitle": "Acknowledge before resolving",
 		"ackRequiredBody": "This incident has a latched tracker alarm. Acknowledge it first; the tracker confirms when the alarm stops.",
 		"ackWaitingForBureauTitle": "Waiting for the bureau to acknowledge",
