@@ -42,7 +42,7 @@ const input = { orgId: "org-1", incidentId: "inc-1", vehicleId: "veh-1" };
 function subscription(overrides: Record<string, unknown> = {}) {
 	return {
 		id: "sub-1",
-		endpoint: "https://push.example.test/send/1",
+		endpoint: "https://fcm.googleapis.com/fcm/send/1",
 		p256dh: "B".repeat(87),
 		auth: "a".repeat(22),
 		locale: "en",
@@ -79,8 +79,16 @@ describe("notifyIncidentPush", () => {
 		mocks.readVapidConfig.mockReturnValue(config);
 		mocks.sendNotification.mockResolvedValue({ statusCode: 201 });
 		mocks.vehicleFindFirst.mockResolvedValue({ plateNo: "ABC 1234", ownerId: "owner-1" });
-		mocks.membershipFindMany.mockResolvedValue([{ userId: "owner-1" }, { userId: "admin-1" }]);
-		mocks.subscriptionFindMany.mockResolvedValue([subscription()]);
+		mocks.membershipFindMany.mockResolvedValue([{ userId: "admin-1" }]);
+		mocks.subscriptionFindMany
+			.mockResolvedValueOnce([subscription({ id: "sub-owner" })])
+			.mockResolvedValueOnce([
+				subscription({
+					id: "sub-admin",
+					endpoint: "https://fcm.googleapis.com/fcm/send/2",
+					locale: "tl",
+				}),
+			]);
 		mocks.subscriptionDeleteMany.mockResolvedValue({ count: 1 });
 		quietConsole();
 	});
@@ -98,12 +106,7 @@ describe("notifyIncidentPush", () => {
 		expect(mocks.sendNotification).not.toHaveBeenCalled();
 	});
 
-	it("delivers to the operator subscriptions of the organisation", async () => {
-		mocks.subscriptionFindMany.mockResolvedValue([
-			subscription({ id: "sub-en" }),
-			subscription({ id: "sub-tl", locale: "tl" }),
-		]);
-
+	it("delivers to the owner and the operator subscriptions", async () => {
 		const summary = await notifyIncidentPush(input);
 
 		expect(summary).toEqual({ configured: true, targeted: 2, sent: 2, removed: 0, failed: 0 });
@@ -112,7 +115,7 @@ describe("notifyIncidentPush", () => {
 		const [firstSubscription, firstPayload, firstOptions] =
 			mocks.sendNotification.mock.calls[0] ?? [];
 		expect(firstSubscription).toEqual({
-			endpoint: "https://push.example.test/send/1",
+			endpoint: "https://fcm.googleapis.com/fcm/send/1",
 			keys: { p256dh: "B".repeat(87), auth: "a".repeat(22) },
 		});
 		expect(JSON.parse(firstPayload as string)).toEqual({
@@ -132,23 +135,53 @@ describe("notifyIncidentPush", () => {
 		expect(JSON.parse(secondPayload as string).url).toBe("/tl/incidents/inc-1?action=cancel");
 	});
 
-	it("scopes recipients to incident managers and the vehicle owner", async () => {
+	it("reserves the owner's slot and scopes the operator query", async () => {
 		await notifyIncidentPush(input);
 
+		expect(mocks.subscriptionFindMany.mock.calls[0]?.[0]).toMatchObject({
+			where: { orgId: "org-1", userId: "owner-1" },
+			orderBy: { createdAt: "desc" },
+			take: 1,
+		});
 		expect(mocks.membershipFindMany).toHaveBeenCalledWith({
 			where: {
 				orgId: "org-1",
-				OR: [{ role: { in: ["ADMIN", "RESPONDER"] } }, { userId: "owner-1" }],
+				role: { in: ["ADMIN", "RESPONDER"] },
+				userId: { not: "owner-1" },
 			},
 			select: { userId: true },
-			take: PUSH_FANOUT_LIMIT,
+			take: PUSH_FANOUT_LIMIT - 1,
 		});
-		expect(mocks.subscriptionFindMany).toHaveBeenCalledWith({
-			where: { orgId: "org-1", userId: { in: ["owner-1", "admin-1"] } },
-			select: { id: true, endpoint: true, p256dh: true, auth: true, locale: true },
+		expect(mocks.subscriptionFindMany.mock.calls[1]?.[0]).toMatchObject({
+			where: { orgId: "org-1", userId: { in: ["admin-1"] } },
 			orderBy: { createdAt: "desc" },
-			take: PUSH_FANOUT_LIMIT,
+			take: PUSH_FANOUT_LIMIT - 1,
 		});
+	});
+
+	it("keeps the owner inside the cap when the organisation is large", async () => {
+		const operators = Array.from({ length: PUSH_FANOUT_LIMIT - 1 }, (_, index) =>
+			subscription({
+				id: `sub-admin-${index}`,
+				endpoint: `https://fcm.googleapis.com/fcm/send/${index + 10}`,
+			}),
+		);
+		mocks.subscriptionFindMany.mockReset();
+		mocks.subscriptionFindMany
+			.mockResolvedValueOnce([subscription({ id: "sub-owner" })])
+			.mockResolvedValueOnce(operators);
+		mocks.membershipFindMany.mockResolvedValue(
+			operators.map((row, index) => ({ userId: `admin-${index}` })),
+		);
+
+		const summary = await notifyIncidentPush(input);
+
+		expect(summary.targeted).toBe(PUSH_FANOUT_LIMIT);
+		expect(mocks.sendNotification).toHaveBeenCalledTimes(PUSH_FANOUT_LIMIT);
+		expect(mocks.sendNotification.mock.calls[0]?.[0]).toMatchObject({
+			endpoint: "https://fcm.googleapis.com/fcm/send/1",
+		});
+		expect(mocks.membershipFindMany.mock.calls[0]?.[0].take).toBe(PUSH_FANOUT_LIMIT - 1);
 	});
 
 	it("sends nothing when the vehicle is not in the organisation", async () => {
@@ -160,20 +193,26 @@ describe("notifyIncidentPush", () => {
 	});
 
 	it("sends nothing when nobody subscribes", async () => {
+		mocks.subscriptionFindMany.mockReset();
+		mocks.subscriptionFindMany.mockResolvedValueOnce([]);
 		mocks.membershipFindMany.mockResolvedValue([]);
+
 		const summary = await notifyIncidentPush(input);
 
 		expect(summary.targeted).toBe(0);
-		expect(mocks.subscriptionFindMany).not.toHaveBeenCalled();
+		expect(mocks.subscriptionFindMany).toHaveBeenCalledTimes(1);
 	});
 
 	it.each([404, 410])(
 		"deletes a subscription the push service reports as %i",
 		async (statusCode) => {
+			mocks.membershipFindMany.mockResolvedValue([]);
+			mocks.subscriptionFindMany.mockReset();
+			mocks.subscriptionFindMany.mockResolvedValueOnce([subscription()]);
 			mocks.sendNotification.mockRejectedValue(
 				Object.assign(new Error("gone"), {
 					statusCode,
-					endpoint: "https://push.example.test/send/1",
+					endpoint: "https://fcm.googleapis.com/fcm/send/1",
 				}),
 			);
 
@@ -186,11 +225,30 @@ describe("notifyIncidentPush", () => {
 		},
 	);
 
+	it("refuses a stored endpoint that is no longer an allowed host", async () => {
+		mocks.membershipFindMany.mockResolvedValue([]);
+		mocks.subscriptionFindMany.mockReset();
+		mocks.subscriptionFindMany.mockResolvedValueOnce([
+			subscription({ id: "sub-evil", endpoint: "https://127.0.0.1/send/1" }),
+		]);
+
+		const summary = await notifyIncidentPush(input);
+
+		expect(summary).toEqual({ configured: true, targeted: 1, sent: 0, removed: 0, failed: 1 });
+		expect(mocks.sendNotification).not.toHaveBeenCalled();
+		expect(mocks.subscriptionDeleteMany).not.toHaveBeenCalled();
+		expect(loggedText()).toContain("not allowed");
+		expect(loggedText()).not.toContain("127.0.0.1");
+	});
+
 	it("keeps a subscription after a transient failure and logs no endpoint", async () => {
+		mocks.membershipFindMany.mockResolvedValue([]);
+		mocks.subscriptionFindMany.mockReset();
+		mocks.subscriptionFindMany.mockResolvedValueOnce([subscription()]);
 		mocks.sendNotification.mockRejectedValue(
-			Object.assign(new Error("upstream said no for https://push.example.test/send/1"), {
+			Object.assign(new Error("upstream said no for https://fcm.googleapis.com/fcm/send/1"), {
 				statusCode: 500,
-				endpoint: "https://push.example.test/send/1",
+				endpoint: "https://fcm.googleapis.com/fcm/send/1",
 			}),
 		);
 
@@ -198,10 +256,8 @@ describe("notifyIncidentPush", () => {
 
 		expect(summary).toEqual({ configured: true, targeted: 1, sent: 0, removed: 0, failed: 1 });
 		expect(mocks.subscriptionDeleteMany).not.toHaveBeenCalled();
-
-		const logged = loggedText();
-		expect(logged).not.toContain("push.example.test");
-		expect(logged).toContain("status=500");
+		expect(loggedText()).not.toContain("fcm.googleapis.com");
+		expect(loggedText()).toContain("status=500");
 	});
 
 	it("resolves when the lookup fails, so the incident response is unaffected", async () => {
@@ -215,6 +271,9 @@ describe("notifyIncidentPush", () => {
 	});
 
 	it("resolves when the expired-subscription cleanup fails", async () => {
+		mocks.membershipFindMany.mockResolvedValue([]);
+		mocks.subscriptionFindMany.mockReset();
+		mocks.subscriptionFindMany.mockResolvedValueOnce([subscription()]);
 		mocks.sendNotification.mockRejectedValue(Object.assign(new Error("gone"), { statusCode: 410 }));
 		mocks.subscriptionDeleteMany.mockRejectedValue(new Error("write failed"));
 

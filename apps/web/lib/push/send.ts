@@ -4,19 +4,22 @@ import prisma from "@/lib/prisma";
 import { sendNotification } from "web-push";
 import { type VapidConfig, readVapidConfig } from "./config";
 import { buildIncidentPushPayload } from "./payload";
+import { isAllowedPushEndpoint } from "./schema";
 
 /**
  * Web Push sender for new incidents.
  *
- * The device incident route calls this after its transaction has committed.
- * Nothing here may reject: a push failure is a delivery problem, never an
- * incident problem. Delivery is bounded (a small number of subscriptions, one
- * parallel batch, a short socket timeout) so the device response is not held
- * open by a slow push service.
+ * The device incident route schedules this after its transaction has committed,
+ * and only for a confirmed incident. Nothing here may reject: a push failure is
+ * a delivery problem, never an incident problem. Delivery is bounded (a small
+ * number of subscriptions, one parallel batch, a short socket timeout).
  *
  * Recipients respect the console's ownership rules: incident managers
- * (ADMIN/RESPONDER) and the vehicle owner. A USER who owns another vehicle must
- * not receive a notification for this one.
+ * (ADMIN/RESPONDER) and the vehicle owner. The owner keeps a reserved slot so a
+ * busy organisation cannot push them out of the capped fan-out.
+ *
+ * A stored endpoint is revalidated before every send, so a row created before
+ * the allowlist existed cannot be used to reach an arbitrary host.
  *
  * Logs never contain an endpoint, a p256dh/auth key, a token or a payload.
  */
@@ -87,26 +90,39 @@ async function recipientSubscriptions(
 	orgId: string,
 	ownerId: string | null,
 ): Promise<SubscriptionRow[]> {
-	const recipientWhere = ownerId
-		? {
-				orgId,
-				OR: [{ role: { in: ["ADMIN" as const, "RESPONDER" as const] } }, { userId: ownerId }],
-			}
-		: { orgId, role: { in: ["ADMIN" as const, "RESPONDER" as const] } };
+	// Reserve the owner's slot first. The cap is for resource safety, not a
+	// reason to drop the person whose vehicle is in the incident.
+	const ownerSubscriptions = ownerId
+		? await prisma.pushSubscription.findMany({
+				where: { orgId, userId: ownerId },
+				select: { id: true, endpoint: true, p256dh: true, auth: true, locale: true },
+				orderBy: { createdAt: "desc" },
+				take: 1,
+			})
+		: [];
+
+	const remaining = PUSH_FANOUT_LIMIT - ownerSubscriptions.length;
+	if (remaining <= 0) return ownerSubscriptions;
 
 	const members = await prisma.membership.findMany({
-		where: recipientWhere,
+		where: {
+			orgId,
+			role: { in: ["ADMIN" as const, "RESPONDER" as const] },
+			...(ownerId ? { userId: { not: ownerId } } : {}),
+		},
 		select: { userId: true },
-		take: PUSH_FANOUT_LIMIT,
+		take: remaining,
 	});
-	if (members.length === 0) return [];
+	if (members.length === 0) return ownerSubscriptions;
 
-	return prisma.pushSubscription.findMany({
+	const operatorSubscriptions = await prisma.pushSubscription.findMany({
 		where: { orgId, userId: { in: members.map((member) => member.userId) } },
 		select: { id: true, endpoint: true, p256dh: true, auth: true, locale: true },
 		orderBy: { createdAt: "desc" },
-		take: PUSH_FANOUT_LIMIT,
+		take: remaining,
 	});
+
+	return [...ownerSubscriptions, ...operatorSubscriptions];
 }
 
 async function deliver(
@@ -117,6 +133,9 @@ async function deliver(
 ): Promise<{ sent: number; failed: number; expired: string[] }> {
 	const results = await Promise.allSettled(
 		subscriptions.map(async (subscription) => {
+			if (!isAllowedPushEndpoint(subscription.endpoint)) {
+				return { id: subscription.id, outcome: "blocked" as const };
+			}
 			const payload = buildIncidentPushPayload({
 				incidentId: input.incidentId,
 				plate: plateNo,
@@ -139,7 +158,7 @@ async function deliver(
 					},
 				},
 			);
-			return subscription.id;
+			return { id: subscription.id, outcome: "sent" as const };
 		}),
 	);
 
@@ -147,12 +166,17 @@ async function deliver(
 	let failed = 0;
 	const expired: string[] = [];
 	results.forEach((result, index) => {
-		const subscription = subscriptions[index];
-		if (!subscription) return;
 		if (result.status === "fulfilled") {
-			sent += 1;
+			if (result.value.outcome === "sent") {
+				sent += 1;
+			} else {
+				failed += 1;
+				console.warn("[push] delivery blocked: endpoint host is not allowed.");
+			}
 			return;
 		}
+		const subscription = subscriptions[index];
+		if (!subscription) return;
 		const statusCode = readStatusCode(result.reason);
 		if (isExpired(statusCode)) {
 			expired.push(subscription.id);

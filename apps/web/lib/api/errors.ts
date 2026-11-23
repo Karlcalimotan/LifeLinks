@@ -6,6 +6,7 @@ export type ApiErrorCode =
 	| "CONFLICT"
 	| "RATE_LIMITED"
 	| "TIMEOUT"
+	| "UNAVAILABLE"
 	| "INTERNAL";
 
 export class ApiError extends Error {
@@ -48,6 +49,10 @@ export function rateLimited(message = "Too many requests") {
 
 export function gatewayTimeout(message = "Gateway timeout") {
 	return new ApiError(504, "TIMEOUT", message);
+}
+
+export function serviceUnavailable(message = "Service unavailable") {
+	return new ApiError(503, "UNAVAILABLE", message);
 }
 
 export function internal(message = "Something went wrong") {

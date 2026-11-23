@@ -87,6 +87,12 @@ export function PushToggle() {
 
 			const subscription = await subscribeToPush(navigator.serviceWorker, VAPID_PUBLIC_KEY);
 			const response = await changeSubscription("POST", { ...subscription, locale });
+			if (response.status === 503) {
+				// The server knows whether the private key is present; the browser
+				// only ever sees the public one.
+				setStatus("unconfigured");
+				return;
+			}
 			if (!response.ok) throw new Error("Subscription was not saved.");
 			setStatus("subscribed");
 		} catch {

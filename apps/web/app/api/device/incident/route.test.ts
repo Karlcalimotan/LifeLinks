@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
 	tripFindFirst: vi.fn(),
 	transaction: vi.fn(),
 	impactCreate: vi.fn(),
+	impactUpdate: vi.fn(),
+	alertCount: vi.fn(),
 	alertCreateMany: vi.fn(),
 	stateCreate: vi.fn(),
 	notifyIncidentPush: vi.fn(),
@@ -71,6 +73,8 @@ describe("POST /api/device/incident", () => {
 		mocks.tripFindFirst.mockReset();
 		mocks.transaction.mockReset();
 		mocks.impactCreate.mockReset();
+		mocks.impactUpdate.mockReset();
+		mocks.alertCount.mockReset();
 		mocks.alertCreateMany.mockReset();
 		mocks.stateCreate.mockReset();
 		mocks.notifyIncidentPush.mockReset();
@@ -98,12 +102,14 @@ describe("POST /api/device/incident", () => {
 		mocks.findUnique.mockResolvedValue(null);
 		mocks.tripFindFirst.mockResolvedValue(null);
 		mocks.impactCreate.mockResolvedValue({ id: "inc-1", status: "CONFIRMED" });
+		mocks.impactUpdate.mockResolvedValue({ count: 1 });
+		mocks.alertCount.mockResolvedValue(0);
 		mocks.alertCreateMany.mockResolvedValue({ count: 2 });
 		mocks.stateCreate.mockResolvedValue({});
 		mocks.transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
 			fn({
-				impactEvent: { create: mocks.impactCreate },
-				alertDelivery: { createMany: mocks.alertCreateMany },
+				impactEvent: { create: mocks.impactCreate, updateMany: mocks.impactUpdate },
+				alertDelivery: { createMany: mocks.alertCreateMany, count: mocks.alertCount },
 				deviceStateEvent: { create: mocks.stateCreate },
 			}),
 		);
@@ -168,6 +174,65 @@ describe("POST /api/device/incident", () => {
 
 		expect(response.status).toBe(200);
 		expect(body.data.status).toBe("CANCELLED");
+		expect(afterTasks).toHaveLength(0);
+		expect(mocks.notifyIncidentPush).not.toHaveBeenCalled();
+	});
+
+	it("stays quiet for an initial suspected report", async () => {
+		mocks.impactCreate.mockResolvedValue({ id: "inc-3", status: "SUSPECTED" });
+		const response = await POST(request({ status: "SUSPECTED" }));
+		const body = await response.json();
+
+		expect(response.status).toBe(200);
+		expect(body.data.status).toBe("SUSPECTED");
+		expect(afterTasks).toHaveLength(0);
+		expect(mocks.notifyIncidentPush).not.toHaveBeenCalled();
+	});
+
+	it("notifies once when a suspected report is later confirmed", async () => {
+		mocks.findUnique.mockResolvedValue({
+			id: "inc-1",
+			status: "SUSPECTED",
+			lat: null,
+			lng: null,
+			gpsAgeS: null,
+			evidence: {},
+		});
+
+		const response = await POST(request());
+		const body = await response.json();
+
+		expect(response.status).toBe(200);
+		expect(body.data).toMatchObject({ incident_id: "inc-1", status: "CONFIRMED", duplicate: true });
+		expect(mocks.impactUpdate).toHaveBeenCalledOnce();
+		expect(afterTasks).toHaveLength(1);
+
+		await flushAfter();
+
+		expect(mocks.notifyIncidentPush).toHaveBeenCalledOnce();
+		expect(mocks.notifyIncidentPush).toHaveBeenCalledWith({
+			orgId: "org-1",
+			incidentId: "inc-1",
+			vehicleId: "veh-1",
+		});
+	});
+
+	it("does not notify when another request already confirmed the incident", async () => {
+		mocks.findUnique.mockResolvedValue({
+			id: "inc-1",
+			status: "SUSPECTED",
+			lat: null,
+			lng: null,
+			gpsAgeS: null,
+			evidence: {},
+		});
+		mocks.impactUpdate.mockResolvedValue({ count: 0 });
+
+		const response = await POST(request());
+		const body = await response.json();
+
+		expect(response.status).toBe(200);
+		expect(body.data).toMatchObject({ status: "CONFIRMED", duplicate: true, alerts_queued: 0 });
 		expect(afterTasks).toHaveLength(0);
 		expect(mocks.notifyIncidentPush).not.toHaveBeenCalled();
 	});

@@ -16,6 +16,25 @@ import { after } from "next/server";
 export const dynamic = "force-dynamic";
 
 /**
+ * Push is a confirmed-incident channel. The route schedules this after the
+ * transaction has committed and after the response is on its way, so a slow
+ * push service cannot delay the device and a failure cannot fail the write.
+ */
+function scheduleIncidentPush(input: {
+	orgId: string;
+	incidentId: string;
+	vehicleId: string;
+}): void {
+	after(async () => {
+		try {
+			await notifyIncidentPush(input);
+		} catch {
+			console.warn("[push] notification dispatch failed after commit.");
+		}
+	});
+}
+
+/**
  * Crash report endpoint. The device is the source of truth for detection; the
  * server records the incident, queues the configured alert targets and keeps
  * the evidence payload for the dashboard.
@@ -70,9 +89,12 @@ export const POST = withApi(
 				const settingsForUpdate = await getOrgSettings(device.orgId);
 				const targets = alertTargetsFromSettings(settingsForUpdate);
 				let queued = 0;
+				let transitioned = false;
 				await prisma.$transaction(async (tx) => {
-					await tx.impactEvent.update({
-						where: { id: existing.id },
+					// Only the request that actually flips SUSPECTED to CONFIRMED
+					// queues alerts, records the event and sends the one push.
+					const updated = await tx.impactEvent.updateMany({
+						where: { id: existing.id, status: "SUSPECTED" },
 						data: {
 							status: "CONFIRMED",
 							lat: hasFix ? input.lat : existing.lat,
@@ -81,6 +103,8 @@ export const POST = withApi(
 							evidence: (input.evidence ?? existing.evidence ?? {}) as Prisma.InputJsonValue,
 						},
 					});
+					if (updated.count === 0) return;
+					transitioned = true;
 					const existingAlerts = await tx.alertDelivery.count({
 						where: { impactEventId: existing.id },
 					});
@@ -109,6 +133,15 @@ export const POST = withApi(
 						},
 					});
 				});
+				if (transitioned) {
+					// A suspected report sent nothing; this transition is the one
+					// confirmed notification for the incident.
+					scheduleIncidentPush({
+						orgId: device.orgId,
+						incidentId: existing.id,
+						vehicleId,
+					});
+				}
 				return ok({
 					received: true,
 					incident_id: existing.id,
@@ -200,21 +233,13 @@ export const POST = withApi(
 				return { created, deliveries };
 			});
 
-			// The incident is committed. Delivery runs after the response is sent,
-			// so a slow push service cannot delay the device, and its failure cannot
-			// turn a recorded crash into a device error or a retry loop. The local
-			// catch is the second line of defence if the sender regresses.
-			if (status !== "CANCELLED") {
-				after(async () => {
-					try {
-						await notifyIncidentPush({
-							orgId: device.orgId,
-							incidentId: incident.created.id,
-							vehicleId,
-						});
-					} catch {
-						console.warn("[push] notification dispatch failed after commit.");
-					}
+			// Confirmed incidents only. The initial SUSPECTED report stays quiet;
+			// if the tracker later confirms, that transition schedules one push.
+			if (status === "CONFIRMED") {
+				scheduleIncidentPush({
+					orgId: device.orgId,
+					incidentId: incident.created.id,
+					vehicleId,
 				});
 			}
 

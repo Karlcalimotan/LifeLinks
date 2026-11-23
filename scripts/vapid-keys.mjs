@@ -52,3 +52,8 @@ console.log(`VAPID_PRIVATE_KEY="${privateKeyB64}"`);
 console.log('VAPID_SUBJECT="mailto:ops@example.com"');
 console.log("");
 console.log("# Rotating these keys invalidates every existing subscription.");
+console.log("");
+console.log("# SECURITY: VAPID_PRIVATE_KEY is a secret. This command prints it to");
+console.log("# stdout; shell history, terminal scrollback, CI logs and screen shares");
+console.log("# can retain it. Write it straight to an uncommitted file you control and");
+console.log("# rotate the key if the output was exposed.");

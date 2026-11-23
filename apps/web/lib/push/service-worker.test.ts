@@ -33,8 +33,8 @@ describe("service worker", () => {
 		expect(source).not.toContain("indexedDB");
 	});
 
-	it("refuses to open a cross-origin or scheme-relative URL", () => {
-		expect(source).toContain('value.startsWith("/")');
-		expect(source).toContain('value.startsWith("//")');
+	it("delegates URL safety to the tested guard", () => {
+		expect(source).toContain('importScripts("/sw-url.js")');
+		expect(source).toContain("safeNotificationUrl");
 	});
 });

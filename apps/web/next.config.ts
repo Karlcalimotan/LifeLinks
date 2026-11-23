@@ -23,6 +23,10 @@ const nextConfig: NextConfig = {
 		root: path.resolve(import.meta.dirname ?? process.cwd(), "../.."),
 	},
 	async headers() {
+		const workerHeaders = [
+			{ key: "Cache-Control", value: "no-cache" },
+			{ key: "Service-Worker-Allowed", value: "/" },
+		];
 		return [
 			{ source: "/(.*)", headers: securityHeaders },
 			{
@@ -30,10 +34,12 @@ const nextConfig: NextConfig = {
 				// Browsers revalidate the script themselves; no-cache keeps proxies
 				// from pinning an old worker after a deploy.
 				source: "/sw.js",
-				headers: [
-					{ key: "Cache-Control", value: "no-cache" },
-					{ key: "Service-Worker-Allowed", value: "/" },
-				],
+				headers: workerHeaders,
+			},
+			{
+				// Imported by the worker; the same staleness rules apply.
+				source: "/sw-url.js",
+				headers: workerHeaders,
 			},
 		];
 	},

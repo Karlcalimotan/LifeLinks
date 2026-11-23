@@ -57,11 +57,13 @@ export async function logoutAction(formData: FormData) {
 	const locale = localeFrom(formData);
 
 	// Revoke this browser's push subscription before the session disappears.
-	// Failure is logged by the helper and never blocks the sign out.
-	const session = await getSession();
+	// The session read, the request headers and the delete all sit inside the
+	// try: a misconfigured secret or a failed revocation must never keep the
+	// operator signed in.
 	const rawEndpoint = String(formData.get("pushEndpoint") ?? "").trim();
-	if (session) {
-		try {
+	try {
+		const session = await getSession();
+		if (session) {
 			const headerStore = await headers();
 			await revokePushOnLogout({
 				userId: session.sub,
@@ -69,10 +71,10 @@ export async function logoutAction(formData: FormData) {
 				endpoint: rawEndpoint.length > 0 && rawEndpoint.length <= 2048 ? rawEndpoint : null,
 				userAgent: clampUserAgent(headerStore.get("user-agent")),
 			});
-		} catch {
-			// Signing out is the user's intent; a stale row is not a reason to keep
-			// the session open.
 		}
+	} catch {
+		// Signing out is the user's intent; a stale row is not a reason to keep
+		// the session open.
 	}
 
 	await destroySession();

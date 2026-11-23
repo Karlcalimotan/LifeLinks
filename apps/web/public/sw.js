@@ -11,26 +11,17 @@
  * a plain tap open the same deep link, which puts the incident page's cancel
  * control in focus. iOS ignores notification actions, so the deep link is the
  * whole path there.
+ *
+ * `sw-url.js` holds the same-origin URL guard and is tested directly.
  */
+importScripts("/sw-url.js");
 
 const ACTION_LABELS = {
 	en: "Cancel alert",
 	tl: "Ihinto ang alert",
 };
 
-function safeRelativeUrl(value) {
-	if (typeof value !== "string") return "/";
-	if (!value.startsWith("/") || value.startsWith("//")) return "/";
-	try {
-		// Parse against our own origin as well: a leading `/\` is treated as `//`
-		// by the URL parser and would leave the origin.
-		const parsed = new URL(value, self.location.origin);
-		if (parsed.origin !== self.location.origin) return "/";
-		return `${parsed.pathname}${parsed.search}${parsed.hash}`;
-	} catch {
-		return "/";
-	}
-}
+const { safeNotificationUrl } = self.LifeLinkPushUrl;
 
 function localeFor(url) {
 	const match = /^\/([a-z]{2})\//.exec(url);
@@ -48,7 +39,7 @@ self.addEventListener("push", (event) => {
 	}
 	if (!payload || typeof payload !== "object") return;
 
-	const url = safeRelativeUrl(payload.url);
+	const url = safeNotificationUrl(payload.url, self.location.origin);
 	const plate = typeof payload.plate === "string" ? payload.plate.slice(0, 40) : "";
 	const body = typeof payload.body === "string" ? payload.body : "";
 	const incidentId = typeof payload.incidentId === "string" ? payload.incidentId : "";
@@ -69,7 +60,7 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
 	event.notification.close();
-	const url = safeRelativeUrl(event.notification.data && event.notification.data.url);
+	const url = safeNotificationUrl(event.notification.data?.url, self.location.origin);
 	event.waitUntil(openIncident(url));
 });
 
