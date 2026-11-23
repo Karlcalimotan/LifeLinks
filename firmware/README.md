@@ -106,11 +106,11 @@ NVS namespace `lifelink`:
 | `device_token` | dashboard device token |
 | `provisioned` | marker written only after a verified portal save |
 
-### Boot reset (GPIO 33)
+### Boot reset (GPIO 13 / GPIO 14)
 
-The existing cancel button is also the commissioning reset. It accepts a new
-hold only during the first 60 seconds after boot (a hold that started inside the
-window may finish after it):
+Two dedicated boot-time buttons replace the old cancel-button gesture. They
+accept a new hold only during the first 60 seconds after boot (a hold that
+started inside the window may finish after it):
 
 - power on with the button **released**; the listener arms 5 s after boot and
   requires a 50 ms debounce;

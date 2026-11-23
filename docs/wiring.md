@@ -44,6 +44,8 @@ countdown.
 | MPU-6050 INT | 23 | optional |
 | Battery sense | 34 | optional; input-only, external divider required |
 | Ignition sense | 35 | optional; input-only, external divider required |
+| WiFi reset button | 13 | INPUT_PULLUP, active LOW, boot-only 5 s |
+| Factory reset button | 14 | INPUT_PULLUP, active LOW, boot-only 10 s |
 
 Power: ESP32 VIN = 5 V rail. MPU-6050, SW-420 and NEO-6M VCC = 3V3. A7670E
 VIN = 5 V rail. All grounds common.
