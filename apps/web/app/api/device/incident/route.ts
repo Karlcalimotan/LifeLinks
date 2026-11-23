@@ -9,6 +9,7 @@ import { isValidCoordinate } from "@/lib/geo";
 import prisma from "@/lib/prisma";
 import { notifyIncidentPush } from "@/lib/push/send";
 import { rateLimit } from "@/lib/rate-limit";
+import { getDeviceConfig } from "@/lib/settings/device-config";
 import { getOrgSettings } from "@/lib/settings/org";
 import { Prisma } from "@prisma/client";
 import { after } from "next/server";
@@ -160,7 +161,10 @@ export const POST = withApi(
 			});
 		}
 
-		const settings = await getOrgSettings(device.orgId);
+		// The cancel deadline is the server-side authority for a driver cancel.
+		// It must use the same per-device effective window the tracker runs, or
+		// an override of 60 s would be rejected against the org default of 5 s.
+		const resolved = await getDeviceConfig(device.orgId, device.id);
 		const activeTrip = await prisma.trip.findFirst({
 			where: { deviceId: device.id, status: "ACTIVE" },
 			orderBy: { startedAt: "desc" },
@@ -186,7 +190,7 @@ export const POST = withApi(
 						lng: hasFix ? input.lng : device.lastLng,
 						gpsAgeS: input.gps_age_s,
 						status,
-						cancelDeadline: new Date(detectedAt.getTime() + settings.cancelWindowS * 1000),
+						cancelDeadline: new Date(detectedAt.getTime() + resolved.values.cancelWindowS * 1000),
 						cancelledAt: status === "CANCELLED" ? new Date() : null,
 						resolution: status === "CANCELLED" ? "Cancelled by driver" : null,
 						evidence: (input.evidence ?? {}) as Prisma.InputJsonValue,
@@ -194,7 +198,7 @@ export const POST = withApi(
 				});
 
 				if (status !== "CANCELLED") {
-					const targets = alertTargetsFromSettings(settings);
+					const targets = alertTargetsFromSettings(resolved.settings);
 					deliveries = [
 						...targets.phones.map((target) => ({
 							channel: "SMS" as const,

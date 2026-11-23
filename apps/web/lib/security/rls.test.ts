@@ -19,6 +19,8 @@ describeRls("RLS organization isolation", () => {
 	let userB = "";
 	let pushA = "";
 	let pushB = "";
+	let overrideA = "";
+	let overrideB = "";
 
 	function db() {
 		if (!prisma) throw new Error("RLS test database is not initialized");
@@ -157,6 +159,15 @@ describeRls("RLS organization isolation", () => {
 		});
 		pushA = pa.id;
 		pushB = pb.id;
+
+		const oa = await client.deviceConfigOverride.create({
+			data: { deviceId: deviceA, orgId: orgA, cancelWindowS: 60 },
+		});
+		const ob = await client.deviceConfigOverride.create({
+			data: { deviceId: deviceB, orgId: orgB, cancelWindowS: 45 },
+		});
+		overrideA = oa.id;
+		overrideB = ob.id;
 	});
 
 	afterAll(async () => {
@@ -164,13 +175,18 @@ describeRls("RLS organization isolation", () => {
 		if (!client) return;
 		const ids = [orgA, orgB].filter(Boolean);
 		if (ids.length > 0) {
-			// PushSubscription, Membership and the rest cascade from Organization.
+			// PushSubscription, DeviceConfigOverride, Membership and the rest
+			// cascade from Organization.
 			await client.organization.deleteMany({ where: { id: { in: ids } } });
 		}
 		const userIds = [userA, userB].filter(Boolean);
 		if (userIds.length > 0) {
 			await client.user.deleteMany({ where: { id: { in: userIds } } });
 		}
+		const leftoverOverrides = await client.deviceConfigOverride.count({
+			where: { id: { in: [overrideA, overrideB].filter(Boolean) } },
+		});
+		expect(leftoverOverrides).toBe(0);
 		await client.$disconnect();
 	});
 
@@ -281,6 +297,38 @@ describeRls("RLS organization isolation", () => {
 		).rejects.toThrow();
 	});
 
+	it("sees only the current organization's device config overrides", async () => {
+		const a = await asTenant(
+			orgA,
+			(tx) => tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "DeviceConfigOverride" ORDER BY "id"`,
+		);
+		expect(a.map((row) => row.id)).toEqual([overrideA]);
+
+		const b = await asTenant(
+			orgB,
+			(tx) => tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "DeviceConfigOverride" ORDER BY "id"`,
+		);
+		expect(b.map((row) => row.id)).toEqual([overrideB]);
+	});
+
+	it("cannot update or delete another organization's device config override", async () => {
+		const updated = await asTenant(
+			orgA,
+			(tx) =>
+				tx.$executeRaw`UPDATE "DeviceConfigOverride" SET "cancelWindowS" = ${5} WHERE "id" = ${overrideB}`,
+		);
+		expect(updated).toBe(0);
+
+		const deleted = await asTenant(
+			orgA,
+			(tx) => tx.$executeRaw`DELETE FROM "DeviceConfigOverride" WHERE "id" = ${overrideB}`,
+		);
+		expect(deleted).toBe(0);
+
+		const still = await db().deviceConfigOverride.findUnique({ where: { id: overrideB } });
+		expect(still?.cancelWindowS).toBe(45);
+	});
+
 	it("fails closed when no organization is set", async () => {
 		const vehicles = await asTenant(
 			null,
@@ -299,6 +347,12 @@ describeRls("RLS organization isolation", () => {
 			(tx) => tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "PushSubscription"`,
 		);
 		expect(subscriptions).toHaveLength(0);
+
+		const overrides = await asTenant(
+			null,
+			(tx) => tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "DeviceConfigOverride"`,
+		);
+		expect(overrides).toHaveLength(0);
 	});
 
 	it("rejects an insert when no organization is set", async () => {

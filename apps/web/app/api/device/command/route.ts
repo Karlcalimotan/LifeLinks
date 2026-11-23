@@ -2,10 +2,9 @@ import { ok } from "@/lib/api/envelope";
 import { badRequest, forbidden, rateLimited } from "@/lib/api/errors";
 import { withApi } from "@/lib/api/instrumentation";
 import { isDeviceApproved, requireDevice } from "@/lib/device/auth";
-import { buildFirmwareConfig } from "@/lib/firmware/config";
 import prisma from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
-import { getOrgSettings, settingsToFirmwareValues } from "@/lib/settings/org";
+import { getDeviceConfig } from "@/lib/settings/device-config";
 
 export const dynamic = "force-dynamic";
 
@@ -53,19 +52,18 @@ export const GET = withApi(
 			take: 10,
 		});
 
-		const settings = await getOrgSettings(device.orgId);
-		const config = buildFirmwareConfig(settingsToFirmwareValues(settings));
+		const resolved = await getDeviceConfig(device.orgId, device.id);
 
 		return ok({
 			server_time: Math.floor(now.getTime() / 1000),
-			alert_phones: settings.alertPhones,
+			alert_phones: resolved.settings.alertPhones,
 			commands: commands.map((command) => ({
 				id: command.id,
 				kind: command.kind,
 				payload: command.payload,
 				created_at: Math.floor(command.createdAt.getTime() / 1000),
 			})),
-			config,
+			config: resolved.config,
 		});
 	},
 	{ route: "GET /api/device/command" },

@@ -454,7 +454,63 @@
 		"tokenCopied": "Token copied.",
 		"variant": "Variant",
 		"unknown": "Unknown",
-		"config": "Device configuration",
+		"configTitle": "Device configuration",
+		"configOverride": "Override",
+		"configInherited": "Organisation default",
+		"configFormTitle": "Per-tracker configuration",
+		"config": {
+			"intro": "Override any of the six server-driven fields for this tracker. A field marked with the organisation default uses the organisation value. Values outside the firmware envelope, or a fraction on a whole-number field, are rejected and never adjusted.",
+			"useDefault": "Use organisation default",
+			"useDefaultFor": "Use organisation default for {field}",
+			"orgDefault": "Organisation default: {value} {unit}",
+			"envelope": "Allowed range: {min} to {max} {unit}",
+			"save": "Save and push",
+			"saving": "Saving...",
+			"savedPending": "Saved. Waiting for the tracker to confirm.",
+			"savedConfirmed": "Saved. The tracker already reports this configuration.",
+			"unchanged": "No changes to push.",
+			"revisions": "Tracker reports rev {deviceRev}. This configuration is rev {configRev}.",
+			"field": {
+				"impactThresholdG": "Impact threshold",
+				"tiltThresholdDeg": "Tilt threshold",
+				"confirmWindowMs": "Confirm window",
+				"cancelWindowS": "Cancel window",
+				"heartbeatIntervalS": "Heartbeat interval",
+				"sosRetryS": "SOS retry"
+			},
+			"unit": {
+				"impactThresholdG": "g",
+				"tiltThresholdDeg": "deg",
+				"confirmWindowMs": "ms",
+				"cancelWindowS": "s",
+				"heartbeatIntervalS": "s",
+				"sosRetryS": "s"
+			},
+			"status": {
+				"none": {
+					"title": "No configuration pushed from this page",
+					"body": "The tracker receives the effective configuration on its next poll. Saving here records a push and shows when the tracker echoes revision {configRev}."
+				},
+				"pending": {
+					"title": "Pending device confirmation",
+					"body": "Saved on the server. The tracker still reports revision {deviceRev}; this configuration is revision {configRev}. It applies on the next poll while the tracker is idle.",
+					"bodyNoRev": "Saved on the server. The tracker has not reported a revision yet; this configuration is revision {configRev}. It applies on the next poll while the tracker is idle."
+				},
+				"confirmed": {
+					"title": "Confirmed by the tracker",
+					"body": "The tracker echoes revision {configRev}, so it has applied this configuration."
+				}
+			},
+			"errors": {
+				"required": "Enter a value or use the organisation default.",
+				"notANumber": "Enter a number.",
+				"fractional": "Use a whole number.",
+				"belowMin": "Must be at least {min}.",
+				"aboveMax": "Must be at most {max}.",
+				"forbidden": "Only admins can change tracker configuration.",
+				"notFound": "Tracker not found in this organisation."
+			}
+		},
 		"commands": "Commands",
 		"locate": "Locate now",
 		"testAlert": "Send test alert",

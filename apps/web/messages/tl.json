@@ -454,7 +454,63 @@
 		"tokenCopied": "Nakopya ang token.",
 		"variant": "Variant",
 		"unknown": "Hindi alam",
-		"config": "Device configuration",
+		"configTitle": "Konfigurasyon ng device",
+		"configOverride": "Override",
+		"configInherited": "Default ng organisasyon",
+		"configFormTitle": "Konfigurasyon ng bawat tracker",
+		"config": {
+			"intro": "I-override ang alinman sa anim na field na galing sa server para sa tracker na ito. Ang field na may default ng organisasyon ay gumagamit ng value ng organisasyon. Tinatanggihan ang mga value sa labas ng firmware envelope, o may fraction sa whole-number na field, at hindi ito awtomatikong inaayos.",
+			"useDefault": "Gamitin ang default ng organisasyon",
+			"useDefaultFor": "Gamitin ang default ng organisasyon para sa {field}",
+			"orgDefault": "Default ng organisasyon: {value} {unit}",
+			"envelope": "Pinapayagang range: {min} hanggang {max} {unit}",
+			"save": "I-save at ipadala",
+			"saving": "Nagse-save...",
+			"savedPending": "Nai-save. Hinihintay ang kumpirmasyon ng tracker.",
+			"savedConfirmed": "Nai-save. Ini-report na ng tracker ang konfigurasyong ito.",
+			"unchanged": "Walang pagbabagong ipapadala.",
+			"revisions": "Ini-report ng tracker ang rev {deviceRev}. Ang konfigurasyong ito ay rev {configRev}.",
+			"field": {
+				"impactThresholdG": "Threshold ng impact",
+				"tiltThresholdDeg": "Threshold ng tilt",
+				"confirmWindowMs": "Window ng kumpirmasyon",
+				"cancelWindowS": "Window ng pagkansela",
+				"heartbeatIntervalS": "Interval ng heartbeat",
+				"sosRetryS": "SOS retry"
+			},
+			"unit": {
+				"impactThresholdG": "g",
+				"tiltThresholdDeg": "deg",
+				"confirmWindowMs": "ms",
+				"cancelWindowS": "s",
+				"heartbeatIntervalS": "s",
+				"sosRetryS": "s"
+			},
+			"status": {
+				"none": {
+					"title": "Wala pang konfigurasyong ipinadala mula sa pahinang ito",
+					"body": "Natatanggap ng tracker ang epektibong konfigurasyon sa susunod nitong poll. Kapag nag-save ka rito, naitala ang pagpapadala at makikita kung kailan i-echo ng tracker ang rev {configRev}."
+				},
+				"pending": {
+					"title": "Naghihintay ng kumpirmasyon ng device",
+					"body": "Nai-save sa server. Ini-report pa rin ng tracker ang rev {deviceRev}; ang konfigurasyong ito ay rev {configRev}. Magagamit ito sa susunod na poll habang idle ang tracker.",
+					"bodyNoRev": "Nai-save sa server. Wala pang ini-report na rev ang tracker; ang konfigurasyong ito ay rev {configRev}. Magagamit ito sa susunod na poll habang idle ang tracker."
+				},
+				"confirmed": {
+					"title": "Kinumpirma ng tracker",
+					"body": "Ini-echo ng tracker ang rev {configRev}, kaya na-apply na nito ang konfigurasyong ito."
+				}
+			},
+			"errors": {
+				"required": "Maglagay ng value o gamitin ang default ng organisasyon.",
+				"notANumber": "Maglagay ng numero.",
+				"fractional": "Gumamit ng whole number.",
+				"belowMin": "Dapat hindi bababa sa {min}.",
+				"aboveMax": "Dapat hindi hihigit sa {max}.",
+				"forbidden": "Admin lang ang puwedeng magbago ng konfigurasyon ng tracker.",
+				"notFound": "Hindi mahanap ang tracker sa organisasyong ito."
+			}
+		},
 		"commands": "Commands",
 		"locate": "Locate now",
 		"testAlert": "Send test alert",

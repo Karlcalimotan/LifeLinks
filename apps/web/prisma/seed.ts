@@ -1,6 +1,11 @@
 import { createHash } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { hash } from "bcryptjs";
+import {
+	type FirmwareConfigValues,
+	buildFirmwareConfig,
+	configRevision,
+} from "../lib/firmware/config";
 import { assertSeedTarget } from "../lib/seed/guard";
 
 const prisma = new PrismaClient();
@@ -11,6 +16,21 @@ const DAY = 24 * HOUR;
 
 /** Every timestamp below is relative to the seed run so screenshots stay current. */
 const ago = (ms: number) => new Date(now.getTime() - ms);
+
+/**
+ * The demo organisation runs the default firmware configuration. The revision
+ * is computed with the same helper the app uses, so a seeded tracker can show
+ * the confirmed state without a fabricated number.
+ */
+const DEMO_ORG_CONFIG: FirmwareConfigValues = {
+	impactThresholdG: 2.5,
+	tiltThresholdDeg: 60,
+	confirmWindowMs: 200,
+	cancelWindowS: 15,
+	heartbeatIntervalS: 30,
+	sosRetryS: 60,
+};
+const DEMO_CONFIG_REV = configRevision(DEMO_ORG_CONFIG);
 
 function hashToken(token: string): string {
 	return createHash("sha256").update(token).digest("hex");
@@ -235,7 +255,10 @@ const TRACKERS: TrackerSeed[] = [
 		rssiDbm: -96,
 		satellites: 4,
 		ignition: false,
-		configRev: 2,
+		// The Hilux echoes the revision of the demo org config, so its detail
+		// page shows the confirmed state. The other trackers keep small
+		// historical revisions to show the not-yet-confirmed state.
+		configRev: DEMO_CONFIG_REV,
 		createdAt: ago(380 * DAY),
 	},
 	{
@@ -1267,7 +1290,9 @@ const COMMANDS: CommandSeed[] = [
 		createdAt: ago(3 * DAY),
 		expiresAt: ago(3 * DAY - 10 * MINUTE),
 		ackedAt: ago(3 * DAY - 1 * MINUTE),
-		payload: { rev: 2 },
+		// The same object the app builds, so the seeded ACK and the echoed
+		// configRev describe a real applied configuration.
+		payload: buildFirmwareConfig(DEMO_ORG_CONFIG),
 	},
 	{
 		key: "dmax-locate",
@@ -1451,12 +1476,7 @@ async function main() {
 		where: { orgId: org.id },
 		create: {
 			orgId: org.id,
-			impactThresholdG: 2.5,
-			tiltThresholdDeg: 60,
-			confirmWindowMs: 200,
-			cancelWindowS: 15,
-			heartbeatIntervalS: 30,
-			sosRetryS: 60,
+			...DEMO_ORG_CONFIG,
 			telemetryRetentionDays: 30,
 			incidentRetentionDays: 365,
 			alertPhones: [ALERT_PHONE_DISPATCH, ALERT_PHONE_SAFETY],
@@ -1464,6 +1484,7 @@ async function main() {
 			parkedImpactAlerts: false,
 		},
 		update: {
+			...DEMO_ORG_CONFIG,
 			alertPhones: [ALERT_PHONE_DISPATCH, ALERT_PHONE_SAFETY],
 			alertEmails: [ALERT_EMAIL_DISPATCH, ALERT_EMAIL_SAFETY],
 		},

@@ -3,11 +3,10 @@ import { badRequest, forbidden, notFound, rateLimited } from "@/lib/api/errors";
 import { withApi } from "@/lib/api/instrumentation";
 import { isDeviceApproved, requireDevice } from "@/lib/device/auth";
 import { heartbeatRequestSchema } from "@/lib/device/schema";
-import { buildFirmwareConfig } from "@/lib/firmware/config";
 import { isValidCoordinate } from "@/lib/geo";
 import prisma from "@/lib/prisma";
 import { rateLimit } from "@/lib/rate-limit";
-import { getOrgSettings, settingsToFirmwareValues } from "@/lib/settings/org";
+import { getDeviceConfig } from "@/lib/settings/device-config";
 
 export const dynamic = "force-dynamic";
 
@@ -95,15 +94,14 @@ export const POST = withApi(
 			}
 		});
 
-		const settings = await getOrgSettings(device.orgId);
-		const config = buildFirmwareConfig(settingsToFirmwareValues(settings));
+		const resolved = await getDeviceConfig(device.orgId, device.id);
 
 		return ok({
 			received: true,
 			duplicate,
 			server_time: Math.floor(now.getTime() / 1000),
-			config_rev: config.rev,
-			heartbeat_interval_s: settings.heartbeatIntervalS,
+			config_rev: resolved.config.rev,
+			heartbeat_interval_s: resolved.values.heartbeatIntervalS,
 		});
 	},
 	{ route: "POST /api/device/heartbeat" },
