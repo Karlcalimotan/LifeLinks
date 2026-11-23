@@ -1857,6 +1857,19 @@ void handleSerialProvisioning() {
 // Setup / loop
 // ---------------------------------------------------------------------------
 
+void updateStatusLed(uint32_t now) {
+	const fw::AlertState state = g_safety.state();
+	bool on = false;
+	if (state == fw::AlertState::Alerting) {
+		on = true;	// solid until acknowledged
+	} else if (state == fw::AlertState::Countdown) {
+		on = ((now % 300) < 150);
+	} else if (state == fw::AlertState::Idle) {
+		on = ((now % 2000) < 60);
+	}
+	digitalWrite(hw::kStatusLed, on ? HIGH : LOW);
+}
+
 void setup() {
 	Serial.begin(115200);
 	delay(250);
@@ -1870,6 +1883,8 @@ void setup() {
 	loadConfig();
 
 	pinMode(hw::kBuzzer, OUTPUT);
+	pinMode(hw::kStatusLed, OUTPUT);
+	digitalWrite(hw::kStatusLed, LOW);
 	digitalWrite(hw::kBuzzer, hw::kBuzzerActiveHigh ? LOW : HIGH);
 	pinMode(hw::kVibrationSensor, INPUT);
 	pinMode(hw::kCancelButton, INPUT_PULLUP);
@@ -1925,7 +1940,7 @@ void loop() {
 
 		float accelG = 0.0f;
 		float tiltDeg = 0.0f;
-		bool vibration = digitalRead(hw::kVibrationSensor) == LOW;
+		bool vibration = digitalRead(hw::kVibrationSensor) == HIGH;	 // active HIGH on this module
 
 		if (g_mpuOk) {
 			sensors_event_t acceleration;
@@ -2016,6 +2031,7 @@ void loop() {
 		// the alert state machine leaves Idle, so a long cancel press during a
 		// countdown can never reboot the tracker.
 		serviceBootReset(now, state != fw::AlertState::Idle);
+		updateStatusLed(now);
 	}
 
 	// WiFi is serviced after the impact/alert pass so the safety-critical sample

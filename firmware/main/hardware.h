@@ -23,6 +23,7 @@ constexpr int kI2cScl = PIN_MPU_SCL;
 constexpr int kMpuInterrupt = PIN_MPU_INT;
 
 constexpr int kVibrationSensor = PIN_SW420_DO;
+constexpr int kStatusLed = PIN_STATUS_LED;
 constexpr int kCancelButton = PIN_CANCEL_BTN;
 constexpr int kWifiResetButton = PIN_WIFI_RESET;
 constexpr int kFactoryResetButton = PIN_FACTORY_RESET;
