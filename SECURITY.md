@@ -72,8 +72,10 @@ set. Do not run the seed against a shared or production database.
   implemented in this deployment, so `platformMfaConfigured()` is always false
   and the allow-without-MFA flag is the only way to open the console today.
   **Real customers require MFA before the platform console is used with
-  production data.** The allow-without-MFA flag is for local development only;
-  the console shows a warning while it is active. Do not describe this as MFA.
+  production data.** The allow-without-MFA flag is for local development only
+  and is refused when `NODE_ENV=production`; a production build must use real
+  MFA. The console shows a warning while the development flag is active. Do not
+  describe this as MFA.
 - **Suspension is immediate.** `Organization.status` is `ACTIVE` or
   `SUSPENDED`. `getCurrentUser` re-reads the membership and its organization on
   every request, so a suspended organization resolves to null and an existing

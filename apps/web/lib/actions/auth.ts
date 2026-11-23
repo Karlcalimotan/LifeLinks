@@ -18,6 +18,11 @@ function localeFrom(formData: FormData): string {
 }
 
 export async function loginAction(formData: FormData) {
+	// A shared browser must not keep a platform session from a previous user.
+	// Clear it before any new session is established, including on a failed
+	// login attempt.
+	await destroyPlatformSession();
+
 	const locale = localeFrom(formData);
 	const parsed = loginSchema.safeParse({
 		email: String(formData.get("email") ?? ""),
@@ -127,8 +132,10 @@ export async function logoutAction(formData: FormData) {
 		// the session open.
 	}
 
-	// Tenant sign-out only. The platform console has its own session and
-	// sign-out, so a user who holds both does not lose the other by accident.
+	// Signing out of the tenant console also clears the platform session. A
+	// shared browser must not leave a privileged 7-day cookie behind for the
+	// next person. The platform console's own sign-out clears only its session.
+	await destroyPlatformSession();
 	await destroySession();
 	redirect(`/${locale}/login`);
 }

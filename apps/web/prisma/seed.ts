@@ -1470,7 +1470,7 @@ async function main() {
 
 	// A platform operator is a separate account with no tenant membership by
 	// default. The demo seed is the only place a demo platform credential is
-	// written; production operators are created explicitly (docs/security.md).
+	// written; production operators are created explicitly (SECURITY.md).
 	const platform = await prisma.user.upsert({
 		where: { email: "platform@lifelink.local" },
 		create: {

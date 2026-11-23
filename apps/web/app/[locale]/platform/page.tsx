@@ -3,6 +3,7 @@ import { OrganizationActions } from "@/components/platform/organization-actions"
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field, Input, Label, Select } from "@/components/ui/field";
 import { EmptyState, PageHeader } from "@/components/ui/page-header";
 import {
 	Table,
@@ -12,6 +13,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { Link } from "@/i18n/routing";
 import { platformLogoutAction } from "@/lib/actions/auth";
 import { requirePlatformAdmin } from "@/lib/auth/platform";
 import { platformAdminDevelopmentMode } from "@/lib/platform/gate";
@@ -23,6 +25,13 @@ import {
 	auditReason,
 	toPlatformOrgListItem,
 } from "@/lib/platform/orgs";
+import {
+	buildPlatformHref,
+	clampPlatformPage,
+	hasPlatformFilters,
+	parsePlatformQuery,
+	platformOrgWhere,
+} from "@/lib/platform/query";
 import prisma from "@/lib/prisma";
 import { formatDateTime } from "@/lib/utils";
 import { Building2, History, LogOut, ShieldCheck } from "lucide-react";
@@ -50,18 +59,27 @@ export default async function PlatformPage({
 	searchParams,
 }: {
 	params: Promise<{ locale: string }>;
-	searchParams: Promise<{ suspended?: string; reinstated?: string }>;
+	searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
 	const { locale } = await params;
-	const { suspended, reinstated } = await searchParams;
+	const rawSearch = await searchParams;
+	const suspended = typeof rawSearch.suspended === "string" ? rawSearch.suspended : "";
+	const reinstated = typeof rawSearch.reinstated === "string" ? rawSearch.reinstated : "";
+	const query = parsePlatformQuery(rawSearch);
 	const admin = await requirePlatformAdmin();
 	const t = await getTranslations({ locale, namespace: "platform" });
 
+	const where = platformOrgWhere(query);
+	const total = await prisma.organization.count({ where });
+	const paging = clampPlatformPage(query.page, total);
+
 	const [orgRows, auditRows] = await Promise.all([
 		prisma.organization.findMany({
+			where,
 			select: PLATFORM_ORG_LIST_SELECT,
 			orderBy: { createdAt: "asc" },
-			take: 200,
+			skip: paging.skip,
+			take: paging.take,
 		}),
 		prisma.auditLog.findMany({
 			where: { action: { in: [...PLATFORM_AUDIT_ACTIONS] } },
@@ -135,8 +153,46 @@ export default async function PlatformPage({
 						<CardDescription>{t("organizationsHint")}</CardDescription>
 					</CardHeader>
 					<CardContent>
+						<form method="get" className="mb-4 flex flex-wrap items-end gap-2">
+							<Field className="w-full sm:w-64">
+								<Label htmlFor="platform-q">{t("search")}</Label>
+								<Input
+									id="platform-q"
+									name="q"
+									defaultValue={query.q}
+									maxLength={100}
+									placeholder={t("searchPlaceholder")}
+								/>
+							</Field>
+							<Field className="w-full sm:w-44">
+								<Label htmlFor="platform-status">{t("filterStatus")}</Label>
+								<Select id="platform-status" name="status" defaultValue={query.status}>
+									<option value="all">{t("filterAll")}</option>
+									<option value="active">{t("filterActive")}</option>
+									<option value="suspended">{t("filterSuspended")}</option>
+								</Select>
+							</Field>
+							<Button type="submit" variant="outline" size="sm">
+								{t("filterApply")}
+							</Button>
+							{hasPlatformFilters(query) ? (
+								<Link
+									href="/platform"
+									className="inline-flex h-8 items-center text-meta text-fog-400 hover:text-signal-300 hover:underline"
+								>
+									{t("filterClear")}
+								</Link>
+							) : null}
+						</form>
+
 						{organizations.length === 0 ? (
-							<EmptyState title={t("organizationsEmpty")} />
+							<EmptyState
+								title={
+									hasPlatformFilters(query)
+										? t("organizationsFilteredEmpty")
+										: t("organizationsEmpty")
+								}
+							/>
 						) : (
 							<Table className="min-w-[920px]">
 								<TableHeader>
@@ -200,6 +256,36 @@ export default async function PlatformPage({
 								</TableBody>
 							</Table>
 						)}
+
+						{paging.pageCount > 1 ? (
+							<div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+								<span className="text-meta text-fog-500">
+									{t("pageSummary", {
+										page: paging.page,
+										pages: paging.pageCount,
+										total,
+									})}
+								</span>
+								<div className="flex gap-2">
+									{paging.page > 1 ? (
+										<Link
+											href={buildPlatformHref(query, { page: paging.page - 1 })}
+											className="inline-flex h-8 items-center rounded-panel border border-ink-600 px-3 text-meta text-fog-300 hover:bg-ink-700/60"
+										>
+											{t("previous")}
+										</Link>
+									) : null}
+									{paging.page < paging.pageCount ? (
+										<Link
+											href={buildPlatformHref(query, { page: paging.page + 1 })}
+											className="inline-flex h-8 items-center rounded-panel border border-ink-600 px-3 text-meta text-fog-300 hover:bg-ink-700/60"
+										>
+											{t("next")}
+										</Link>
+									) : null}
+								</div>
+							</div>
+						) : null}
 					</CardContent>
 				</Card>
 

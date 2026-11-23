@@ -22,6 +22,7 @@ import { buildMapHref, hasActiveMapFilters, parseMapQuery } from "@/lib/map/quer
 import { metadataForPage } from "@/lib/page-metadata";
 import prisma from "@/lib/prisma";
 import { formatDateTime, formatRelative } from "@/lib/utils";
+import { MAP_VEHICLE_SELECT } from "@/lib/vehicles/payload";
 import { Maximize2, TriangleAlert } from "lucide-react";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
@@ -56,33 +57,7 @@ export default async function MapPage({
 		prisma.vehicle.findMany({
 			where: scope,
 			orderBy: { plateNo: "asc" },
-			// Explicit fields only: the map needs the approved tracker's live
-			// position, never its token hash.
-			select: {
-				id: true,
-				plateNo: true,
-				make: true,
-				model: true,
-				year: true,
-				driverName: true,
-				driverPhone: true,
-				devices: {
-					select: {
-						id: true,
-						label: true,
-						mac: true,
-						approvalStatus: true,
-						lastSeenAt: true,
-						lastLat: true,
-						lastLng: true,
-						lastFixAt: true,
-						lastSpeedKph: true,
-						batteryV: true,
-						rssiDbm: true,
-						satellites: true,
-					},
-				},
-			},
+			select: MAP_VEHICLE_SELECT,
 		}),
 		prisma.impactEvent.findMany({
 			where: {

@@ -21,7 +21,8 @@ import { z } from "zod";
 
 export type PlatformActionError =
 	| "forbidden"
-	| "invalid"
+	| "invalid_reason"
+	| "invalid_credentials"
 	| "password"
 	| "notfound"
 	| "already"
@@ -30,23 +31,29 @@ export type PlatformActionError =
 export interface PlatformActionState {
 	ok: boolean;
 	error?: PlatformActionError;
+	/** Current status when a conditional update loses a concurrent race. */
+	status?: "ACTIVE" | "SUSPENDED";
 }
 
-const mutationSchema = z.object({
-	orgId: z.string().trim().min(1).max(64),
-	reason: z.string().trim().min(5).max(500),
-	password: z.string().min(1).max(200),
-});
+const orgIdSchema = z.string().trim().min(1).max(64);
+const reasonSchema = z.string().trim().min(5).max(500);
+const passwordSchema = z.string().min(1).max(200);
 
 function localeFrom(formData: FormData): string {
 	return String(formData.get("locale") ?? "en") === "tl" ? "tl" : "en";
+}
+
+interface StepUpData {
+	orgId: string;
+	reason: string;
+	password: string;
 }
 
 type StepUp =
 	| { error: PlatformActionError }
 	| {
 			admin: { id: string; email: string; name: string };
-			data: z.infer<typeof mutationSchema>;
+			data: StepUpData;
 	  };
 
 /**
@@ -58,12 +65,14 @@ async function stepUp(formData: FormData): Promise<StepUp> {
 	const admin = await getPlatformAdmin();
 	if (!admin) return { error: "forbidden" };
 
-	const parsed = mutationSchema.safeParse({
-		orgId: String(formData.get("orgId") ?? ""),
-		reason: String(formData.get("reason") ?? ""),
-		password: String(formData.get("password") ?? ""),
-	});
-	if (!parsed.success) return { error: "invalid" };
+	const orgId = orgIdSchema.safeParse(String(formData.get("orgId") ?? ""));
+	if (!orgId.success) return { error: "notfound" };
+
+	const reason = reasonSchema.safeParse(String(formData.get("reason") ?? ""));
+	if (!reason.success) return { error: "invalid_reason" };
+
+	const password = passwordSchema.safeParse(String(formData.get("password") ?? ""));
+	if (!password.success) return { error: "invalid_credentials" };
 
 	const limit = rateLimit(`platform-step-up:${admin.id}`, 5, 10 * 60 * 1000);
 	if (!limit.allowed) return { error: "rate" };
@@ -76,13 +85,16 @@ async function stepUp(formData: FormData): Promise<StepUp> {
 
 	let passwordOk = false;
 	try {
-		passwordOk = await verifyPassword(parsed.data.password, user.passwordHash);
+		passwordOk = await verifyPassword(password.data, user.passwordHash);
 	} catch {
 		passwordOk = false;
 	}
 	if (!passwordOk) return { error: "password" };
 
-	return { admin, data: parsed.data };
+	return {
+		admin,
+		data: { orgId: orgId.data, reason: reason.data, password: password.data },
+	};
 }
 
 export async function suspendOrganizationAction(
@@ -100,10 +112,15 @@ export async function suspendOrganizationAction(
 			select: { id: true, name: true, status: true },
 		});
 		if (!org) return { error: "notfound" as const };
-		if (org.status === "SUSPENDED") return { error: "already" as const };
+		if (org.status === "SUSPENDED") {
+			return { error: "already" as const, status: "SUSPENDED" as const };
+		}
 
-		await tx.organization.update({
-			where: { id: org.id },
+		// Conditional update: two operators cannot both read ACTIVE and both
+		// write a stale "before" audit row. The loser re-reads the current
+		// state and reports it honestly.
+		const updated = await tx.organization.updateMany({
+			where: { id: org.id, status: "ACTIVE" },
 			data: {
 				status: "SUSPENDED",
 				suspendedAt: now,
@@ -111,6 +128,15 @@ export async function suspendOrganizationAction(
 				suspendedBy: checked.admin.id,
 			},
 		});
+		if (updated.count !== 1) {
+			const current = await tx.organization.findUnique({
+				where: { id: org.id },
+				select: { status: true },
+			});
+			if (!current) return { error: "notfound" as const };
+			return { error: "already" as const, status: current.status };
+		}
+
 		await tx.auditLog.create({
 			data: {
 				orgId: org.id,
@@ -119,7 +145,7 @@ export async function suspendOrganizationAction(
 				target: org.id,
 				metadata: {
 					reason: checked.data.reason,
-					before: org.status,
+					before: "ACTIVE",
 					after: "SUSPENDED",
 				},
 			},
@@ -127,7 +153,11 @@ export async function suspendOrganizationAction(
 		return { ok: true as const, name: org.name };
 	});
 
-	if ("error" in result) return { ok: false, error: result.error };
+	if ("error" in result) {
+		return "status" in result
+			? { ok: false, error: result.error, status: result.status }
+			: { ok: false, error: result.error };
+	}
 
 	revalidatePath(`/${locale}/platform`);
 	redirect(`/${locale}/platform?suspended=1`);
@@ -147,10 +177,12 @@ export async function reinstateOrganizationAction(
 			select: { id: true, name: true, status: true },
 		});
 		if (!org) return { error: "notfound" as const };
-		if (org.status === "ACTIVE") return { error: "already" as const };
+		if (org.status === "ACTIVE") {
+			return { error: "already" as const, status: "ACTIVE" as const };
+		}
 
-		await tx.organization.update({
-			where: { id: org.id },
+		const updated = await tx.organization.updateMany({
+			where: { id: org.id, status: "SUSPENDED" },
 			data: {
 				status: "ACTIVE",
 				suspendedAt: null,
@@ -158,6 +190,15 @@ export async function reinstateOrganizationAction(
 				suspendedBy: null,
 			},
 		});
+		if (updated.count !== 1) {
+			const current = await tx.organization.findUnique({
+				where: { id: org.id },
+				select: { status: true },
+			});
+			if (!current) return { error: "notfound" as const };
+			return { error: "already" as const, status: current.status };
+		}
+
 		await tx.auditLog.create({
 			data: {
 				orgId: org.id,
@@ -166,7 +207,7 @@ export async function reinstateOrganizationAction(
 				target: org.id,
 				metadata: {
 					reason: checked.data.reason,
-					before: org.status,
+					before: "SUSPENDED",
 					after: "ACTIVE",
 				},
 			},
@@ -174,7 +215,11 @@ export async function reinstateOrganizationAction(
 		return { ok: true as const, name: org.name };
 	});
 
-	if ("error" in result) return { ok: false, error: result.error };
+	if ("error" in result) {
+		return "status" in result
+			? { ok: false, error: result.error, status: result.status }
+			: { ok: false, error: result.error };
+	}
 
 	revalidatePath(`/${locale}/platform`);
 	redirect(`/${locale}/platform?reinstated=1`);

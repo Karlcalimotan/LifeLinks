@@ -16,6 +16,7 @@ import { deviceConnectionState } from "@/lib/device/status";
 import { metadataForPage } from "@/lib/page-metadata";
 import prisma from "@/lib/prisma";
 import { formatRelative } from "@/lib/utils";
+import { VEHICLE_LIST_SELECT } from "@/lib/vehicles/payload";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
@@ -38,24 +39,7 @@ export default async function VehiclesPage({ params }: { params: Promise<{ local
 	const vehicles = await prisma.vehicle.findMany({
 		where: vehicleScope(current.role, current.org.id, current.user.id),
 		orderBy: { plateNo: "asc" },
-		// Explicit fields only. The vehicle list needs the tracker label and
-		// last-seen time, never the tracker's token hash.
-		select: {
-			id: true,
-			plateNo: true,
-			make: true,
-			model: true,
-			year: true,
-			driverName: true,
-			driverPhone: true,
-			status: true,
-			devices: {
-				select: { id: true, label: true, lastSeenAt: true },
-				orderBy: { createdAt: "asc" },
-				take: 1,
-			},
-			_count: { select: { impacts: true, trips: true } },
-		},
+		select: VEHICLE_LIST_SELECT,
 	});
 
 	return (

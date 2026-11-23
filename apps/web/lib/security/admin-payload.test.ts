@@ -3,11 +3,18 @@ import {
 	type AdminDeviceListRow,
 	toAdminDeviceListItem,
 } from "@/lib/device/admin-payload";
+import { INCIDENT_DETAIL_SELECT } from "@/lib/incidents/payload";
 import {
 	PLATFORM_ORG_LIST_SELECT,
 	type PlatformOrgRow,
 	toPlatformOrgListItem,
 } from "@/lib/platform/orgs";
+import { MEMBER_LIST_SELECT } from "@/lib/settings/member-payload";
+import {
+	MAP_VEHICLE_SELECT,
+	VEHICLE_DETAIL_SELECT,
+	VEHICLE_LIST_SELECT,
+} from "@/lib/vehicles/payload";
 import { describe, expect, it } from "vitest";
 
 const FORBIDDEN_KEYS = [
@@ -34,8 +41,16 @@ function collectKeys(value: unknown, keys: string[] = []): string[] {
 }
 
 describe("admin payload hygiene", () => {
-	it("never selects a secret field for the platform org list or the tracker list", () => {
-		const keys = collectKeys([PLATFORM_ORG_LIST_SELECT, ADMIN_DEVICE_LIST_SELECT]);
+	it("never selects a secret field for any admin list or detail", () => {
+		const keys = collectKeys([
+			PLATFORM_ORG_LIST_SELECT,
+			ADMIN_DEVICE_LIST_SELECT,
+			MEMBER_LIST_SELECT,
+			VEHICLE_LIST_SELECT,
+			VEHICLE_DETAIL_SELECT,
+			MAP_VEHICLE_SELECT,
+			INCIDENT_DETAIL_SELECT,
+		]);
 		for (const forbidden of FORBIDDEN_KEYS) {
 			expect(keys, `unexpected ${forbidden} in an admin select`).not.toContain(forbidden);
 		}

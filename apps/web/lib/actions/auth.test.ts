@@ -45,7 +45,7 @@ vi.mock("next/navigation", () => ({
 	},
 }));
 
-import { loginAction } from "./auth";
+import { loginAction, logoutAction } from "./auth";
 
 function form(email = "admin@example.test", password = "Secret123"): FormData {
 	const data = new FormData();
@@ -101,6 +101,24 @@ describe("loginAction", () => {
 			name: "Admin",
 		});
 		expect(mocks.createPlatformSession).not.toHaveBeenCalled();
+	});
+
+	it("clears a stale platform session before establishing a new session", async () => {
+		await catchRedirect(() => loginAction(form()));
+
+		const destroyOrder = mocks.destroyPlatformSession.mock.invocationCallOrder[0] ?? 0;
+		const createOrder = mocks.createSession.mock.invocationCallOrder[0] ?? 0;
+		expect(mocks.destroyPlatformSession).toHaveBeenCalled();
+		expect(destroyOrder).toBeLessThan(createOrder);
+	});
+
+	it("clears the platform session even when the login fails", async () => {
+		mocks.verifyPassword.mockResolvedValue(false);
+
+		await catchRedirect(() => loginAction(form()));
+
+		expect(mocks.destroyPlatformSession).toHaveBeenCalled();
+		expect(mocks.createSession).not.toHaveBeenCalled();
 	});
 
 	it("rejects a suspended organization after the password check", async () => {
@@ -206,5 +224,17 @@ describe("loginAction", () => {
 
 		expect(path).toBe("/en/login?error=invalid");
 		expect(mocks.createPlatformSession).not.toHaveBeenCalled();
+	});
+});
+
+describe("logoutAction", () => {
+	it("clears both the tenant and platform sessions on a shared browser", async () => {
+		mocks.getSession.mockResolvedValue(null);
+
+		const path = await catchRedirect(() => logoutAction(form()));
+
+		expect(path).toBe("/en/login");
+		expect(mocks.destroyPlatformSession).toHaveBeenCalled();
+		expect(mocks.destroySession).toHaveBeenCalled();
 	});
 });

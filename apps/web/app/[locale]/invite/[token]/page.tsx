@@ -41,10 +41,11 @@ export default async function InvitePage({
 	const invitation = tokenHash
 		? await prisma.invitationToken.findUnique({
 				where: { tokenHash },
-				include: { org: { select: { name: true } } },
+				include: { org: { select: { name: true, status: true } } },
 			})
 		: null;
-	const usable = invitation != null && isInvitationUsable(invitation);
+	const usable =
+		invitation != null && invitation.org.status === "ACTIVE" && isInvitationUsable(invitation);
 
 	if (!invitation || !usable) {
 		return (

@@ -14,12 +14,12 @@ import { useActionState } from "react";
 
 const initial: PlatformActionState = { ok: false };
 
-const errorKeys: Record<PlatformActionError, string> = {
+const errorKeys: Record<Exclude<PlatformActionError, "already">, string> = {
 	forbidden: "errorForbidden",
-	invalid: "errorReason",
+	invalid_reason: "errorReason",
+	invalid_credentials: "errorCredentials",
 	password: "errorPassword",
 	notfound: "errorNotFound",
-	already: "errorAlready",
 	rate: "errorRate",
 };
 
@@ -53,7 +53,12 @@ export function OrganizationActions({
 	const state = suspended ? reinstateState : suspendState;
 	const formAction = suspended ? reinstateAction : suspendAction;
 	const pending = suspended ? reinstatePending : suspendPending;
-	const errorMessage = state.error ? t(errorKeys[state.error]) : null;
+	const errorMessage =
+		state.error === "already"
+			? t(state.status === "SUSPENDED" ? "errorAlreadySuspended" : "errorAlreadyActive")
+			: state.error
+				? t(errorKeys[state.error])
+				: null;
 
 	return (
 		<details className="group">

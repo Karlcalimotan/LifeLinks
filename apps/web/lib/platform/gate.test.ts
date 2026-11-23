@@ -7,22 +7,42 @@ import {
 
 describe("platform admin gate", () => {
 	it("is closed by default", () => {
-		expect(isPlatformAdminEnabled({})).toBe(false);
-		expect(isPlatformAdminEnabled({ PLATFORM_ADMIN_ALLOW_WITHOUT_MFA: "true" })).toBe(false);
+		expect(isPlatformAdminEnabled({ NODE_ENV: "development" })).toBe(false);
+		expect(
+			isPlatformAdminEnabled({
+				NODE_ENV: "development",
+				PLATFORM_ADMIN_ALLOW_WITHOUT_MFA: "true",
+			}),
+		).toBe(false);
 	});
 
 	it("stays closed when only the feature flag is set, because MFA is not configured", () => {
 		expect(platformMfaConfigured()).toBe(false);
-		expect(isPlatformAdminEnabled({ PLATFORM_ADMIN_ENABLED: "true" })).toBe(false);
+		expect(
+			isPlatformAdminEnabled({ NODE_ENV: "development", PLATFORM_ADMIN_ENABLED: "true" }),
+		).toBe(false);
 	});
 
-	it("opens only with the explicit development flag", () => {
+	it("opens with the explicit development flag in development and test", () => {
+		for (const nodeEnv of ["development", "test"]) {
+			expect(
+				isPlatformAdminEnabled({
+					NODE_ENV: nodeEnv,
+					PLATFORM_ADMIN_ENABLED: "true",
+					PLATFORM_ADMIN_ALLOW_WITHOUT_MFA: "true",
+				}),
+			).toBe(true);
+		}
+	});
+
+	it("refuses the allow-without-MFA flag in production", () => {
 		expect(
 			isPlatformAdminEnabled({
+				NODE_ENV: "production",
 				PLATFORM_ADMIN_ENABLED: "true",
 				PLATFORM_ADMIN_ALLOW_WITHOUT_MFA: "true",
 			}),
-		).toBe(true);
+		).toBe(false);
 	});
 
 	it("does not accept truthy-looking values", () => {
@@ -37,11 +57,21 @@ describe("platform admin gate", () => {
 	it("reports development mode only when the allow-without-MFA path opened the gate", () => {
 		expect(
 			platformAdminDevelopmentMode({
+				NODE_ENV: "development",
 				PLATFORM_ADMIN_ENABLED: "true",
 				PLATFORM_ADMIN_ALLOW_WITHOUT_MFA: "true",
 			}),
 		).toBe(true);
-		expect(platformAdminDevelopmentMode({ PLATFORM_ADMIN_ENABLED: "true" })).toBe(false);
-		expect(platformAdminDevelopmentMode({})).toBe(false);
+		expect(
+			platformAdminDevelopmentMode({ NODE_ENV: "development", PLATFORM_ADMIN_ENABLED: "true" }),
+		).toBe(false);
+		expect(platformAdminDevelopmentMode({ NODE_ENV: "development" })).toBe(false);
+		expect(
+			platformAdminDevelopmentMode({
+				NODE_ENV: "production",
+				PLATFORM_ADMIN_ENABLED: "true",
+				PLATFORM_ADMIN_ALLOW_WITHOUT_MFA: "true",
+			}),
+		).toBe(false);
 	});
 });

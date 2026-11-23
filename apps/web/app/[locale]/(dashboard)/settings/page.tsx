@@ -20,6 +20,7 @@ import { canAdminister, requireRole, roleLabelKey } from "@/lib/auth/session";
 import { DEVICE_OFFLINE_AFTER_MIN, DEVICE_WEAK_AFTER_MIN } from "@/lib/constants";
 import { metadataForPage } from "@/lib/page-metadata";
 import prisma from "@/lib/prisma";
+import { MEMBER_LIST_SELECT } from "@/lib/settings/member-payload";
 import { type ResolvedOrgSettings, getOrgSettings } from "@/lib/settings/org";
 import {
 	PERMISSION_ROLE_ORDER,
@@ -402,15 +403,7 @@ async function MembersSection({
 	const roleNames = await getTranslations({ locale, namespace: "roles" });
 	const members = await prisma.membership.findMany({
 		where: { orgId },
-		// Explicit fields only: the member list never needs `passwordHash`.
-		select: {
-			id: true,
-			role: true,
-			userId: true,
-			createdAt: true,
-			revokedAt: true,
-			user: { select: { id: true, name: true, email: true } },
-		},
+		select: MEMBER_LIST_SELECT,
 		orderBy: { createdAt: "asc" },
 	});
 	const activeAdmins = members.filter(

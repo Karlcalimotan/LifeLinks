@@ -13,6 +13,7 @@
  */
 export interface PlatformAdminEnv {
 	[key: string]: string | undefined;
+	NODE_ENV?: string;
 	PLATFORM_ADMIN_ENABLED?: string;
 	PLATFORM_ADMIN_ALLOW_WITHOUT_MFA?: string;
 }
@@ -26,10 +27,15 @@ export function platformMfaConfigured(): boolean {
 	return false;
 }
 
-/** True only when both the feature flag and an acceptable second factor path are on. */
+/**
+ * True only when both the feature flag and an acceptable second factor path are
+ * on. The allow-without-MFA shortcut is refused in production: a production
+ * build must use real MFA, not a development flag.
+ */
 export function isPlatformAdminEnabled(env: PlatformAdminEnv = process.env): boolean {
 	if (env.PLATFORM_ADMIN_ENABLED !== "true") return false;
 	if (platformMfaConfigured()) return true;
+	if (env.NODE_ENV === "production") return false;
 	return env.PLATFORM_ADMIN_ALLOW_WITHOUT_MFA === "true";
 }
 

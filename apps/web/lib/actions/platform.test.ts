@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
 	rateLimit: vi.fn(),
 	userFindUnique: vi.fn(),
 	organizationFindUnique: vi.fn(),
-	organizationUpdate: vi.fn(),
+	organizationUpdateMany: vi.fn(),
 	auditLogCreate: vi.fn(),
 	transaction: vi.fn(),
 	revalidatePath: vi.fn(),
@@ -67,14 +67,14 @@ beforeEach(() => {
 		name: "Acme Fleet",
 		status: "ACTIVE",
 	});
-	mocks.organizationUpdate.mockResolvedValue({});
+	mocks.organizationUpdateMany.mockResolvedValue({ count: 1 });
 	mocks.auditLogCreate.mockResolvedValue({});
 	mocks.revalidatePath.mockReturnValue(undefined);
 	mocks.transaction.mockImplementation(async (fn: unknown) =>
 		(fn as (tx: unknown) => Promise<unknown>)({
 			organization: {
 				findUnique: mocks.organizationFindUnique,
-				update: mocks.organizationUpdate,
+				updateMany: mocks.organizationUpdateMany,
 			},
 			auditLog: { create: mocks.auditLogCreate },
 		}),
@@ -97,8 +97,17 @@ describe("suspendOrganizationAction", () => {
 		const short = await suspendOrganizationAction({ ok: false }, form({ reason: "no" }));
 		const long = await suspendOrganizationAction({ ok: false }, form({ reason: "x".repeat(501) }));
 
-		expect(short).toEqual({ ok: false, error: "invalid" });
-		expect(long).toEqual({ ok: false, error: "invalid" });
+		expect(short).toEqual({ ok: false, error: "invalid_reason" });
+		expect(long).toEqual({ ok: false, error: "invalid_reason" });
+		expect(mocks.verifyPassword).not.toHaveBeenCalled();
+		expect(mocks.transaction).not.toHaveBeenCalled();
+	});
+
+	it("reports a missing password separately from a wrong reason", async () => {
+		const state = await suspendOrganizationAction({ ok: false }, form({ password: "" }));
+
+		expect(state).toEqual({ ok: false, error: "invalid_credentials" });
+		expect(mocks.verifyPassword).not.toHaveBeenCalled();
 		expect(mocks.transaction).not.toHaveBeenCalled();
 	});
 
@@ -124,12 +133,12 @@ describe("suspendOrganizationAction", () => {
 		expect(mocks.transaction).not.toHaveBeenCalled();
 	});
 
-	it("suspends the organization and writes an audit row with the reason", async () => {
+	it("suspends with a conditional update and audits the transition", async () => {
 		const path = await catchRedirect(() => suspendOrganizationAction({ ok: false }, form()));
 
 		expect(path).toBe("/en/platform?suspended=1");
-		expect(mocks.organizationUpdate).toHaveBeenCalledWith({
-			where: { id: "org-1" },
+		expect(mocks.organizationUpdateMany).toHaveBeenCalledWith({
+			where: { id: "org-1", status: "ACTIVE" },
 			data: {
 				status: "SUSPENDED",
 				suspendedAt: expect.any(Date),
@@ -163,8 +172,23 @@ describe("suspendOrganizationAction", () => {
 		await expect(suspendOrganizationAction({ ok: false }, form())).resolves.toEqual({
 			ok: false,
 			error: "already",
+			status: "SUSPENDED",
 		});
-		expect(mocks.organizationUpdate).not.toHaveBeenCalled();
+		expect(mocks.organizationUpdateMany).not.toHaveBeenCalled();
+		expect(mocks.auditLogCreate).not.toHaveBeenCalled();
+	});
+
+	it("reports the current state when a concurrent suspend wins the race", async () => {
+		mocks.organizationUpdateMany.mockResolvedValue({ count: 0 });
+		mocks.organizationFindUnique
+			.mockResolvedValueOnce({ id: "org-1", name: "Acme Fleet", status: "ACTIVE" })
+			.mockResolvedValueOnce({ status: "SUSPENDED" });
+
+		await expect(suspendOrganizationAction({ ok: false }, form())).resolves.toEqual({
+			ok: false,
+			error: "already",
+			status: "SUSPENDED",
+		});
 		expect(mocks.auditLogCreate).not.toHaveBeenCalled();
 	});
 
@@ -175,7 +199,7 @@ describe("suspendOrganizationAction", () => {
 			ok: false,
 			error: "notfound",
 		});
-		expect(mocks.organizationUpdate).not.toHaveBeenCalled();
+		expect(mocks.organizationUpdateMany).not.toHaveBeenCalled();
 	});
 });
 
@@ -188,12 +212,12 @@ describe("reinstateOrganizationAction", () => {
 		});
 	});
 
-	it("clears the suspension fields and audits the transition", async () => {
+	it("clears the suspension fields with a conditional update and audits it", async () => {
 		const path = await catchRedirect(() => reinstateOrganizationAction({ ok: false }, form()));
 
 		expect(path).toBe("/en/platform?reinstated=1");
-		expect(mocks.organizationUpdate).toHaveBeenCalledWith({
-			where: { id: "org-1" },
+		expect(mocks.organizationUpdateMany).toHaveBeenCalledWith({
+			where: { id: "org-1", status: "SUSPENDED" },
 			data: {
 				status: "ACTIVE",
 				suspendedAt: null,
@@ -226,7 +250,22 @@ describe("reinstateOrganizationAction", () => {
 		await expect(reinstateOrganizationAction({ ok: false }, form())).resolves.toEqual({
 			ok: false,
 			error: "already",
+			status: "ACTIVE",
 		});
-		expect(mocks.organizationUpdate).not.toHaveBeenCalled();
+		expect(mocks.organizationUpdateMany).not.toHaveBeenCalled();
+	});
+
+	it("reports the current state when a concurrent reinstate wins the race", async () => {
+		mocks.organizationUpdateMany.mockResolvedValue({ count: 0 });
+		mocks.organizationFindUnique
+			.mockResolvedValueOnce({ id: "org-1", name: "Acme Fleet", status: "SUSPENDED" })
+			.mockResolvedValueOnce({ status: "ACTIVE" });
+
+		await expect(reinstateOrganizationAction({ ok: false }, form())).resolves.toEqual({
+			ok: false,
+			error: "already",
+			status: "ACTIVE",
+		});
+		expect(mocks.auditLogCreate).not.toHaveBeenCalled();
 	});
 });

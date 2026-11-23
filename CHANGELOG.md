@@ -48,8 +48,10 @@ All notable changes to this project are documented here. The format follows
 - Platform administration (`/platform`) with a `PlatformAdmin` row separate
   from tenant memberships and roles, a separate platform session cookie, and an
   environment gate that stays closed until MFA exists or
-  `PLATFORM_ADMIN_ALLOW_WITHOUT_MFA=true` is explicitly set for development
-  (#12).
+  `PLATFORM_ADMIN_ALLOW_WITHOUT_MFA=true` is explicitly set for development.
+  The development flag is refused in production. The organization list has a
+  status/search filter and pagination, and both sessions are cleared on tenant
+  sign-out (#12).
 - Organization suspension: `Organization.status`, `suspendedAt`,
   `suspendedReason` and `suspendedBy`. A suspended organization is rejected at
   login and resolves to no session on the next request, so existing cookies stop
@@ -58,9 +60,9 @@ All notable changes to this project are documented here. The format follows
   `platform.org_suspended` / `platform.org_reinstated` audit row with actor,
   organization, reason and before/after status (#12).
 - Explicit admin payload field lists for the platform organization list, tenant
-  member list, tracker list/detail and vehicle list/detail, so no `tokenHash`,
-  `passwordHash`, `p256dh`, `auth`, `endpoint` or raw device token is selected
-  into a list payload (#12).
+  member list, tracker list/detail, vehicle list/detail, incident detail and
+  live map, so no `tokenHash`, `passwordHash`, `p256dh`, `auth`, `endpoint` or
+  raw device token is selected into a list or detail payload (#12).
 
 ### Changed
 
