@@ -20,6 +20,7 @@ import {
 	readBureauAckState,
 } from "@/lib/incidents/bureau-ack";
 import { readCancelAlertState } from "@/lib/incidents/cancel-alert";
+import { INCIDENT_DETAIL_SELECT } from "@/lib/incidents/payload";
 import {
 	incidentAuditLabelKey,
 	mergeIncidentTimeline,
@@ -81,12 +82,7 @@ export default async function IncidentDetailPage({
 		current.role === "USER" ? { vehicle: { is: { ownerId: current.user.id } } } : {};
 	const incident = await prisma.impactEvent.findFirst({
 		where: { id, orgId: current.org.id, ...ownership },
-		include: {
-			vehicle: true,
-			device: true,
-			trip: true,
-			alerts: { orderBy: { createdAt: "asc" } },
-		},
+		select: INCIDENT_DETAIL_SELECT,
 	});
 	if (!incident) notFound();
 

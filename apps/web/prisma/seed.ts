@@ -1417,16 +1417,25 @@ function evidenceFor(incident: IncidentSeed) {
 async function main() {
 	assertDemoTarget();
 
-	const [adminHash, ownerHash, responderHash] = await Promise.all([
+	const [adminHash, ownerHash, responderHash, platformHash] = await Promise.all([
 		hash("Admin123!", 12),
 		hash("Owner123!", 12),
 		hash("Responder123!", 12),
+		hash("Platform123!", 12),
 	]);
 
 	const org = await prisma.organization.upsert({
 		where: { slug: "demo" },
 		create: { name: "LifeLink Demo Fleet", slug: "demo" },
-		update: { name: "LifeLink Demo Fleet" },
+		// A demo re-run clears a suspension left by someone trying the platform
+		// console, so the documented sign-in works again.
+		update: {
+			name: "LifeLink Demo Fleet",
+			status: "ACTIVE",
+			suspendedAt: null,
+			suspendedReason: null,
+			suspendedBy: null,
+		},
 	});
 
 	const [admin, owner, responder] = await Promise.all([
@@ -1458,6 +1467,25 @@ async function main() {
 			update: { name: "CDRRMO / Pulis Responder", passwordHash: responderHash },
 		}),
 	]);
+
+	// A platform operator is a separate account with no tenant membership by
+	// default. The demo seed is the only place a demo platform credential is
+	// written; production operators are created explicitly (SECURITY.md).
+	const platform = await prisma.user.upsert({
+		where: { email: "platform@lifelink.local" },
+		create: {
+			email: "platform@lifelink.local",
+			name: "LifeLink Platform Administrator",
+			passwordHash: platformHash,
+		},
+		update: { name: "LifeLink Platform Administrator", passwordHash: platformHash },
+	});
+	await prisma.membership.deleteMany({ where: { userId: platform.id } });
+	await prisma.platformAdmin.upsert({
+		where: { userId: platform.id },
+		create: { userId: platform.id, createdBy: admin.id },
+		update: {},
+	});
 
 	const memberships = [
 		{ userId: admin.id, role: "ADMIN" as const },
@@ -1765,6 +1793,10 @@ async function main() {
 	console.log("Admin:         admin@lifelink.local / Admin123!");
 	console.log("Vehicle owner: owner@lifelink.local / Owner123!");
 	console.log("Responder:     responder@lifelink.local / Responder123!");
+	console.log("Platform:      platform@lifelink.local / Platform123!");
+	console.log(
+		"Platform gate: set PLATFORM_ADMIN_ENABLED=true and PLATFORM_ADMIN_ALLOW_WITHOUT_MFA=true for local use.",
+	);
 	console.log("Device tokens:");
 	for (const tracker of TRACKERS) {
 		console.log(`  ${tracker.label}: ${tracker.token}`);

@@ -170,10 +170,11 @@ export async function createInvitationAction(
  * unusable token (unknown, used, expired) returns the same generic error, so
  * the page never confirms which of those applied.
  *
- * The organization is considered active when its row exists; the schema has no
- * separate organization status, and a deleted organization cascades the token
- * away. An existing account is attached only when the invitee proves its
- * password: holding the link is not enough to take over an account.
+ * The organization must be ACTIVE. A suspended organization returns the same
+ * generic invalid error and the token is not consumed, so it can be used again
+ * if the organization is reinstated before the token expires. An existing
+ * account is attached only when the invitee proves its password: holding the
+ * link is not enough to take over an account.
  */
 export async function acceptInvitationAction(
 	_previous: AcceptState,
@@ -185,9 +186,14 @@ export async function acceptInvitationAction(
 
 	const invitation = await prisma.invitationToken.findUnique({
 		where: { tokenHash: hashInvitationToken(token) },
-		include: { org: { select: { id: true } } },
+		include: { org: { select: { id: true, status: true } } },
 	});
-	if (!invitation || !invitation.org || !isInvitationUsable(invitation)) {
+	if (
+		!invitation ||
+		!invitation.org ||
+		invitation.org.status !== "ACTIVE" ||
+		!isInvitationUsable(invitation)
+	) {
 		return { ok: false, error: "invalid" };
 	}
 

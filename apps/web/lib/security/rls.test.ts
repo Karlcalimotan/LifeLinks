@@ -27,6 +27,7 @@ describeRls("RLS organization isolation", () => {
 	let permissionB = "";
 	let inviteA = "";
 	let inviteB = "";
+	let platformAdminId = "";
 
 	function db() {
 		if (!prisma) throw new Error("RLS test database is not initialized");
@@ -136,6 +137,10 @@ describeRls("RLS organization isolation", () => {
 		});
 		userA = ua.id;
 		userB = ub.id;
+		const platformAdmin = await client.platformAdmin.create({
+			data: { userId: userA, createdBy: userA },
+		});
+		platformAdminId = platformAdmin.id;
 		const ma = await client.membership.create({
 			data: { orgId: orgA, userId: userA, role: "ADMIN" },
 		});
@@ -235,6 +240,10 @@ describeRls("RLS organization isolation", () => {
 			where: { id: { in: [inviteA, inviteB].filter(Boolean) } },
 		});
 		expect(leftoverInvites).toBe(0);
+		const leftoverPlatformAdmins = await client.platformAdmin.count({
+			where: { id: platformAdminId || "__none__" },
+		});
+		expect(leftoverPlatformAdmins).toBe(0);
 		await client.$disconnect();
 	});
 
@@ -482,6 +491,61 @@ describeRls("RLS organization isolation", () => {
 		).rejects.toThrow();
 	});
 
+	it("keeps the global platform administrator table out of every tenant", async () => {
+		// The owner sees the row. A tenant role sees nothing: either the query
+		// is denied (no grant) or the deny-all policy returns no rows.
+		expect(await db().platformAdmin.count()).toBeGreaterThan(0);
+
+		const visible = await asTenant(
+			orgA,
+			(tx) => tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "PlatformAdmin"`,
+		)
+			.then((rows) => rows.length)
+			.catch(() => 0);
+		expect(visible).toBe(0);
+
+		const policies = await db().$queryRaw<
+			{ polname: string; qual: string | null; withcheck: string | null }[]
+		>`
+			SELECT polname,
+			       pg_get_expr(polqual, polrelid) AS qual,
+			       pg_get_expr(polwithcheck, polrelid) AS withcheck
+			FROM pg_policy
+			WHERE polrelid = '"PlatformAdmin"'::regclass
+		`;
+		expect(
+			policies.some(
+				(policy) =>
+					policy.polname === "platform_admin_owner_only" &&
+					policy.qual?.toLowerCase().includes("false") === true &&
+					policy.withcheck?.toLowerCase().includes("false") === true,
+			),
+		).toBe(true);
+
+		// userB has no PlatformAdmin row, so a unique-index failure cannot be
+		// mistaken for the RLS denial.
+		let insertError: unknown;
+		try {
+			await asTenant(
+				orgA,
+				(tx) => tx.$executeRaw`
+					INSERT INTO "PlatformAdmin" ("id", "userId")
+					VALUES (
+						${`rls-platform-x-${Date.now()}-${Math.random().toString(36).slice(2)}`},
+						${userB}
+					)
+				`,
+			);
+		} catch (error) {
+			insertError = error;
+		}
+
+		expect(insertError).toBeDefined();
+		const message = insertError instanceof Error ? insertError.message : String(insertError);
+		expect(message.toLowerCase()).not.toContain("duplicate key");
+		expect(message.toLowerCase()).toMatch(/row-level security|permission denied/);
+	});
+
 	it("fails closed when no organization is set", async () => {
 		const vehicles = await asTenant(
 			null,
@@ -518,6 +582,14 @@ describeRls("RLS organization isolation", () => {
 			(tx) => tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "InvitationToken"`,
 		);
 		expect(invites).toHaveLength(0);
+
+		const platformAdmins = await asTenant(
+			null,
+			(tx) => tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "PlatformAdmin"`,
+		)
+			.then((rows) => rows.length)
+			.catch(() => 0);
+		expect(platformAdmins).toBe(0);
 	});
 
 	it("rejects an insert when no organization is set", async () => {

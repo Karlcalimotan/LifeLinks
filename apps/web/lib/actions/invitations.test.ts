@@ -259,7 +259,7 @@ describe("acceptInvitationAction", () => {
 			usedAt: null,
 			createdById: "admin-1",
 			createdAt: new Date(),
-			org: { id: "org-1" },
+			org: { id: "org-1", status: "ACTIVE" },
 			...overrides,
 		};
 	}
@@ -283,8 +283,21 @@ describe("acceptInvitationAction", () => {
 
 		expect(mocks.invitationToken.findUnique).toHaveBeenCalledWith({
 			where: { tokenHash: hashInvitationToken(token) },
-			include: { org: { select: { id: true } } },
+			include: { org: { select: { id: true, status: true } } },
 		});
+	});
+
+	it("rejects an invitation into a suspended organization without consuming it", async () => {
+		mocks.invitationToken.findUnique.mockResolvedValue(
+			invitation({ org: { id: "org-1", status: "SUSPENDED" } }),
+		);
+
+		const state = await acceptInvitationAction({ ok: false }, acceptForm());
+
+		expect(state).toEqual({ ok: false, error: "invalid" });
+		expect(mocks.$transaction).not.toHaveBeenCalled();
+		expect(mocks.invitationToken.updateMany).not.toHaveBeenCalled();
+		expect(mocks.createSession).not.toHaveBeenCalled();
 	});
 
 	it("creates the user, the membership and the audit row, then signs in", async () => {

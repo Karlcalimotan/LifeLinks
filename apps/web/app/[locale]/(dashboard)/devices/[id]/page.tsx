@@ -64,10 +64,33 @@ export default async function DeviceDetailPage({
 	const [device, vehicles, lastConfigPush] = await Promise.all([
 		prisma.trackerDevice.findFirst({
 			where: { id, orgId: current.org.id },
-			include: {
-				vehicle: true,
-				commands: { orderBy: { createdAt: "desc" }, take: 10 },
-				events: { orderBy: { createdAt: "desc" }, take: 20 },
+			// Explicit fields only. `tokenHash` is never part of an admin page
+			// payload; the plaintext token exists only in the rotate action result.
+			select: {
+				id: true,
+				label: true,
+				mac: true,
+				vehicleId: true,
+				approvalStatus: true,
+				lastSeenAt: true,
+				lastFixAt: true,
+				batteryV: true,
+				rssiDbm: true,
+				satellites: true,
+				configRev: true,
+				firmwareVersion: true,
+				hwVariant: true,
+				vehicle: { select: { id: true, plateNo: true, make: true, model: true } },
+				commands: {
+					select: { id: true, kind: true, status: true, createdAt: true },
+					orderBy: { createdAt: "desc" },
+					take: 10,
+				},
+				events: {
+					select: { id: true, type: true, createdAt: true },
+					orderBy: { createdAt: "desc" },
+					take: 20,
+				},
 			},
 		}),
 		prisma.vehicle.findMany({
