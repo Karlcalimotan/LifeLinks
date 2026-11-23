@@ -26,7 +26,8 @@ export function BarChart({
 	return (
 		<figure className="m-0">
 			<figcaption className="sr-only">{title}</figcaption>
-			<div className="overflow-x-auto">
+			{/* biome-ignore lint/a11y/noNoninteractiveTabindex: the chart scrolls horizontally, so keyboard users need to reach it */}
+			<section className="overflow-x-auto" tabIndex={0} aria-label={title}>
 				<div className="min-w-full">
 					<div className="flex gap-1" aria-hidden="true">
 						{data.map((datum) => (
@@ -63,7 +64,7 @@ export function BarChart({
 						))}
 					</div>
 				</div>
-			</div>
+			</section>
 			<ul className="sr-only">
 				{data.map((datum) => (
 					<li key={datum.key}>{datum.description}</li>
