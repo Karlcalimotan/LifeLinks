@@ -139,6 +139,9 @@ export function DeviceConfigForm({
 										name={overrideInputName(field.key)}
 										checked={useDefault}
 										onChange={(event) => toggleInherit(field.key, event.target.checked)}
+										aria-label={t("useDefaultFor", {
+											field: t(`field.${field.key}`),
+										})}
 										className="size-4 rounded border-ink-600 bg-ink-950 accent-signal-500"
 									/>
 									{t("useDefault")}

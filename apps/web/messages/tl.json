@@ -461,6 +461,7 @@
 		"config": {
 			"intro": "I-override ang alinman sa anim na field na galing sa server para sa tracker na ito. Ang field na may default ng organisasyon ay gumagamit ng value ng organisasyon. Tinatanggihan ang mga value sa labas ng firmware envelope, o may fraction sa whole-number na field, at hindi ito awtomatikong inaayos.",
 			"useDefault": "Gamitin ang default ng organisasyon",
+			"useDefaultFor": "Gamitin ang default ng organisasyon para sa {field}",
 			"orgDefault": "Default ng organisasyon: {value} {unit}",
 			"envelope": "Pinapayagang range: {min} hanggang {max} {unit}",
 			"save": "I-save at ipadala",

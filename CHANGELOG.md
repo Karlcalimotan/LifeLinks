@@ -20,6 +20,10 @@ All notable changes to this project are documented here. The format follows
   detail shows "Cancel requested, waiting for tracker", retries when the
   command expires, and the stored command row keeps the server
   `impactEventId` (#9).
+- Per-tracker firmware configuration overrides for the six server-driven
+  fields, with shared envelope validation, a `SET_CONFIG` push, before/after
+  audit and a pending/confirmed state driven by the device's echoed
+  `config_rev` (#44).
 
 ### Changed
 

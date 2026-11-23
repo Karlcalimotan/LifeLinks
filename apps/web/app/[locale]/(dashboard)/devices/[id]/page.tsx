@@ -77,7 +77,7 @@ export default async function DeviceDetailPage({
 		}),
 		prisma.deviceCommand.findFirst({
 			where: { deviceId: id, kind: "SET_CONFIG", device: { orgId: current.org.id } },
-			orderBy: { createdAt: "desc" },
+			orderBy: [{ createdAt: "desc" }, { id: "desc" }],
 			select: { payload: true },
 		}),
 	]);

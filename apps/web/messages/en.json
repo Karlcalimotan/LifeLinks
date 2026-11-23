@@ -461,6 +461,7 @@
 		"config": {
 			"intro": "Override any of the six server-driven fields for this tracker. A field marked with the organisation default uses the organisation value. Values outside the firmware envelope, or a fraction on a whole-number field, are rejected and never adjusted.",
 			"useDefault": "Use organisation default",
+			"useDefaultFor": "Use organisation default for {field}",
 			"orgDefault": "Organisation default: {value} {unit}",
 			"envelope": "Allowed range: {min} to {max} {unit}",
 			"save": "Save and push",

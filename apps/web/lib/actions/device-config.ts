@@ -89,7 +89,7 @@ export async function updateDeviceConfigAction(
 		}),
 		prisma.deviceCommand.findFirst({
 			where: { deviceId: device.id, kind: "SET_CONFIG" },
-			orderBy: { createdAt: "desc" },
+			orderBy: [{ createdAt: "desc" }, { id: "desc" }],
 			select: { id: true, status: true, payload: true },
 		}),
 	]);

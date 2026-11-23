@@ -87,6 +87,7 @@ Organization ── Membership ── User
      │
      ├── Vehicle ── TrackerDevice ── DeviceStateEvent
      │        │            │
+     │        │            └── DeviceConfigOverride
      │        └── Trip ────┴── TelemetrySample
      │                 │
      └── ImpactEvent ──┴── AlertDelivery
@@ -100,6 +101,9 @@ OrgSettings, EmergencyContact, Geofence, AuditLog
   online?"; the event log answers "what happened?".
 - `ImpactEvent` is the incident. `AlertDelivery` records every intended
   recipient and its state.
+- `DeviceConfigOverride` is the optional per-tracker layer over `OrgSettings`.
+  A null column inherits the organisation value; the row is deleted when every
+  field inherits again.
 - `AuditLog` records member changes (acknowledge, resolve, false alarm,
   configuration, device token rotation).
 
@@ -158,6 +162,12 @@ Rules:
 - The device echoes `config_rev` in the heartbeat, so a responder can prove the
   unit applied the exact object.
 
+The effective object is `DeviceConfigOverride` field ?? `OrgSettings` field.
+`apps/web/lib/settings/device-config.ts` resolves it once for the command poll,
+heartbeat and ingest. Incident creation uses the effective `cancel_window_s`
+for the server cancel deadline, so the device countdown and the server deadline
+agree per tracker.
+
 The server and firmware tables are kept in sync by
 `apps/web/lib/firmware/config.test.ts` and `pnpm stack:check`.
 
@@ -177,5 +187,7 @@ add a new feature without copying a large domain pack.
 - `pnpm gen model <Name>` — Prisma model + schema + test
 - `OrgSettings` — add an operational field only if it belongs in the class B
   envelope; otherwise use a compile-time constant in the firmware.
+- `DeviceConfigOverride` — add a field only after it exists in the firmware
+  contract. A null column must mean inherit, never a hidden default.
 - `DeviceCommand` — add a command kind, handle it in `handleCommands()` and
   acknowledge it. Never add a command that can suppress the SOS path.

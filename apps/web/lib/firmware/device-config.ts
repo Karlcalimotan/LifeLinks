@@ -118,12 +118,6 @@ export function mergeDeviceConfig(
 	return merged;
 }
 
-export function hasDeviceConfigOverrides(
-	overrides: DeviceConfigOverrides | null | undefined,
-): boolean {
-	return CONFIG_FIELDS.some((field) => typeof overrides?.[field.key] === "number");
-}
-
 export interface DeviceConfigOverrideRow {
 	impactThresholdG: number | null;
 	tiltThresholdDeg: number | null;

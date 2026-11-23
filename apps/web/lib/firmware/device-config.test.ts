@@ -3,7 +3,6 @@ import { DEFAULT_FIRMWARE_CONFIG, type FirmwareConfigValues } from "./config";
 import {
 	configPushState,
 	configRevFromPayload,
-	hasDeviceConfigOverrides,
 	mergeDeviceConfig,
 	overrideRowToValues,
 	sameDeviceConfigOverrides,
@@ -161,12 +160,6 @@ describe("mergeDeviceConfig", () => {
 });
 
 describe("override presence", () => {
-	it("detects whether any field is overridden", () => {
-		expect(hasDeviceConfigOverrides({})).toBe(false);
-		expect(hasDeviceConfigOverrides({ impactThresholdG: 3 })).toBe(true);
-		expect(hasDeviceConfigOverrides(null)).toBe(false);
-	});
-
 	it("turns a row into only its non-null overrides", () => {
 		const values = overrideRowToValues({
 			impactThresholdG: 3.5,
