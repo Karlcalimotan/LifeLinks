@@ -16,11 +16,14 @@ main/
   gps.h               fix quality (Arduino-free)
   power.h             ADC scaling and power bands (Arduino-free)
   provisioning.h      WiFi AP name, form/NVS rules, boot reset (Arduino-free)
+  display.h           optional SSD1306 driver (I2C 0x3C)
+  display_format.h    screen text, IPv4, state labels (Arduino-free)
   status.h            buzzer patterns (Arduino-free)
   modem.h             SOS SMS body (Arduino-free)
   hardware.h          hw:: aliases over pins.h
 test/
   test_config/        envelope and defaults
+  test_display/       screen text, IPv4, state labels, panel width
   test_filters/       pothole, crash, rollover, door slam, debounce
   test_provisioning/  AP name, form/NVS limits, boot reset gesture
   test_safety/        countdown, cancel, retry, latch/ack, faults, power, GPS, SMS
@@ -104,6 +107,7 @@ NVS namespace `lifelink`:
 | `wifi_pass` | WPA/WPA2 passphrase, empty for an open network |
 | `device_id` | dashboard device id (the unit MAC by default) |
 | `device_token` | dashboard device token |
+| `device_uuid` | optional UUID; nothing writes it today, shown only when present |
 | `provisioned` | marker written only after a verified portal save |
 
 ### Boot reset (GPIO 13 / GPIO 14)
@@ -117,8 +121,8 @@ started inside the window may finish after it):
 - a button held from power-on (stuck) never arms, so a shorted button cannot
   erase anything;
 - hold 5 s: clears WiFi only and reboots on release, keeping the identity;
-- hold 10 s: clears WiFi, `device_id`, `device_token` and `provisioned`, then
-  reboots.
+- hold 10 s: clears WiFi, `device_id`, `device_token`, `device_uuid` and
+  `provisioned`, then reboots.
 
 The reset is disabled permanently if the alert state machine leaves `Idle`, so
 a long press during a countdown or SOS cannot reboot the tracker. A 5 s hold is
@@ -149,6 +153,85 @@ leaving the Device Token field blank.
 
 The server command poll also sends `alert_phones`; the firmware caches the first
 two numbers in NVS so the SMS path keeps working if the backend is unreachable.
+
+## Status display (SSD1306)
+
+The production firmware drives an optional 128x64 SSD1306 panel on the shared
+I2C bus. It is a commissioning and bench aid, not a safety indicator.
+
+| Signal | Connection |
+| --- | --- |
+| VCC | 3V3 (the panel is a 3.3 V part; do not use the 5 V rail) |
+| GND | GND |
+| SDA | GPIO 21, shared with the MPU-6050 |
+| SCL | GPIO 22, shared with the MPU-6050 |
+| RES | not connected; the driver initialises with `reset=false` |
+| Address | `0x3C` |
+
+The driver is fixed at `0x3C` and 128x64. A module strapped to `0x3D`, or a
+different panel size, needs `fw::kDisplayAddress`/`kDisplayWidth`/`kDisplayHeight`
+in `main/display.h` changed and a rebuild. Do not power the panel from 5 V.
+
+### Screens
+
+| Screen | When | Content |
+| --- | --- | --- |
+| `PROVISIONING` | the setup AP is open | `WiFi setup`, `Join network:`, the `LifeLink-XXXX` AP name, `Open 192.168.4.1` |
+| `JOINING` | a stored-network check or a portal join is in progress | the SSID, `Working` with progress dots, and `Try n of 3` for the stored check |
+| `WIFI OK` | about 3 s after a verified portal save | `WiFi OK - saved`, the SSID, the IP, `Uplink: 4G modem` |
+| Home | every other time | `WiFi: setup` / `WiFi: joining` / `WiFi: connected`, the device ID (`g_deviceId`), an optional UUID, `Uplink: 4G modem` |
+
+**"Connected" means joined to WiFi, not online.** The WiFi radio is
+commissioning-only: telemetry, commands and SOS stay on the A7670E. The home and
+success screens say `Uplink: 4G modem` so the display cannot be read as a
+network-status indicator. The home screen keeps the last proven result; the
+radio is switched off after commissioning, so `WiFi: connected` is a
+commissioning result, not a live association.
+
+The device token is never displayed. `display_format.h` has no token input at
+all; the home screen receives only the WiFi state, `g_deviceId`, and an optional
+UUID.
+
+The UUID line is shown only when one already exists. The firmware reads the
+optional NVS key `device_uuid` and never derives or invents one. Nothing writes
+that key today, so the line is normally absent. A UUID longer than 21 characters
+is truncated on the panel; the full value stays in NVS.
+
+Screen text is sanitised to printable ASCII: control bytes and anything above
+0x7E render as `?`, so a UTF-8 SSID cannot produce a broken glyph or split a
+multi-byte sequence.
+
+The build pins Adafruit SSD1306 2.5.17, Adafruit GFX 1.13.0 and Adafruit BusIO
+1.17.4 in `platformio.ini`. They are not used by the native test environment.
+
+### Non-blocking behaviour
+
+- `begin()` probes `0x3C` once. A missing panel, or a failed init, disables the
+  display and the tracker runs exactly as before. The serial log says
+  `[OLED] no SSD1306 at 0x3C - continuing without a display`.
+- The driver redraws only when the rendered text changes, at most once per
+  250 ms. A full 1024-byte frame at 400 kHz takes about 25 ms.
+- The caller skips the display entirely while the alert state is not `Idle`, so
+  no I2C traffic can sit inside a countdown, an alert or an acknowledgement.
+- The display is serviced after the buzzer is written and before the blocking
+  modem block. There are no `delay()` calls in the display path.
+- The I2C clock is raised to 400 kHz only when the panel answers. If a long bus
+  or a slow module proves unreliable, lower `kDisplayI2cClockHz` and expect a
+  longer flush (about 100 ms at 100 kHz).
+
+The pure layout lives in `main/display_format.h` and is covered by
+`test/test_display`, so the screen text, IPv4 formatting, AP name and state
+labels are testable without a panel. Hardware checks are in
+[`../docs/hardware.md`](../docs/hardware.md); they are not a bench claim.
+
+### Bench checks (human)
+
+The full list is in [`../docs/hardware.md`](../docs/hardware.md), items 18-24.
+The minimum is: boot with the panel connected and confirm the home screen; boot
+with it unplugged and confirm the firmware still joins and reports; run a portal
+join and confirm `JOINING`, then `WIFI OK`, then home; trigger an alert and
+confirm the display does not update during the alert. None of this is a bench
+claim until it runs on a real unit.
 
 ## Acknowledgement latch (`ACK_INCIDENT`)
 
@@ -284,3 +367,10 @@ the integration, not as a formality.
   but anyone in radio range can load it while it is open. The 10-minute
   lifetime and physical control of the unit are the mitigations; a per-unit AP
   password is future work.
+- **The status display is not a safety indicator.** It is frozen while the alert
+  state is not `Idle`, and the firmware never reads it back. A panel that fails
+  after boot can add a bounded I2C wait to the loop; the alert state machine and
+  the modem path do not depend on it.
+- **The display shares the I2C bus with the IMU.** A wiring fault on the panel
+  can affect the MPU-6050 too. The panel is optional: boot with it disconnected
+  to isolate an I2C problem.

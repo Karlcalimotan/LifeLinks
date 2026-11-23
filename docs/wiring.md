@@ -18,6 +18,7 @@ countdown.
 
 - ESP32 DevKit V1 (30-pin, ESP32-WROOM-32)
 - MPU-6050 (GY-521) accelerometer + gyro, I2C
+- SSD1306 128x64 I2C OLED, optional setup/status display at 0x3C
 - SW-420 vibration sensor module (digital output)
 - NEO-6M GPS (GY-GPS6MV2), UART1
 - A7670E 4G LTE Cat-1 core board, UART2, nano SIM
@@ -40,16 +41,20 @@ countdown.
 | A7670E RX (A7670E TXD to ESP32) | 18 | UART2 RX2 |
 | A7670E TX (ESP32 to A7670E RXD) | 19 | UART2 TX2 |
 | A7670E PWRKEY | 4 | optional |
-| MPU-6050 SDA | 21 | I2C |
-| MPU-6050 SCL | 22 | I2C |
+| MPU-6050 SDA | 21 | I2C, shared with the SSD1306 |
+| MPU-6050 SCL | 22 | I2C, shared with the SSD1306 |
 | MPU-6050 INT | 23 | optional |
 | Battery sense | 34 | optional; input-only, external divider required |
 | Ignition sense | 35 | optional; input-only, external divider required |
 | WiFi reset button | 13 | INPUT_PULLUP, active LOW, boot-only 5 s |
 | Factory reset button | 14 | INPUT_PULLUP, active LOW, boot-only 10 s |
 
-Power: ESP32 VIN = 5 V rail. MPU-6050, SW-420 and NEO-6M VCC = 3V3. A7670E
-VIN = 5 V rail. All grounds common.
+Power: ESP32 VIN = 5 V rail. MPU-6050, SW-420, NEO-6M and the optional SSD1306
+VCC = 3V3. A7670E VIN = 5 V rail. All grounds common.
+
+The SSD1306 status display uses the same I2C bus as the MPU-6050 (SDA 21,
+SCL 22) at address 0x3C. It has no reset line wired; VCC is 3V3, never 5 V.
+The panel is optional and the firmware runs without it.
 
 Do not use strapping pins GPIO 0, 2, 5, 12, 15 for new features.
 
@@ -81,6 +86,8 @@ Vehicle 12 V
   across the buzzer if it is magnetic.
 - All grounds are common. The buck, shield, ESP32, sensors and modem must share
   GND.
+- The optional SSD1306 status display is powered from the DevKit 3V3 rail and
+  shares SDA 21 / SCL 22 with the MPU-6050. Never power it from 5 V.
 
 ## Pre-power checklist (human)
 

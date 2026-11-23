@@ -61,7 +61,7 @@ The cancel button on GPIO 33 stays dedicated to the alert.
 | --- | --- |
 | power on with the button released, wait 5 s | listener arms (50 ms debounce) |
 | hold 5 s | clears WiFi, keeps device identity; reboots on release |
-| hold 10 s | clears WiFi, `device_id`, `device_token`, `provisioned`; reboots |
+| hold 10 s | clears WiFi, `device_id`, `device_token`, `device_uuid`, `provisioned`; reboots |
 | button held from power-on | no reset (stuck-button guard) |
 | any alert leaves `Idle` | reset is disabled for the rest of the boot |
 
@@ -73,6 +73,47 @@ erase a working unit. A 5 s hold does not reboot immediately, so continuing to
 
 WiFi does not change the A7670E wiring, the SOS path or the alert state machine.
 The modem is still the only uplink.
+
+## Status display (SSD1306)
+
+The tracker can drive an optional 128x64 SSD1306 OLED as a commissioning and
+bench aid. It is not part of the safety path and the firmware never reads it
+back.
+
+- **Bus:** the shared I2C bus already used by the MPU-6050. SDA GPIO 21, SCL
+  GPIO 22, VCC 3V3, GND. Do not use the 5 V rail; the panel is a 3.3 V part.
+- **Address:** `0x3C`, fixed in `firmware/main/display.h`. Some modules are
+  strapped to `0x3D`; use a `0x3C` module or change the constant and rebuild.
+- **Reset:** no RES line is wired. The driver initialises with `reset=false`.
+  If a particular module needs a reset pulse, wire RES to a spare GPIO and
+  change `display.h`.
+- **Clock:** the driver raises the bus to 400 kHz when the panel answers; the
+  MPU-6050 supports the same rate. If a long bus or a slow module is unreliable,
+  lower `kDisplayI2cClockHz` and accept a slower frame (about 100 ms at
+  100 kHz).
+- **Mounting:** put the panel where it can be seen during installation and
+  bench work. It is not a driver-facing gauge and must not be mounted where it
+  distracts the driver.
+
+| Screen | Meaning |
+| --- | --- |
+| `PROVISIONING` | The setup AP is open. Join `LifeLink-XXXX` and open `192.168.4.1`. |
+| `JOINING` | A stored-network check or a portal join is in progress; the SSID, progress dots and `Try n of 3` are shown. |
+| `WIFI OK` | A portal join was verified and saved; the SSID and IP stay for about 3 s. |
+| Home | `WiFi: setup`, `WiFi: joining` or `WiFi: connected`, the device ID, an optional UUID, and `Uplink: 4G modem`. |
+
+`WiFi: connected` means the unit joined a WiFi network. It does **not** mean the
+tracker is online: telemetry, commands and SOS stay on the A7670E. The home
+screen keeps the last proven result; the radio is switched off after
+commissioning, so `WiFi: connected` is a commissioning result, not a live
+association. The display never shows the device token, and the UUID line appears
+only when a UUID already exists (the optional NVS key `device_uuid`; nothing
+writes it today). A UUID longer than 21 characters is truncated on the panel.
+
+If the panel is absent or the I2C init fails, the firmware logs
+`[OLED] no SSD1306 at 0x3C - continuing without a display` and runs normally.
+The display is redrawn only when the text changes (at most every 250 ms) and is
+skipped entirely while the alert state is not `Idle`.
 
 ## Bench checklist
 
@@ -125,6 +166,30 @@ the result.
 17. **Portal lifetime**: leave the portal open without saving. Confirm it closes
     after 10 minutes and the tracker returns to normal monitoring and modem
     operation without a reboot.
+18. **Display present**: boot a provisioned unit with the panel connected.
+    Confirm the home screen shows the device ID that matches the boot log and
+    `STATUS`, `WiFi: connected` after a successful stored join, and
+    `Uplink: 4G modem`.
+19. **Display absent**: unplug the panel and boot. Confirm the serial log says
+    `[OLED] no SSD1306 at 0x3C - continuing without a display`, the unit still
+    joins its stored network and sends a heartbeat/SMS, and there is no reset
+    loop.
+20. **Provisioning screen**: factory-reset the unit (10 s on GPIO 14). Confirm
+    the display shows `PROVISIONING`, the `LifeLink-XXXX` AP name matching the
+    last four MAC hex digits, and `Open 192.168.4.1`.
+21. **Join screens**: join a network from the portal. Confirm `JOINING` shows
+    the SSID and progress, `WIFI OK` shows the SSID and IP for about 3 s, then
+    the home screen shows `WiFi: connected`.
+22. **Wrong password**: submit a deliberately wrong password. Confirm the
+    display returns to `PROVISIONING` (no `WIFI OK`) and the stored credentials
+    are unchanged.
+23. **Alert isolation**: trigger a countdown and let it alert with the panel
+    connected. Confirm the display does not update during the countdown or the
+    alert, the buzzer/cancel/ack timing is unchanged, and the display updates
+    again after the acknowledgement.
+24. **Shared bus**: with the panel and the MPU-6050 on the same bus, confirm the
+    heartbeat still carries plausible `accel_g`/`tilt_deg` values and the panel
+    does not corrupt the IMU readings.
 
 ## Bill of materials
 
@@ -137,6 +202,7 @@ the result.
 | A7670E Cat-1 | SMS / HTTP uplink |
 | Active buzzer 5 V + NPN (2N2222/S8050) + 1 kΩ | Cabin alarm |
 | Momentary 12 mm button | Driver cancel |
+| SSD1306 128x64 I2C OLED (0x3C) | Optional setup/status display, shared I2C |
 | LM2596S buck | 12 V → 5 V |
 | 18650 shield V8 + 2 cells | Backup power |
 | 1000 µF / 16 V | Modem current buffer |
