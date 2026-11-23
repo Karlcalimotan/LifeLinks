@@ -2,8 +2,10 @@
 
 import { verifyPassword } from "@/lib/auth/password";
 import { loginSchema } from "@/lib/auth/schemas";
-import { createSession, destroySession } from "@/lib/auth/session";
+import { createSession, destroySession, getSession } from "@/lib/auth/session";
 import prisma from "@/lib/prisma";
+import { revokePushOnLogout } from "@/lib/push/revoke";
+import { clampUserAgent } from "@/lib/push/schema";
 import { rateLimit } from "@/lib/rate-limit";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -53,6 +55,26 @@ export async function loginAction(formData: FormData) {
 
 export async function logoutAction(formData: FormData) {
 	const locale = localeFrom(formData);
+
+	// Revoke this browser's push subscription before the session disappears.
+	// Failure is logged by the helper and never blocks the sign out.
+	const session = await getSession();
+	const rawEndpoint = String(formData.get("pushEndpoint") ?? "").trim();
+	if (session) {
+		try {
+			const headerStore = await headers();
+			await revokePushOnLogout({
+				userId: session.sub,
+				orgId: session.orgId,
+				endpoint: rawEndpoint.length > 0 && rawEndpoint.length <= 2048 ? rawEndpoint : null,
+				userAgent: clampUserAgent(headerStore.get("user-agent")),
+			});
+		} catch {
+			// Signing out is the user's intent; a stale row is not a reason to keep
+			// the session open.
+		}
+	}
+
 	await destroySession();
 	redirect(`/${locale}/login`);
 }

@@ -21,6 +21,7 @@
 		"prisma:migrate": "pnpm --filter web prisma:migrate",
 		"prisma:deploy": "pnpm --filter web prisma:deploy",
 		"seed": "pnpm --filter web seed",
+		"vapid": "node scripts/vapid-keys.mjs",
 		"gen": "node stack/generators/gen.mjs",
 		"stack:check": "node stack/src/verify.mjs --self",
 		"api:latency": "node scripts/api-latency.mjs",

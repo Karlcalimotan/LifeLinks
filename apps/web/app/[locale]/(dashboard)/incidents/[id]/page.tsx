@@ -21,6 +21,7 @@ import {
 	timelineHasCancellation,
 } from "@/lib/incidents/timeline";
 import prisma from "@/lib/prisma";
+import { isCancelActionFocus } from "@/lib/push/payload";
 import { formatDateTime, telHref } from "@/lib/utils";
 import { ExternalLink, MapPin, Phone, UserRound } from "lucide-react";
 import { getTranslations } from "next-intl/server";
@@ -58,10 +59,10 @@ export default async function IncidentDetailPage({
 	searchParams,
 }: {
 	params: Promise<{ locale: string; id: string }>;
-	searchParams: Promise<{ updated?: string; error?: string; cancel?: string }>;
+	searchParams: Promise<{ updated?: string; error?: string; cancel?: string; action?: string }>;
 }) {
 	const { locale, id } = await params;
-	const { updated, error, cancel } = await searchParams;
+	const { updated, error, cancel, action } = await searchParams;
 	const current = await requireUser();
 	const t = await getTranslations({ locale, namespace: "incidents" });
 
@@ -376,6 +377,7 @@ export default async function IncidentDetailPage({
 							status={incident.status}
 							role={current.role}
 							cancelAlert={cancelAlert}
+							focusCancel={isCancelActionFocus(action)}
 						/>
 					</CardContent>
 				</Card>

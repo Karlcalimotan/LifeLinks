@@ -7,9 +7,11 @@ import { incidentSchema } from "@/lib/device/schema";
 import { resolveDeviceTime } from "@/lib/device/time";
 import { isValidCoordinate } from "@/lib/geo";
 import prisma from "@/lib/prisma";
+import { notifyIncidentPush } from "@/lib/push/send";
 import { rateLimit } from "@/lib/rate-limit";
 import { getOrgSettings } from "@/lib/settings/org";
 import { Prisma } from "@prisma/client";
+import { after } from "next/server";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +43,9 @@ export const POST = withApi(
 		if (!device.vehicleId) {
 			throw conflict("Tracker is not assigned to a vehicle. Assign it before reporting incidents.");
 		}
+		// Kept as a local because the deferred push callback runs after this
+		// scope's narrowing has ended.
+		const vehicleId = device.vehicleId;
 
 		const detectedAt = resolveDeviceTime(input.detected_at);
 		const hasFix =
@@ -136,7 +141,7 @@ export const POST = withApi(
 					data: {
 						orgId: device.orgId,
 						deviceId: device.id,
-						vehicleId: device.vehicleId as string,
+						vehicleId,
 						tripId: activeTrip?.id,
 						clientIncidentId: input.incident_id,
 						detectedAt,
@@ -194,6 +199,24 @@ export const POST = withApi(
 
 				return { created, deliveries };
 			});
+
+			// The incident is committed. Delivery runs after the response is sent,
+			// so a slow push service cannot delay the device, and its failure cannot
+			// turn a recorded crash into a device error or a retry loop. The local
+			// catch is the second line of defence if the sender regresses.
+			if (status !== "CANCELLED") {
+				after(async () => {
+					try {
+						await notifyIncidentPush({
+							orgId: device.orgId,
+							incidentId: incident.created.id,
+							vehicleId,
+						});
+					} catch {
+						console.warn("[push] notification dispatch failed after commit.");
+					}
+				});
+			}
 
 			return ok({
 				received: true,
