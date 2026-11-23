@@ -50,6 +50,20 @@
 		"notificationsLoading": "Nag-a-update.",
 		"viewAll": "Tingnan lahat ng insidente"
 	},
+	"push": {
+		"title": "Mga alert sa browser",
+		"hint": "Makatanggap ng notification kapag may bagong insidente.",
+		"checking": "Sinusuri ang browser…",
+		"working": "Ina-update…",
+		"enable": "I-on ang mga alert",
+		"disable": "I-off",
+		"retry": "Subukan muli",
+		"subscribed": "Naka-on ang mga alert sa browser para sa device na ito.",
+		"unsupported": "Hindi sinusuportahan ng browser na ito ang web push.",
+		"unconfigured": "Hindi naka-configure ang push sa server na ito. Kailangang idagdag ng administrator ang VAPID keys.",
+		"denied": "Naka-block ang mga notification para sa site na ito. Payagan ang mga ito sa settings ng browser, pagkatapos subukan muli.",
+		"error": "Hindi nabago ang mga alert sa browser. Subukan muli."
+	},
 	"nav": {
 		"dashboard": "Dashboard",
 		"map": "Live na mapa",
