@@ -25,6 +25,7 @@ import { isValidCoordinate, mapLink } from "@/lib/geo";
 import prisma from "@/lib/prisma";
 import { formatDateTime } from "@/lib/utils";
 import { type VehicleTab, parseVehicleTab } from "@/lib/vehicles/detail";
+import { VEHICLE_DETAIL_SELECT } from "@/lib/vehicles/payload";
 import { ExternalLink } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
@@ -57,7 +58,7 @@ export default async function VehicleDetailPage({
 
 	const vehicle = await prisma.vehicle.findFirst({
 		where: { id, ...vehicleScope(current.role, current.org.id, current.user.id) },
-		include: { devices: { orderBy: { createdAt: "asc" }, take: 1 } },
+		select: VEHICLE_DETAIL_SELECT,
 	});
 	if (!vehicle) notFound();
 

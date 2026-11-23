@@ -33,7 +33,7 @@ BOOT
        ├─ SMS to configured phones
        ├─ HTTP incident to the dashboard
        ├─ retry every 60 s (configurable)
-       └─ stop retrying after 10 min; the incident stays open
+       └─ stay in ALERTING until ACK_INCIDENT; after 10 min a slower reminder beep, never silence
 ```
 
 The server records a `SUSPECTED` incident at confirmation and upgrades it to
@@ -65,6 +65,67 @@ cover the matrix above; the vehicle bench test is what proves it.
   not stop the SMS; the dashboard can still mark the incident a false alarm.
 - The cancel is sent to the backend as an event, not treated as "nothing
   happened".
+
+## Acknowledgement latch
+
+`ALERTING` has no timed exit. The device stays in that state, with a solid LED
+and an audible buzzer, until the portal acknowledges the active incident or the
+unit loses power.
+
+After ten minutes the buzzer changes from the long beep (2 s on / 1 s off) to a
+slower reminder (1 s on / 5 s off). The LED stays solid. The change is a
+comfort decision, not a safety timeout: the alarm never goes silent on a timer.
+
+The acknowledgement command carries the device client incident id:
+
+```json
+{
+  "kind": "ACK_INCIDENT",
+  "payload": { "incident_id": "llk-1a2b3c4d-00001234" }
+}
+```
+
+- The id is the `llk-...` value the device generated and sent as `incident_id`.
+  It is not the server `ImpactEvent.id`.
+- A matching id while `Alerting` stops the buzzer, clears the active incident,
+  returns the device to `Idle`, and ACKs with `{ "detail": "acknowledged" }`.
+- A different or missing id, an acknowledgement during the countdown, or one
+  with no active incident changes nothing and ACKs with
+  `{ "detail": "unknown_incident" }`. An acknowledgement can never suppress a
+  countdown that has not expired.
+- `CANCEL_ALERT` keeps its existing behavior for the false-alarm path. The
+  driver button remains the only way to stop the countdown locally.
+- SMS and HTTP retries continue on `sos_retry_s` until the acknowledgement, so
+  an unattended unit keeps using the SIM. That is deliberate: a missed alert is
+  worse than the cost.
+- A reboot or power loss ends the latch. The unit boots to `Idle` and the
+  incident must be resolved from the portal.
+
+### Portal recovery when the tracker cannot confirm
+
+The portal requires a tracker acknowledgement before a dispatched incident can
+be resolved. If the acknowledgement command expired or failed, or the tracker
+answered `unknown_incident` or `unconfirmed`, an ADMIN may use **Resolve without
+tracker confirmation** on the incident detail page. This includes a tracker
+that rebooted or lost power: the unit boots to `Idle`, no longer knows the
+incident, and answers `unknown_incident`. The path is deliberately narrow:
+
+- only an ADMIN sees it, and only for a device-backed `CONFIRMED` incident;
+- it is not offered while a fresh acknowledgement command is still pending;
+- the UI requires typing `RESOLVE`, and the server verifies the same field;
+- the action audits `incident.resolved_unconfirmed` with the actor, the
+  acknowledgement state, and the last command state, sets `RESOLVED`, and
+  clears the pending acknowledgement.
+
+This recovery does **not** stop the device. The alarm may keep sounding until
+the unit is powered off or the tracker acknowledges. That is the same
+power-loss limit described above: the portal can close its record, but it cannot
+silence a tracker it cannot reach. After a reboot the alarm is already silent,
+but the portal cannot prove that from the record, so the warning still applies.
+
+The pure latch/ack decision is covered by native tests. The physical bench run
+(synthetic impact, wait past the countdown, ACK, silence) is issue #54 and stays
+a human task; no flashing or hardware result is claimed here.
 
 ## Alert channels
 
@@ -119,7 +180,8 @@ recovered on boot: the incident id is persisted before the countdown starts.
 
 Verified in this repository:
 
-- the pure filters, state machine, retry, fault and power logic (native tests)
+- the pure filters, state machine, retry, latch/ack, fault and power logic
+  (native tests)
 - the server/firmware configuration contract (Vitest + `pnpm stack:check`)
 - the three-role permission model and vehicle-owner scoping (Vitest)
 - the web build, typecheck, unit tests and the API envelope

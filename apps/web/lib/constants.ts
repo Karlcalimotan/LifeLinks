@@ -6,6 +6,13 @@ export const APP_TAGLINE = "Crash detection and emergency response for every veh
 export const SESSION_COOKIE = "lifelink_session";
 export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
+/**
+ * The platform console uses its own cookie. A tenant session can never be
+ * replayed as a platform session (and the platform JWT carries no orgId or
+ * role, so the reverse is also impossible).
+ */
+export const PLATFORM_SESSION_COOKIE = "lifelink_platform_session";
+
 export const DEVICE_TOKEN_HEADER = "x-device-token";
 export const DEVICE_TOKEN_PREFIX = "llk_";
 

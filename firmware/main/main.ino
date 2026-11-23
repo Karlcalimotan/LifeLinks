@@ -5,6 +5,9 @@
 	IMU + vibration + GPS -> ImpactFilter -> CrashSafety countdown
 	  cancel button within the window  -> SMS/incident cancelled
 	  window expires                   -> SMS to configured phones + HTTP incident
+	  ACK_INCIDENT for this incident   -> alarm stops and the tracker returns to idle
+	Alerting is latched: it never stops on a timer. After ten minutes the buzzer
+	drops to a slower reminder pattern and the LED stays solid.
 	Heartbeat and command polling run on a non-blocking interval.
 
   This sketch is deliberately explicit about what is verified and what still
@@ -36,6 +39,7 @@
 
 #include "config.h"
 #include "config_apply.h"
+#include "display.h"
 #include "filters.h"
 #include "gps.h"
 #include "hardware.h"
@@ -50,7 +54,7 @@
 #endif
 
 #ifndef FW_VERSION
-#define FW_VERSION "0.2.0"
+#define FW_VERSION "0.3.0"
 #endif
 
 #ifndef LIFELINK_API_BASE
@@ -74,12 +78,23 @@ fw::MinInterval g_commandTimer(5 * 1000);
 
 String g_deviceId;
 String g_deviceToken;
+// Optional, read-only: no flow writes this key yet, so the home screen omits
+// the UUID line unless one already exists.
+String g_deviceUuid;
 uint32_t g_configRev = 0;
 String g_pendingConfig;
 uint32_t g_pendingRev = 0;
 bool g_configPending = false;
 bool g_armed = true;
 bool g_mpuOk = false;
+
+// Optional status panel. It is never part of the safety path; see display.h.
+fw::StatusDisplay g_display;
+fw::DisplayWifiState g_homeWifiState = fw::DisplayWifiState::Setup;
+String g_activeWifiSsid;
+String g_wifiOkSsid;
+char g_wifiOkIp[fw::kIpv4TextMax] = {0};
+uint32_t g_wifiOkUntilMs = 0;
 
 fw::AlertState g_lastState = fw::AlertState::Idle;
 uint32_t g_cancelledAt = 0;
@@ -1038,6 +1053,7 @@ void failPortalJoin(const char* detail, const char* message) {
 	g_portalJoinDetail = detail;
 	g_portalJoinMessage = message != nullptr ? message : portalJoinFailureMessage(detail);
 	g_portalJoinState = PortalJoinState::Failed;
+	g_homeWifiState = fw::DisplayWifiState::Setup;
 	g_portalPendingPass = "";
 	// Keep a first-time token in RAM so a retry does not force it to be retyped,
 	// but never let it shadow an already-stored token: a blank field then means
@@ -1074,8 +1090,19 @@ void succeedPortalJoin() {
 	g_portalStopAtMs = millis() + kPortalCloseDelayMs;
 	g_portalPendingPass = "";
 	g_portalPendingToken = "";
+
+	// The success screen outlives the portal's 2 s close delay by a second, so
+	// the operator sees the SSID and IP for about 3 s even after the radio is
+	// switched off. The home screen then reports "WiFi: joined", which means
+	// joined to the network, not online.
+	const IPAddress ip = WiFi.localIP();
+	fw::formatIpv4(ip[0], ip[1], ip[2], ip[3], g_wifiOkIp, sizeof(g_wifiOkIp));
+	g_wifiOkSsid = g_portalPendingSsid;
+	g_wifiOkUntilMs = millis() + fw::kDisplayWifiOkHoldMs;
+	g_homeWifiState = fw::DisplayWifiState::Joined;
+
 	Serial.printf("[WIFI] joined \"%s\" at %s - provisioning saved; closing portal\n",
-				  g_portalPendingSsid.c_str(), WiFi.localIP().toString().c_str());
+				  g_portalPendingSsid.c_str(), ip.toString().c_str());
 }
 
 void startPortalJoin(const String& ssid, const String& pass, const String& deviceId,
@@ -1296,6 +1323,7 @@ void handlePortalNotFound() {
 void startProvisioningPortal() {
 	if (g_portalActive) return;
 
+	g_homeWifiState = fw::DisplayWifiState::Setup;
 	g_storedWifiCheckActive = false;
 	g_storedWifiState = StoredWifiState::Done;
 
@@ -1357,6 +1385,8 @@ void startProvisioningPortal() {
 void startStoredWifiAttempt(uint32_t now) {
 	const String ssid = prefs.getString("wifi_ssid", "");
 	const String pass = prefs.getString("wifi_pass", "");
+	g_activeWifiSsid = ssid;
+	g_homeWifiState = fw::DisplayWifiState::Joining;
 	g_storedWifiAttempts += 1;
 	g_storedWifiStartedMs = now;
 	g_storedWifiState = StoredWifiState::Joining;
@@ -1379,6 +1409,7 @@ void serviceStoredWifiCheck(uint32_t now) {
 		if (WiFi.status() == WL_CONNECTED && hasIp) {
 			Serial.printf("[WIFI] stored network reachable at %s; radio off\n",
 						  ip.toString().c_str());
+			g_homeWifiState = fw::DisplayWifiState::Joined;
 			WiFi.disconnect(false, false);
 			WiFi.setAutoReconnect(false);
 			WiFi.mode(WIFI_OFF);
@@ -1433,6 +1464,9 @@ void serviceWifiCommissioning(uint32_t now) {
 			return;
 		}
 		if ((now - g_portalStartedMs) >= fw::kPortalMaxLifetimeMs) {
+			// No verified save in the window: the home screen must say "setup",
+			// not "connected", even if a stored network exists.
+			g_homeWifiState = fw::DisplayWifiState::Setup;
 			stopProvisioningPortal("lifetime elapsed");
 			return;
 		}
@@ -1458,6 +1492,52 @@ void setupWifiCommissioning() {
 	startStoredWifiAttempt(millis());
 }
 
+// ---------------------------------------------------------------------------
+// Status display (SSD1306 at 0x3C on the shared 21/22 bus)
+// ---------------------------------------------------------------------------
+//
+// The panel is optional and is not part of the safety path. It shows the
+// commissioning state and a home summary; it never shows the device token and
+// never claims the unit is "online", because WiFi is commissioning-only and
+// telemetry stays on the A7670E.
+//
+// The update is bounded: the driver redraws only when the text changed, at
+// most once per kDisplayMinDrawGapMs, and this function returns before any I2C
+// traffic while the alert state machine is not Idle. No delays here.
+
+void serviceDisplay(uint32_t now) {
+	if (!g_display.present()) return;
+	if (g_safety.state() != fw::AlertState::Idle) return;
+
+	if (g_wifiOkUntilMs != 0) {
+		if (static_cast<int32_t>(now - g_wifiOkUntilMs) < 0) {
+			g_display.show(fw::wifiOkScreen(g_wifiOkSsid.c_str(), g_wifiOkIp), now);
+			return;
+		}
+		g_wifiOkUntilMs = 0;
+	}
+
+	if (g_portalActive) {
+		if (g_portalJoinState == PortalJoinState::Testing) {
+			g_display.show(fw::joiningScreen(g_portalPendingSsid.c_str(),
+											 now / fw::kDisplayProgressStepMs, 0, 0),
+						   now);
+		} else {
+			g_display.show(fw::provisioningScreen(g_portalApName.c_str()), now);
+		}
+		return;
+	}
+
+	if (g_storedWifiCheckActive && g_storedWifiState == StoredWifiState::Joining) {
+		g_display.show(fw::joiningScreen(g_activeWifiSsid.c_str(), now / fw::kDisplayProgressStepMs,
+										 g_storedWifiAttempts, fw::kMaxJoinFailures),
+					   now);
+		return;
+	}
+
+	g_display.show(fw::homeScreen(g_homeWifiState, g_deviceId.c_str(), g_deviceUuid.c_str()), now);
+}
+
 void clearStoredWifiCredentials() {
 	prefs.remove("wifi_ssid");
 	prefs.remove("wifi_pass");
@@ -1466,9 +1546,11 @@ void clearStoredWifiCredentials() {
 void clearStoredIdentity() {
 	prefs.remove("device_id");
 	prefs.remove("device_token");
+	prefs.remove("device_uuid");
 	prefs.remove("provisioned");
 	g_deviceId = chipMac();
 	g_deviceToken = "";
+	g_deviceUuid = "";
 	g_provisioned = false;
 }
 
@@ -1730,6 +1812,24 @@ void handleCommands(JsonArray commands) {
 				sendCommandAck(id, "ACKED", "too_late");
 			}
 			continue;
+		} else if (kind == "ACK_INCIDENT") {
+			// The portal acknowledges the dispatch alarm with the device client
+			// incident id (llk-...), not the server ImpactEvent id. A different
+			// or missing id changes nothing: the alarm keeps running.
+			const String incidentId = command["payload"]["incident_id"] | "";
+			const fw::IncidentAck result =
+				g_safety.acknowledgeIncident(incidentId.c_str(), g_incidentId.c_str());
+			if (result == fw::IncidentAck::Acknowledged) {
+				Serial.println("[CMD] ACK_INCIDENT accepted");
+				g_buzzer.setPattern(fw::BuzzerPattern::Off, millis());
+				g_incidentId = "";
+				g_lastState = fw::AlertState::Idle;
+				sendCommandAck(id, "ACKED", "acknowledged");
+			} else {
+				Serial.println("[CMD] ACK_INCIDENT for an unknown incident");
+				sendCommandAck(id, "ACKED", "unknown_incident");
+			}
+			continue;
 		}
 		sendCommandAck(id, "ACKED", nullptr);
 	}
@@ -1875,11 +1975,13 @@ void setup() {
 	delay(250);
 	Serial.println();
 	Serial.println("[FIRMWARE] LifeLink " FW_VERSION);
-	Serial.println("[WIRING] MPU 21/22, SW-420 32, cancel 33, GPS 26/27, modem 16/17, buzzer 25");
+	Serial.println(
+		"[WIRING] MPU+OLED 21/22, SW-420 27, cancel 33, GPS 16/17, modem 18/19, buzzer 25");
 
 	prefs.begin("lifelink", false);
 	g_deviceId = prefs.getString("device_id", chipMac());
 	g_deviceToken = prefs.getString("device_token", "");
+	g_deviceUuid = prefs.getString("device_uuid", "");
 	loadConfig();
 
 	pinMode(hw::kBuzzer, OUTPUT);
@@ -1904,6 +2006,14 @@ void setup() {
 		mpu.setGyroRange(MPU6050_RANGE_500_DEG);
 		mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
 		Serial.println("[IMU] MPU-6050 ready");
+	}
+
+	// The panel is optional. A missing panel or a failed init leaves the
+	// tracker running with no display, exactly as before.
+	if (g_display.begin()) {
+		Serial.println("[OLED] SSD1306 ready at 0x3C");
+	} else {
+		Serial.println("[OLED] no SSD1306 at 0x3C - continuing without a display");
 	}
 
 	gpsSerial.begin(hw::kGpsBaud, SERIAL_8N1, hw::kGpsRx, hw::kGpsTx);
@@ -2002,9 +2112,12 @@ void loop() {
 			g_safety.markAlertSent(now);
 		}
 
-		if (state == fw::AlertState::Alerting && (now - g_alertStartedAt) > 10UL * 60UL * 1000UL) {
-			Serial.println("[SOS] retry window elapsed; keeping the incident open");
-			g_safety.stopAlerting();
+		// Alerting is latched until ACK_INCIDENT, so the alarm has no timed
+		// exit. After ten minutes it falls back to a slower reminder pattern
+		// instead of going silent.
+		if (state == fw::AlertState::Alerting) {
+			const fw::BuzzerPattern pattern = fw::alertingPattern(now - g_alertStartedAt);
+			if (g_buzzer.pattern() != pattern) g_buzzer.setPattern(pattern, now);
 		}
 
 		if (state == fw::AlertState::Cancelled && (now - g_cancelledAt) > 5000UL) {
@@ -2045,6 +2158,12 @@ void loop() {
 
 	const bool buzzerOn = g_buzzer.isOn(now);
 	digitalWrite(hw::kBuzzer, buzzerOn == hw::kBuzzerActiveHigh ? HIGH : LOW);
+
+	// The display is serviced after the buzzer and before the modem block. It
+	// returns immediately while the alert state is not Idle and bounds its own
+	// frame rate, so it cannot delay the alert path, a modem timeout or the
+	// command poll.
+	serviceDisplay(millis());
 
 	if (!g_deviceToken.isEmpty()) {
 		if (g_heartbeatTimer.ready(now)) {

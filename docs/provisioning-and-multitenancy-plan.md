@@ -165,8 +165,9 @@ No WiFi columns required. Optional: `TrackerDevice.wifiConfiguredAt` to distingu
 
 ### 4.1 Reality check
 
-RLS is **enabled** on all LifeLinks tables but **no policies exist** (`20261118000100_enable_rls`).
-Prisma connects as the owner and bypasses RLS. App-level `orgId` filters are the only boundary.
+RLS is **enabled** on all LifeLinks tables and per-organization policies exist
+(`20261122000000_rls_org_policies`). Prisma connects as the owner and bypasses RLS. App-level
+`orgId` filters remain the authoritative boundary.
 
 The reference implementation's lesson, verbatim: *do not claim RLS is the tenant boundary until the app role changes*
 (`docs/database-rls-retention.md:17,36-55`).
@@ -178,9 +179,9 @@ The reference implementation's lesson, verbatim: *do not claim RLS is the tenant
 | 1 | `Membership.revokedAt`, `invitedBy` | soft revocation; every gate assumes it |
 | 2 | `MembershipPermission` | per-member grant/deny without new roles |
 | 3 | `Organization.status`, `suspendedAt`, `suspendedReason` | suspended org grants nothing |
-| 4 | `InvitationToken` (orgId, email, role, tokenHash, expiresAt, consumedAt) | real invite flow; LifeLinks has real emails, unlike the reference platform |
-| 5 | `PlatformAdmin` (userId unique, expiresAt, revokedAt, mfaEnrolledAt) | god mode separate from tenant ADMIN |
-| 6 | Platform audit fields or `PlatformAuditLog` | reason, step-up, before/after — one audit table, not two |
+| 4 | `InvitationToken` (orgId, email, role, tokenHash, expiresAt, usedAt) | real invite flow; LifeLinks has real emails, unlike the reference platform |
+| 5 | `PlatformAdmin` (userId unique, createdAt, createdBy) | god mode separate from tenant ADMIN |
+| 6 | `AuditLog` action + `metadata.reason` | reason, step-up, before/after — one audit table, not two |
 
 Optional: `PasswordResetToken` if invite links are tokenised.
 

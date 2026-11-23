@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
 	MEMBER_ROLES,
+	canAcknowledgeAsBureau,
 	canAdminister,
 	canManageIncidents,
 	canViewAllVehicles,
@@ -48,6 +49,12 @@ describe("member roles", () => {
 
 	it("lets every role work incidents inside its scope", () => {
 		for (const role of MEMBER_ROLES) expect(canManageIncidents(role)).toBe(true);
+	});
+
+	it("reserves bureau acknowledgement for responders and admins", () => {
+		expect(canAcknowledgeAsBureau("RESPONDER")).toBe(true);
+		expect(canAcknowledgeAsBureau("ADMIN")).toBe(true);
+		expect(canAcknowledgeAsBureau("USER")).toBe(false);
 	});
 
 	it("maps each role to its display label", () => {

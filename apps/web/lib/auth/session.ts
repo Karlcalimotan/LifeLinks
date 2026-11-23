@@ -6,12 +6,15 @@ import { SignJWT, jwtVerify } from "jose";
 import { getLocale } from "next-intl/server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { isMembershipActive } from "./membership";
+import { type PermissionSet, resolvePermissions } from "./permissions";
 import { type MemberRoleName, isMemberRole } from "./roles";
 import { resolveAuthSecret, shouldUseSecureSessionCookie } from "./secret";
 
 export type { MemberRoleName };
 export {
 	MEMBER_ROLES,
+	canAcknowledgeAsBureau,
 	canAdminister,
 	canManageIncidents,
 	canManageSettings,
@@ -52,6 +55,12 @@ export async function createSession(payload: SessionPayload): Promise<void> {
 	});
 }
 
+/**
+ * Verify the cookie's signature and shape only. This is not an authorization
+ * decision: `getCurrentUser` is the session resolver that re-reads the
+ * membership and organization and enforces revocation and suspension. Do not
+ * use this helper to gate a page or an action.
+ */
 export async function getSession(): Promise<SessionPayload | null> {
 	const store = await cookies();
 	const token = store.get(SESSION_COOKIE)?.value;
@@ -94,13 +103,16 @@ export interface CurrentUser {
 	user: { id: string; email: string; name: string };
 	org: { id: string; name: string; slug: string };
 	role: MemberRoleName;
+	/** Explicit `MembershipPermission` overrides ?? role defaults. */
+	permissions: PermissionSet;
 }
 
 /**
  * Resolve the session against the database on every request. The JWT says who
  * the user claimed to be; the membership row says what they may still do. A
- * revoked membership therefore takes effect on the next request, not when the
- * cookie expires.
+ * revoked membership or a suspended organization therefore takes effect on the
+ * next request, not when the cookie expires. The permission overlay is resolved
+ * here too, so every action reads the same set for the whole request.
  */
 export async function getCurrentUser(): Promise<CurrentUser | null> {
 	const session = await getSession();
@@ -108,9 +120,16 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 
 	const membership = await prisma.membership.findUnique({
 		where: { orgId_userId: { orgId: session.orgId, userId: session.sub } },
-		include: { user: true, org: true },
+		include: {
+			user: { select: { id: true, email: true, name: true } },
+			org: { select: { id: true, name: true, slug: true, status: true } },
+			permissions: { select: { key: true, allowed: true } },
+		},
 	});
-	if (!membership) return null;
+	if (!membership || !isMembershipActive(membership)) return null;
+	// Suspension is immediate: every tenant page, action and API route resolves
+	// the session here, so an existing cookie stops working on the next request.
+	if (membership.org.status !== "ACTIVE") return null;
 
 	return {
 		session,
@@ -125,6 +144,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 			slug: membership.org.slug,
 		},
 		role: membership.role,
+		permissions: resolvePermissions(membership.role, membership.permissions),
 	};
 }
 

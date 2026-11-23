@@ -25,7 +25,13 @@ export default async function LoginPage({
 	const common = await getTranslations({ locale, namespace: "common" });
 
 	const errorMessage =
-		error === "rate" ? t("rateLimited") : error === "invalid" ? t("invalid") : null;
+		error === "rate"
+			? t("rateLimited")
+			: error === "suspended"
+				? t("suspended")
+				: error === "invalid"
+					? t("invalid")
+					: null;
 	const showDemoAccounts = demoModeEnabled();
 
 	const path = [
@@ -90,7 +96,10 @@ export default async function LoginPage({
 							<p className="mt-2 text-sm leading-relaxed text-fog-500">{t("signInSubtitle")}</p>
 
 							{errorMessage ? (
-								<p className="mt-4 rounded-[3px] border border-alarm-400/30 bg-alarm-400/10 px-3 py-2 text-xs text-alarm-300">
+								<p
+									role="alert"
+									className="mt-4 rounded-[3px] border border-alarm-400/30 bg-alarm-400/10 px-3 py-2 text-xs text-alarm-300"
+								>
 									{errorMessage}
 								</p>
 							) : null}

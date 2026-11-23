@@ -16,6 +16,7 @@ import { deviceConnectionState } from "@/lib/device/status";
 import { metadataForPage } from "@/lib/page-metadata";
 import prisma from "@/lib/prisma";
 import { formatRelative } from "@/lib/utils";
+import { VEHICLE_LIST_SELECT } from "@/lib/vehicles/payload";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
@@ -38,10 +39,7 @@ export default async function VehiclesPage({ params }: { params: Promise<{ local
 	const vehicles = await prisma.vehicle.findMany({
 		where: vehicleScope(current.role, current.org.id, current.user.id),
 		orderBy: { plateNo: "asc" },
-		include: {
-			devices: true,
-			_count: { select: { impacts: true, trips: true } },
-		},
+		select: VEHICLE_LIST_SELECT,
 	});
 
 	return (

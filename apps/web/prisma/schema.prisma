@@ -23,6 +23,13 @@ enum MemberRole {
   ADMIN
 }
 
+/// Tenant lifecycle. A SUSPENDED organization grants nothing: login is
+/// rejected and `getCurrentUser` resolves to null on the next request.
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+}
+
 enum VehicleStatus {
   ACTIVE
   MAINTENANCE
@@ -72,6 +79,7 @@ enum CommandKind {
   SET_CONFIG
   ROTATE_TOKEN
   CANCEL_ALERT
+  ACK_INCIDENT
 }
 
 enum CommandStatus {
@@ -105,18 +113,28 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  memberships       Membership[]
-  ownedVehicles     Vehicle[]          @relation("VehicleOwner")
-  auditLogs         AuditLog[]         @relation("AuditActor")
-  pushSubscriptions PushSubscription[]
+  memberships        Membership[]
+  ownedVehicles      Vehicle[]          @relation("VehicleOwner")
+  auditLogs          AuditLog[]         @relation("AuditActor")
+  pushSubscriptions  PushSubscription[]
+  invitationsCreated InvitationToken[]  @relation("InvitationCreator")
+  /// Global platform operator. Deliberately separate from `Membership` and
+  /// `MemberRole`: it grants `/platform` only, never tenant permissions.
+  platformAdmin      PlatformAdmin?
 }
 
 model Organization {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String             @id @default(cuid())
+  name            String
+  slug            String             @unique
+  status          OrganizationStatus @default(ACTIVE)
+  /// Set while suspended; cleared on reinstate. `suspendedBy` is the actor
+  /// user id (a plain string, so the audit breadcrumb survives user deletion).
+  suspendedAt     DateTime?
+  suspendedReason String?
+  suspendedBy     String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
 
   memberships       Membership[]
   vehicles          Vehicle[]
@@ -126,8 +144,28 @@ model Organization {
   emergencyContacts EmergencyContact[]
   geofences         Geofence[]
   settings          OrgSettings?
+  configOverrides   DeviceConfigOverride[]
   auditLogs         AuditLog[]
   pushSubscriptions PushSubscription[]
+  invitationTokens  InvitationToken[]
+
+  @@index([status, createdAt])
+}
+
+/// Global platform operator. This is not a tenant role: it is keyed to a User
+/// and grants only the separate `/platform` console. A platform admin with no
+/// Membership has no tenant access at all. The table is intentionally global
+/// (not org-scoped) because the operator must see every organization; the
+/// migration enables RLS with a deny-all policy so only the owner/Prisma path
+/// can read it.
+model PlatformAdmin {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+  /// User id of the operator who created this row, when known.
+  createdBy String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Membership {
@@ -135,13 +173,63 @@ model Membership {
   orgId     String
   userId    String
   role      MemberRole @default(USER)
+  /// User id of the admin whose invitation created or last renewed this
+  /// membership. A plain string, not a relation: it is an audit breadcrumb,
+  /// not a reference that has to survive the inviter's deletion.
+  invitedBy String?
+  /// Soft revocation. The row keeps its role and audit trail so an admin can
+  /// re-invite the person; every request path treats a revoked membership as
+  /// absent (`getCurrentUser` returns null).
+  revokedAt DateTime?
   createdAt DateTime   @default(now())
 
-  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org         Organization           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissions MembershipPermission[]
 
   @@unique([orgId, userId])
   @@index([userId])
+  @@index([orgId, revokedAt])
+}
+
+/// Explicit per-member permission override. The role default applies when no
+/// row exists for the key; `lib/auth/permissions.ts` is the only resolver. The
+/// rows cascade with the membership, so a re-invite that returns to role
+/// defaults only has to delete them.
+model MembershipPermission {
+  id           String   @id @default(cuid())
+  membershipId String
+  key          String
+  allowed      Boolean
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@unique([membershipId, key])
+  @@index([membershipId])
+}
+
+/// Single-use, hashed invitation. The plaintext token exists only in the link
+/// shown to the admin who minted it; `tokenHash` is the SHA-256 of that token.
+/// `usedAt` is set when the invitation is accepted, or when a newer invitation
+/// for the same organization and email supersedes it.
+model InvitationToken {
+  id          String     @id @default(cuid())
+  orgId       String
+  email       String
+  role        MemberRole @default(USER)
+  tokenHash   String     @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdById String
+  createdAt   DateTime   @default(now())
+
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy User         @relation("InvitationCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([orgId, email])
+  @@index([orgId, createdAt])
 }
 
 model Vehicle {
@@ -194,16 +282,40 @@ model TrackerDevice {
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
-  org      Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  vehicle  Vehicle?           @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
-  trips    Trip[]
-  samples  TelemetrySample[]
-  impacts  ImpactEvent[]
-  commands DeviceCommand[]
-  events   DeviceStateEvent[]
+  org            Organization          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  vehicle        Vehicle?              @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  configOverride DeviceConfigOverride?
+  trips          Trip[]
+  samples        TelemetrySample[]
+  impacts        ImpactEvent[]
+  commands       DeviceCommand[]
+  events         DeviceStateEvent[]
 
   @@index([orgId, lastSeenAt])
   @@index([vehicleId])
+}
+
+/// Optional per-device overrides for the six server-driven firmware fields.
+/// A null column means "use the organisation default". The row is deleted when
+/// every field inherits again, so its presence always means at least one
+/// override exists.
+model DeviceConfigOverride {
+  id                 String   @id @default(cuid())
+  deviceId           String   @unique
+  orgId              String
+  impactThresholdG   Float?
+  tiltThresholdDeg   Float?
+  confirmWindowMs    Int?
+  cancelWindowS      Int?
+  heartbeatIntervalS Int?
+  sosRetryS          Int?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  device TrackerDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  org    Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
 }
 
 model Trip {
@@ -275,6 +387,7 @@ model ImpactEvent {
   cancelDeadline    DateTime?
   cancelledAt       DateTime?
   cancelRequestedAt DateTime?
+  ackRequestedAt    DateTime?
   resolvedAt        DateTime?
   resolution        String?
   evidence          Json?
