@@ -1,6 +1,6 @@
 import { ConfirmSubmit } from "@/components/devices/confirm-submit";
 import { EditDeviceForm } from "@/components/devices/edit-device-form";
-import { RotateTokenButton } from "@/components/devices/rotate-token-button";
+import { ProvisioningPanel } from "@/components/devices/provisioning-panel";
 import { ApprovalBadge, DeviceStatusBadge } from "@/components/domain/badges";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -157,6 +157,16 @@ export default async function DeviceDetailPage({
 				</Card>
 			) : null}
 
+			{canAdminister(current.role) ? (
+				<ProvisioningPanel
+					deviceId={device.id}
+					label={device.label}
+					mac={device.mac}
+					lastSeenAt={device.lastSeenAt}
+					locale={locale}
+				/>
+			) : null}
+
 			<Card className="mb-6">
 				<CardHeader>
 					<CardTitle>Edit tracker</CardTitle>
@@ -227,15 +237,15 @@ export default async function DeviceDetailPage({
 				</Card>
 
 				<Card>
-					<CardHeader className="flex-row items-center justify-between">
-						<CardTitle>{t("tokenTitle")}</CardTitle>
-						<RotateTokenButton deviceId={device.id} label={device.label} locale={locale} />
+					<CardHeader>
+						<CardTitle>{t("firmware")}</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<p className="text-xs leading-relaxed text-fog-500">{t("tokenDescription")}</p>
-						<p className="mt-3 text-meta text-fog-500">
-							Firmware {device.firmwareVersion ?? "unknown"} / variant{" "}
-							{device.hwVariant ?? "unknown"}
+						<p className="font-mono text-body text-fog-100">
+							{device.firmwareVersion ?? t("unknown")}
+						</p>
+						<p className="mt-1 text-meta text-fog-500">
+							{t("variant")}: {device.hwVariant ?? t("unknown")}
 						</p>
 					</CardContent>
 				</Card>

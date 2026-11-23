@@ -4,8 +4,10 @@ const mocks = vi.hoisted(() => ({
 	$transaction: vi.fn(),
 	trackerDevice: {
 		findUnique: vi.fn(),
+		findFirst: vi.fn(),
 		findMany: vi.fn(),
 		create: vi.fn(),
+		update: vi.fn(),
 		updateMany: vi.fn(),
 	},
 	vehicle: {
@@ -49,11 +51,14 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { BULK_APPROVE_MAX } from "@/lib/device/bulk";
+import { TOKEN_ROTATION_RATE_LIMIT } from "@/lib/device/limits";
+import { resetRateLimitsForTests } from "@/lib/rate-limit";
 import {
 	type BulkApproveState,
 	type DeviceTokenState,
 	bulkApproveDevicesAction,
 	createDeviceAction,
+	rotateDeviceTokenAction,
 } from "./devices";
 
 const initial: DeviceTokenState = { ok: false };
@@ -77,8 +82,16 @@ function bulkForm(ids: readonly string[]): FormData {
 	return data;
 }
 
+function rotation(deviceId = "device-1"): FormData {
+	const data = new FormData();
+	data.set("locale", "en");
+	data.set("deviceId", deviceId);
+	return data;
+}
+
 beforeEach(() => {
 	vi.clearAllMocks();
+	resetRateLimitsForTests();
 	mocks.requireUser.mockResolvedValue({
 		user: { id: "user-1" },
 		org: { id: "org-1" },
@@ -88,7 +101,9 @@ beforeEach(() => {
 	mocks.generateDeviceToken.mockReturnValue("raw-token");
 	mocks.hashDeviceToken.mockReturnValue("hash-raw-token");
 	mocks.trackerDevice.findUnique.mockResolvedValue(null);
+	mocks.trackerDevice.findFirst.mockResolvedValue(null);
 	mocks.trackerDevice.create.mockImplementation(async ({ data }) => ({ id: "device-1", ...data }));
+	mocks.trackerDevice.update.mockResolvedValue({});
 	mocks.trackerDevice.findMany.mockResolvedValue([]);
 	mocks.trackerDevice.updateMany.mockResolvedValue({ count: 1 });
 	mocks.vehicle.findFirst.mockResolvedValue({ id: "vehicle-1" });
@@ -225,6 +240,71 @@ describe("createDeviceAction", () => {
 
 		expect(state).toEqual({ ok: false, error: "Only admins can register trackers." });
 		expect(mocks.trackerDevice.findUnique).not.toHaveBeenCalled();
+	});
+});
+
+describe("rotateDeviceTokenAction", () => {
+	it("rotates an org-scoped token and writes an audit row", async () => {
+		mocks.trackerDevice.findFirst.mockResolvedValue({
+			id: "device-1",
+			mac: "24:0A:C4:9F:2A:71",
+		});
+
+		const state = await rotateDeviceTokenAction(initial, rotation());
+
+		expect(state).toEqual({ ok: true, token: "raw-token", mac: "24:0A:C4:9F:2A:71" });
+		expect(mocks.trackerDevice.findFirst).toHaveBeenCalledWith({
+			where: { id: "device-1", orgId: "org-1" },
+		});
+		expect(mocks.trackerDevice.update).toHaveBeenCalledWith({
+			where: { id: "device-1" },
+			data: { tokenHash: "hash-raw-token" },
+		});
+		expect(mocks.auditLog.create).toHaveBeenCalledWith({
+			data: expect.objectContaining({
+				orgId: "org-1",
+				actorId: "user-1",
+				action: "device.token_rotated",
+				target: "device-1",
+				metadata: { mac: "24:0A:C4:9F:2A:71" },
+			}),
+		});
+	});
+
+	it("rate limits repeated rotations for the same admin and tracker", async () => {
+		mocks.trackerDevice.findFirst.mockResolvedValue({
+			id: "device-1",
+			mac: "24:0A:C4:9F:2A:71",
+		});
+
+		for (let attempt = 0; attempt < TOKEN_ROTATION_RATE_LIMIT.limit; attempt += 1) {
+			const state = await rotateDeviceTokenAction(initial, rotation());
+			expect(state.ok).toBe(true);
+		}
+		mocks.trackerDevice.update.mockClear();
+
+		const blocked = await rotateDeviceTokenAction(initial, rotation());
+
+		expect(blocked).toMatchObject({ ok: false, errorCode: "rate_limited" });
+		expect(blocked.retryAfterSeconds).toBeGreaterThan(0);
+		expect(mocks.trackerDevice.update).not.toHaveBeenCalled();
+	});
+
+	it("does not rotate a tracker from another organization", async () => {
+		const state = await rotateDeviceTokenAction(initial, rotation("device-other"));
+
+		expect(state).toEqual({ ok: false, error: "Tracker not found." });
+		expect(mocks.trackerDevice.update).not.toHaveBeenCalled();
+		expect(mocks.auditLog.create).not.toHaveBeenCalled();
+	});
+
+	it("rejects a non-admin before reading the form", async () => {
+		mocks.canAdminister.mockReturnValue(false);
+
+		const state = await rotateDeviceTokenAction(initial, rotation());
+
+		expect(state).toEqual({ ok: false, error: "Only admins can rotate device tokens." });
+		expect(mocks.trackerDevice.findFirst).not.toHaveBeenCalled();
 	});
 });
 
