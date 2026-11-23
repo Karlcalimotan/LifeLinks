@@ -514,6 +514,7 @@ uint32_t g_storedWifiStartedMs = 0;
 uint32_t g_storedWifiRetryAtMs = 0;
 
 fw::BootResetSequence g_bootReset;
+fw::BootResetSequence g_factoryReset;
 bool g_provisioned = false;	 // NVS marker written only after a proven join
 
 void collectScannedNetworks(int found);
@@ -1472,32 +1473,47 @@ void clearStoredIdentity() {
 }
 
 void serviceBootReset(uint32_t now, bool alertActive) {
-	if (!g_bootReset.active() && !g_bootReset.restartPending()) return;
+	if (!g_bootReset.active() && !g_bootReset.restartPending() && !g_factoryReset.active() &&
+		!g_factoryReset.restartPending()) {
+		return;
+	}
 	if (alertActive) {
 		// A pending restart must not interrupt an alert. The NVS clear (if it
 		// already happened) stays; the portal reopens on the next boot.
 		g_bootReset.abort();
+		g_factoryReset.abort();
 		Serial.println("[RESET] boot reset cancelled: alert is active");
 		return;
 	}
-	if (g_bootReset.restartPending()) {
-		Serial.println("[RESET] restarting");
-		delay(150);
-		ESP.restart();
-	}
 
-	const bool pressed = digitalRead(hw::kCancelButton) == LOW;
-	const fw::BootResetAction action = g_bootReset.update(now, pressed);
-	if (action == fw::BootResetAction::ClearWifi) {
-		clearStoredWifiCredentials();
-		Serial.println("[RESET] WiFi cleared, identity kept; release to restart");
-	} else if (action == fw::BootResetAction::ClearAll) {
+	const bool wifiPressed = digitalRead(hw::kWifiResetButton) == LOW;
+	const bool factoryPressed = digitalRead(hw::kFactoryResetButton) == LOW;
+
+	// Factory wins if both are held: it is the destructive gesture.
+	const fw::BootResetAction factoryAction = g_factoryReset.update(now, factoryPressed);
+	if (factoryAction == fw::BootResetAction::ClearAll) {
 		clearStoredWifiCredentials();
 		clearStoredIdentity();
 		Serial.println("[RESET] WiFi, identity and provisioning cleared");
+	} else {
+		const fw::BootResetAction wifiAction = g_bootReset.update(now, wifiPressed);
+		if (wifiAction == fw::BootResetAction::ClearWifi) {
+			clearStoredWifiCredentials();
+			Serial.println("[RESET] WiFi cleared, identity kept; release to restart");
+		} else if (wifiAction == fw::BootResetAction::ClearAll) {
+			clearStoredWifiCredentials();
+			clearStoredIdentity();
+			Serial.println("[RESET] WiFi, identity and provisioning cleared");
+		}
 	}
-	if (g_bootReset.restartPending()) {
-		delay(100);
+
+	// Do not restart the WiFi gesture while the factory button is still held;
+	// that would interrupt the 10 s factory hold.
+	const bool factoryDone = g_factoryReset.restartPending();
+	const bool wifiDone = g_bootReset.restartPending() && !factoryPressed;
+	if (factoryDone || wifiDone) {
+		Serial.println("[RESET] restarting");
+		delay(150);
 		ESP.restart();
 	}
 }
@@ -1841,6 +1857,19 @@ void handleSerialProvisioning() {
 // Setup / loop
 // ---------------------------------------------------------------------------
 
+void updateStatusLed(uint32_t now) {
+	const fw::AlertState state = g_safety.state();
+	bool on = false;
+	if (state == fw::AlertState::Alerting) {
+		on = true;	// solid until acknowledged
+	} else if (state == fw::AlertState::Countdown) {
+		on = ((now % 300) < 150);
+	} else if (state == fw::AlertState::Idle) {
+		on = ((now % 2000) < 60);
+	}
+	digitalWrite(hw::kStatusLed, on ? HIGH : LOW);
+}
+
 void setup() {
 	Serial.begin(115200);
 	delay(250);
@@ -1854,9 +1883,13 @@ void setup() {
 	loadConfig();
 
 	pinMode(hw::kBuzzer, OUTPUT);
+	pinMode(hw::kStatusLed, OUTPUT);
+	digitalWrite(hw::kStatusLed, LOW);
 	digitalWrite(hw::kBuzzer, hw::kBuzzerActiveHigh ? LOW : HIGH);
 	pinMode(hw::kVibrationSensor, INPUT);
 	pinMode(hw::kCancelButton, INPUT_PULLUP);
+	pinMode(hw::kWifiResetButton, INPUT_PULLUP);
+	pinMode(hw::kFactoryResetButton, INPUT_PULLUP);
 	pinMode(hw::kBatteryAdc, INPUT);
 	pinMode(hw::kIgnitionAdc, INPUT);
 	analogReadResolution(12);
@@ -1887,8 +1920,11 @@ void setup() {
 		Serial.println("[SETUP] No token. Use the WiFi setup portal or send SET_TOKEN llk_...");
 		Serial.println("[SETUP] Then: SET_PHONE1 +63... and SET_PLATE ABC1234");
 	}
-	Serial.println("[RESET] Hold cancel (GPIO 33) 5 s to clear WiFi, 10 s to clear everything");
+	Serial.println(
+		"[RESET] WiFi button (GPIO 13) 5 s clears WiFi; factory button (GPIO 14) 10 s clears "
+		"everything");
 	g_bootReset.begin(millis());
+	g_factoryReset.beginFactory(millis());
 	setupWifiCommissioning();
 	Serial.println("[READY] LifeLink tracker online");
 }
@@ -1904,7 +1940,7 @@ void loop() {
 
 		float accelG = 0.0f;
 		float tiltDeg = 0.0f;
-		bool vibration = digitalRead(hw::kVibrationSensor) == LOW;
+		bool vibration = digitalRead(hw::kVibrationSensor) == HIGH;	 // active HIGH on this module
 
 		if (g_mpuOk) {
 			sensors_event_t acceleration;
@@ -1995,6 +2031,7 @@ void loop() {
 		// the alert state machine leaves Idle, so a long cancel press during a
 		// countdown can never reboot the tracker.
 		serviceBootReset(now, state != fw::AlertState::Idle);
+		updateStatusLed(now);
 	}
 
 	// WiFi is serviced after the impact/alert pass so the safety-critical sample

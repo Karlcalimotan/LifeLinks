@@ -47,8 +47,15 @@ only after the station has an IP. A wrong password leaves the stored credentials
 alone and the portal stays open with the reason. The portal closes about 2 s
 after a verified save or after 10 minutes, then the radio is switched off.
 
-The existing cancel button (GPIO 33, INPUT_PULLUP, active LOW) is also the
-boot-time reset:
+Two dedicated boot-time buttons replace the old cancel-button gesture, both
+`INPUT_PULLUP` and active LOW:
+
+- **GPIO 13 - WiFi reset:** hold 5 s to clear the stored WiFi credentials and
+  reboot. Identity is kept.
+- **GPIO 14 - factory reset:** hold 10 s to clear WiFi, identity and the
+  `provisioned` marker.
+
+The cancel button on GPIO 33 stays dedicated to the alert.
 
 | Gesture | Result |
 | --- | --- |
