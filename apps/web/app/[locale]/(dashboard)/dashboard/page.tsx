@@ -10,7 +10,6 @@ import { EmptyState, PageHeader } from "@/components/ui/page-header";
 import { Link } from "@/i18n/routing";
 import { acknowledgeIncidentAction } from "@/lib/actions/incidents";
 import { formatDuration } from "@/lib/analytics/aggregate";
-import { canAcknowledgeAsBureau } from "@/lib/auth/roles";
 import { requireUser } from "@/lib/auth/session";
 import { DEVICE_OFFLINE_AFTER_MIN } from "@/lib/constants";
 import { loadDashboardData } from "@/lib/dashboard/data";
@@ -411,7 +410,8 @@ export default async function DashboardPage({
 												/>
 											</span>
 											<div className="flex items-center gap-2">
-												{canAcknowledgeAsBureau(current.role) && incident.status === "CONFIRMED" ? (
+												{current.permissions["incident.acknowledge"] &&
+												incident.status === "CONFIRMED" ? (
 													<form action={acknowledgeIncidentAction}>
 														<input type="hidden" name="locale" value={locale} />
 														<input type="hidden" name="incidentId" value={incident.id} />

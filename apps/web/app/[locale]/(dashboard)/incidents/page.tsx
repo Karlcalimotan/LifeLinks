@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/table";
 import { Link } from "@/i18n/routing";
 import { acknowledgeIncidentAction } from "@/lib/actions/incidents";
-import { canAcknowledgeAsBureau, requireUser } from "@/lib/auth/session";
+import { requireUser } from "@/lib/auth/session";
 import { acknowledgementDuration } from "@/lib/incidents/acknowledgement";
 import {
 	INCIDENT_PAGE_SIZE,
@@ -251,7 +251,7 @@ export default async function IncidentsPage({
 									incidents={incidents}
 									acknowledgedAt={acknowledgedAt}
 									now={now}
-									canAcknowledge={canAcknowledgeAsBureau(current.role)}
+									canAcknowledge={current.permissions["incident.acknowledge"]}
 									returnTo={returnTo}
 								/>
 							</div>
@@ -293,7 +293,8 @@ export default async function IncidentsPage({
 												(alert) => alert.status === "SENT" || alert.status === "ACKNOWLEDGED",
 											).length;
 											const canAcknowledge =
-												canAcknowledgeAsBureau(current.role) && incident.status === "CONFIRMED";
+												current.permissions["incident.acknowledge"] &&
+												incident.status === "CONFIRMED";
 
 											return (
 												<TableRow key={incident.id}>

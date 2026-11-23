@@ -1,6 +1,6 @@
 "use server";
 
-import { canAcknowledgeAsBureau, canManageIncidents } from "@/lib/auth/roles";
+import type { PermissionKey } from "@/lib/auth/permissions";
 import { requireUser } from "@/lib/auth/session";
 import {
 	ACK_INCIDENT_COMMAND_TTL_MS,
@@ -42,14 +42,16 @@ function value(formData: FormData, key: string): string {
  */
 class CommandConflictError extends Error {}
 
-async function transition(formData: FormData, to: ImpactStatusName) {
+async function transition(formData: FormData, to: ImpactStatusName, permission: PermissionKey) {
 	const locale = value(formData, "locale") === "tl" ? "tl" : "en";
 	const incidentId = value(formData, "incidentId");
 	const returnTo = value(formData, "returnTo");
 	const fromDashboard = returnTo === "dashboard";
 	const current = await requireUser();
 
-	if (!canManageIncidents(current.role)) {
+	// The overlay decides, not just the role name: a membership can be denied
+	// acknowledge or resolve without losing the rest of its access.
+	if (!current.permissions[permission]) {
 		redirect(
 			fromDashboard
 				? `/${locale}/dashboard?error=forbidden`
@@ -176,7 +178,7 @@ export async function acknowledgeIncidentAction(formData: FormData) {
 	const forbiddenPath = fromDashboard
 		? `/${locale}/dashboard?error=forbidden`
 		: `/${locale}/incidents/${incidentId}?error=forbidden`;
-	if (!canAcknowledgeAsBureau(current.role)) redirect(forbiddenPath);
+	if (!current.permissions["incident.acknowledge"]) redirect(forbiddenPath);
 
 	const incident = await prisma.impactEvent.findFirst({
 		where: { id: incidentId, orgId: current.org.id },
@@ -343,7 +345,7 @@ export async function acknowledgeIncidentAction(formData: FormData) {
 }
 
 export async function resolveIncidentAction(formData: FormData) {
-	await transition(formData, "RESOLVED");
+	await transition(formData, "RESOLVED", "incident.resolve");
 }
 
 /**
@@ -366,7 +368,9 @@ export async function resolveWithoutTrackerAction(formData: FormData) {
 	const forbiddenPath = fromDashboard
 		? `/${locale}/dashboard?error=forbidden`
 		: `/${locale}/incidents/${incidentId}?error=forbidden`;
-	if (current.role !== "ADMIN") redirect(forbiddenPath);
+	if (current.role !== "ADMIN" || !current.permissions["incident.resolve"]) {
+		redirect(forbiddenPath);
+	}
 
 	// The typed confirmation is enforced here, not only by the dialog. A direct
 	// action call without the exact word is refused before any write.
@@ -479,11 +483,11 @@ export async function resolveWithoutTrackerAction(formData: FormData) {
 }
 
 export async function falseAlarmAction(formData: FormData) {
-	await transition(formData, "FALSE_ALARM");
+	await transition(formData, "FALSE_ALARM", "incident.resolve");
 }
 
 export async function cancelIncidentAction(formData: FormData) {
-	await transition(formData, "CANCELLED");
+	await transition(formData, "CANCELLED", "incident.resolve");
 }
 
 /**
@@ -506,7 +510,7 @@ export async function requestCancelAlertAction(formData: FormData) {
 	const forbiddenPath = fromDashboard
 		? `/${locale}/dashboard?error=forbidden`
 		: `/${locale}/incidents/${incidentId}?error=forbidden`;
-	if (!canManageIncidents(current.role)) redirect(forbiddenPath);
+	if (!current.permissions["incident.resolve"]) redirect(forbiddenPath);
 
 	const incident = await prisma.impactEvent.findFirst({
 		where: { id: incidentId, orgId: current.org.id },

@@ -35,6 +35,16 @@ All notable changes to this project are documented here. The format follows
   "Alarm latched, waiting for tracker", reports `unknown_incident`, retries an
   expired command, and a latched device incident must be acknowledged before
   it can be resolved (#105).
+- Member invitations and soft revocation: an admin mints a 32-byte, single-use,
+  seven-day invitation stored only as a SHA-256 hash and gets a copyable
+  `/{locale}/invite/{token}` link (no email sender exists, and the panel says
+  so), the accept page creates or attaches the user, creates the membership and
+  audits the join, a revoked membership is blocked on the next request, and a
+  re-invite clears stale permission overrides, returns the member to role
+  defaults and invalidates older links (#11).
+- A per-member permission overlay (`MembershipPermission`) resolved as explicit
+  override ?? role default, enforced by the incident acknowledge/resolve and
+  device-configuration actions. Admin always keeps every permission (#11).
 
 ### Changed
 
@@ -46,6 +56,11 @@ All notable changes to this project are documented here. The format follows
   audit row and honest copy that the alarm may still sound. The recovery
   requires a server-checked typed `RESOLVE`, and an `ACK_INCIDENT` and
   `CANCEL_ALERT` cannot be pending for the same incident at once (#105).
+- A revoked membership is rejected by `getCurrentUser` and ignored by the login
+  lookup, so revocation takes effect immediately rather than at cookie expiry;
+  revoking also removes the member's push subscriptions (#11).
+- The settings members section now lists status, invites, revokes and
+  re-invites instead of saying invitations are unavailable (#11).
 - `CANCEL_ALERT` acknowledgements decide the incident: only `cancelled` sets
   `FALSE_ALARM`. `too_late`, `unknown_incident`, a missing detail, an expired
   command or a failed command keep the status and record the reason. A

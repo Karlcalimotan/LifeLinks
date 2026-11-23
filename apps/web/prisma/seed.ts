@@ -1468,7 +1468,9 @@ async function main() {
 		await prisma.membership.upsert({
 			where: { orgId_userId: { orgId: org.id, userId: membership.userId } },
 			create: { orgId: org.id, ...membership },
-			update: { role: membership.role },
+			// The demo seed restores a revoked demo account so the documented
+			// sign-in still works after someone tries the revoke flow.
+			update: { role: membership.role, revokedAt: null, invitedBy: null },
 		});
 	}
 

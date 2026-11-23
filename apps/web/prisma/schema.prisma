@@ -106,10 +106,11 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  memberships       Membership[]
-  ownedVehicles     Vehicle[]          @relation("VehicleOwner")
-  auditLogs         AuditLog[]         @relation("AuditActor")
-  pushSubscriptions PushSubscription[]
+  memberships        Membership[]
+  ownedVehicles      Vehicle[]          @relation("VehicleOwner")
+  auditLogs          AuditLog[]         @relation("AuditActor")
+  pushSubscriptions  PushSubscription[]
+  invitationsCreated InvitationToken[]  @relation("InvitationCreator")
 }
 
 model Organization {
@@ -130,6 +131,7 @@ model Organization {
   configOverrides   DeviceConfigOverride[]
   auditLogs         AuditLog[]
   pushSubscriptions PushSubscription[]
+  invitationTokens  InvitationToken[]
 }
 
 model Membership {
@@ -137,13 +139,63 @@ model Membership {
   orgId     String
   userId    String
   role      MemberRole @default(USER)
+  /// User id of the admin whose invitation created or last renewed this
+  /// membership. A plain string, not a relation: it is an audit breadcrumb,
+  /// not a reference that has to survive the inviter's deletion.
+  invitedBy String?
+  /// Soft revocation. The row keeps its role and audit trail so an admin can
+  /// re-invite the person; every request path treats a revoked membership as
+  /// absent (`getCurrentUser` returns null).
+  revokedAt DateTime?
   createdAt DateTime   @default(now())
 
-  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org         Organization           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissions MembershipPermission[]
 
   @@unique([orgId, userId])
   @@index([userId])
+  @@index([orgId, revokedAt])
+}
+
+/// Explicit per-member permission override. The role default applies when no
+/// row exists for the key; `lib/auth/permissions.ts` is the only resolver. The
+/// rows cascade with the membership, so a re-invite that returns to role
+/// defaults only has to delete them.
+model MembershipPermission {
+  id           String   @id @default(cuid())
+  membershipId String
+  key          String
+  allowed      Boolean
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@unique([membershipId, key])
+  @@index([membershipId])
+}
+
+/// Single-use, hashed invitation. The plaintext token exists only in the link
+/// shown to the admin who minted it; `tokenHash` is the SHA-256 of that token.
+/// `usedAt` is set when the invitation is accepted, or when a newer invitation
+/// for the same organization and email supersedes it.
+model InvitationToken {
+  id          String     @id @default(cuid())
+  orgId       String
+  email       String
+  role        MemberRole @default(USER)
+  tokenHash   String     @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdById String
+  createdAt   DateTime   @default(now())
+
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy User         @relation("InvitationCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([orgId, email])
+  @@index([orgId, createdAt])
 }
 
 model Vehicle {

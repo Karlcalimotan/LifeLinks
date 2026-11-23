@@ -84,6 +84,12 @@ beforeEach(() => {
 		user: { id: "user-1" },
 		org: { id: "org-1" },
 		role: "ADMIN",
+		permissions: {
+			"incident.acknowledge": true,
+			"incident.resolve": true,
+			"device.configure": true,
+			"members.manage": true,
+		},
 	});
 	mocks.canAdminister.mockReturnValue(true);
 	mocks.trackerDevice.findFirst.mockResolvedValue({
@@ -110,8 +116,18 @@ beforeEach(() => {
 });
 
 describe("updateDeviceConfigAction", () => {
-	it("rejects a non-admin before reading the device", async () => {
-		mocks.canAdminister.mockReturnValue(false);
+	it("rejects a member without the device.configure permission before reading the device", async () => {
+		mocks.requireUser.mockResolvedValue({
+			user: { id: "user-1" },
+			org: { id: "org-1" },
+			role: "RESPONDER",
+			permissions: {
+				"incident.acknowledge": true,
+				"incident.resolve": true,
+				"device.configure": false,
+				"members.manage": false,
+			},
+		});
 
 		const state = await updateDeviceConfigAction(initial, configForm({}));
 

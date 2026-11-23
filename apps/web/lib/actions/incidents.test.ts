@@ -44,6 +44,8 @@ vi.mock("next/navigation", () => ({
 	},
 }));
 
+import { type PermissionKey, rolePermissionDefaults } from "@/lib/auth/permissions";
+import type { MemberRoleName } from "@/lib/auth/roles";
 import { MAX_RESOLUTION_LENGTH } from "@/lib/incidents/resolution";
 import {
 	acknowledgeIncidentAction,
@@ -106,13 +108,19 @@ function redirectOf(data: FormData): Promise<string> {
 	return catchRedirect(() => requestCancelAlertAction(data));
 }
 
-beforeEach(() => {
-	vi.clearAllMocks();
-	mocks.requireUser.mockResolvedValue({
+/** The session shape after #11: the overlay is resolved on every request. */
+function currentFor(role: MemberRoleName, overrides: Partial<Record<PermissionKey, boolean>> = {}) {
+	return {
 		user: { id: "user-1" },
 		org: { id: "org-1" },
-		role: "ADMIN",
-	});
+		role,
+		permissions: { ...rolePermissionDefaults(role), ...overrides },
+	};
+}
+
+beforeEach(() => {
+	vi.clearAllMocks();
+	mocks.requireUser.mockResolvedValue(currentFor("ADMIN"));
 	mocks.incidentFindFirst.mockResolvedValue(incident());
 	mocks.incidentUpdate.mockResolvedValue({});
 	mocks.incidentUpdateMany.mockResolvedValue({ count: 1 });
@@ -293,11 +301,7 @@ describe("requestCancelAlertAction", () => {
 	});
 
 	it("keeps the vehicle-owner scope for USER members", async () => {
-		mocks.requireUser.mockResolvedValue({
-			user: { id: "user-1" },
-			org: { id: "org-1" },
-			role: "USER",
-		});
+		mocks.requireUser.mockResolvedValue(currentFor("USER"));
 		mocks.incidentFindFirst.mockResolvedValue(incident({ vehicle: { ownerId: "user-2" } }));
 
 		const path = await redirectOf(form());
@@ -307,11 +311,7 @@ describe("requestCancelAlertAction", () => {
 	});
 
 	it("lets a USER request a cancel for their own vehicle", async () => {
-		mocks.requireUser.mockResolvedValue({
-			user: { id: "user-1" },
-			org: { id: "org-1" },
-			role: "USER",
-		});
+		mocks.requireUser.mockResolvedValue(currentFor("USER"));
 
 		const path = await redirectOf(form());
 
@@ -387,25 +387,20 @@ describe("acknowledgeIncidentAction", () => {
 		return catchRedirect(() => acknowledgeIncidentAction(data));
 	}
 
-	it.each(["RESPONDER", "ADMIN"])("lets a %s acknowledge a dispatched incident", async (role) => {
-		mocks.requireUser.mockResolvedValue({
-			user: { id: "user-1" },
-			org: { id: "org-1" },
-			role,
-		});
+	it.each(["RESPONDER", "ADMIN"] as const)(
+		"lets a %s acknowledge a dispatched incident",
+		async (role) => {
+			mocks.requireUser.mockResolvedValue(currentFor(role));
 
-		const path = await ackRedirect(form());
+			const path = await ackRedirect(form());
 
-		expect(path).toBe("/en/incidents/inc-1?ack=requested");
-		expect(mocks.commandCreate).toHaveBeenCalledOnce();
-	});
+			expect(path).toBe("/en/incidents/inc-1?ack=requested");
+			expect(mocks.commandCreate).toHaveBeenCalledOnce();
+		},
+	);
 
 	it("denies a USER even for their own vehicle", async () => {
-		mocks.requireUser.mockResolvedValue({
-			user: { id: "user-1" },
-			org: { id: "org-1" },
-			role: "USER",
-		});
+		mocks.requireUser.mockResolvedValue(currentFor("USER"));
 
 		const path = await ackRedirect(form());
 
@@ -788,11 +783,7 @@ describe("resolveWithoutTrackerAction", () => {
 	});
 
 	it("denies a RESPONDER", async () => {
-		mocks.requireUser.mockResolvedValue({
-			user: { id: "user-1" },
-			org: { id: "org-1" },
-			role: "RESPONDER",
-		});
+		mocks.requireUser.mockResolvedValue(currentFor("RESPONDER"));
 
 		const path = await recoveryRedirect(confirmedForm());
 
@@ -866,5 +857,46 @@ describe("resolveWithoutTrackerAction", () => {
 		expect(path).toBe("/en/incidents/inc-1?updated=1");
 		const [update] = mocks.incidentUpdateMany.mock.calls;
 		expect(update?.[0].data.resolution).toHaveLength(MAX_RESOLUTION_LENGTH);
+	});
+});
+
+describe("permission overlay", () => {
+	it("refuses an acknowledge the membership override denies", async () => {
+		mocks.requireUser.mockResolvedValue(currentFor("RESPONDER", { "incident.acknowledge": false }));
+
+		const path = await catchRedirect(() => acknowledgeIncidentAction(form()));
+
+		expect(path).toBe("/en/incidents/inc-1?error=forbidden");
+		expect(mocks.transaction).not.toHaveBeenCalled();
+		expect(mocks.auditCreate).not.toHaveBeenCalled();
+	});
+
+	it("lets an override grant acknowledgement to a USER", async () => {
+		mocks.requireUser.mockResolvedValue(currentFor("USER", { "incident.acknowledge": true }));
+
+		const path = await catchRedirect(() => acknowledgeIncidentAction(form()));
+
+		expect(path).toBe("/en/incidents/inc-1?ack=requested");
+		expect(mocks.commandCreate).toHaveBeenCalledOnce();
+	});
+
+	it("refuses a resolve the membership override denies", async () => {
+		mocks.requireUser.mockResolvedValue(currentFor("RESPONDER", { "incident.resolve": false }));
+
+		const path = await catchRedirect(() => resolveIncidentAction(form()));
+
+		expect(path).toBe("/en/incidents/inc-1?error=forbidden");
+		expect(mocks.transaction).not.toHaveBeenCalled();
+	});
+
+	it("refuses the admin recovery when the overlay denies resolve", async () => {
+		mocks.requireUser.mockResolvedValue(currentFor("ADMIN", { "incident.resolve": false }));
+
+		const path = await catchRedirect(() =>
+			resolveWithoutTrackerAction(form({ confirm: "RESOLVE" })),
+		);
+
+		expect(path).toBe("/en/incidents/inc-1?error=forbidden");
+		expect(mocks.commandFindMany).not.toHaveBeenCalled();
 	});
 });

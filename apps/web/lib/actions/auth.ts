@@ -33,7 +33,16 @@ export async function loginAction(formData: FormData) {
 
 	const user = await prisma.user.findUnique({
 		where: { email: parsed.data.email },
-		include: { memberships: { include: { org: true }, take: 1 } },
+		include: {
+			memberships: {
+				// A revoked membership is not a way in; an account whose only
+				// membership is revoked fails the same generic check as a wrong
+				// password.
+				where: { revokedAt: null },
+				include: { org: true },
+				take: 1,
+			},
+		},
 	});
 	const passwordOk = user ? await verifyPassword(parsed.data.password, user.passwordHash) : false;
 	const membership = user?.memberships[0];
