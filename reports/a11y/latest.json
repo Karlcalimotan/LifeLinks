@@ -1,0 +1,443 @@
+{
+  "generatedAt": "2026-11-23T13:13:54.152Z",
+  "baseURL": "http://localhost:3000",
+  "locale": "en",
+  "axeVersion": "4.14.1",
+  "viewports": [
+    "desktop 1440x900"
+  ],
+  "gate": "serious and critical violations",
+  "routes": [
+    {
+      "viewport": "desktop",
+      "route": "login",
+      "url": "http://localhost:3000/en/login",
+      "title": "LifeLink — Crash detection and emergency response for every vehicle.",
+      "measured": true,
+      "counts": {
+        "critical": 0,
+        "serious": 0,
+        "moderate": 2,
+        "minor": 0,
+        "unknown": 0
+      },
+      "violations": [
+        {
+          "id": "landmark-one-main",
+          "impact": "moderate",
+          "help": "Document should have one main landmark",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/landmark-one-main?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                "html"
+              ],
+              "html": "<html lang=\"en\" class=\"dark\">",
+              "failureSummary": "Fix all of the following:\n  Document does not have a main landmark"
+            }
+          ]
+        },
+        {
+          "id": "region",
+          "impact": "moderate",
+          "help": "All page content should be contained by landmarks",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/region?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                ".justify-between > .gap-2\\.5.inline-flex.items-center > .min-w-0.flex-col.flex"
+              ],
+              "html": "<span class=\"flex min-w-0 flex-col\"><span class=\"font-display text-[1.35rem] font-semibold leading-none tracking-tight text-fog-50\">LifeLink</span><span class=\"mt-1 text-[10px] font-medium text-fog-500\">Crash response network</span></span>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            },
+            {
+              "target": [
+                ".mt-16"
+              ],
+              "html": "<div class=\"relative mt-16 max-w-2xl\">",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            },
+            {
+              "target": [
+                "li:nth-child(1) > .text-2xl.text-signal-500.leading-none"
+              ],
+              "html": "<span class=\"font-display text-2xl leading-none text-signal-500\">01</span>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            },
+            {
+              "target": [
+                "li:nth-child(1) > .text-sm.text-fog-100.font-medium"
+              ],
+              "html": "<span class=\"text-sm font-medium text-fog-100\">Impact detected</span>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            },
+            {
+              "target": [
+                "li:nth-child(2) > .text-2xl.text-signal-500.leading-none"
+              ],
+              "html": "<span class=\"font-display text-2xl leading-none text-signal-500\">02</span>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            },
+            {
+              "target": [
+                "li:nth-child(2) > .text-sm.text-fog-100.font-medium"
+              ],
+              "html": "<span class=\"text-sm font-medium text-fog-100\">Confirm window</span>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            },
+            {
+              "target": [
+                "li:nth-child(3) > .text-2xl.text-signal-500.leading-none"
+              ],
+              "html": "<span class=\"font-display text-2xl leading-none text-signal-500\">03</span>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            },
+            {
+              "target": [
+                "li:nth-child(3) > .text-sm.text-fog-100.font-medium"
+              ],
+              "html": "<span class=\"text-sm font-medium text-fog-100\">Driver cancel</span>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            },
+            {
+              "target": [
+                "li:nth-child(4) > .text-2xl.text-signal-500.leading-none"
+              ],
+              "html": "<span class=\"font-display text-2xl leading-none text-signal-500\">04</span>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            },
+            {
+              "target": [
+                "li:nth-child(4) > .text-sm.text-fog-100.font-medium"
+              ],
+              "html": "<span class=\"text-sm font-medium text-fog-100\">SMS and console</span>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            },
+            {
+              "target": [
+                ".pt-6"
+              ],
+              "html": "<p class=\"relative pt-6 text-[11px] text-fog-500\">Prototype. Call local emergency services first.</p>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            },
+            {
+              "target": [
+                "h2"
+              ],
+              "html": "<h2 class=\"font-display text-3xl font-semibold leading-none tracking-tight text-fog-50\">Sign in</h2>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            },
+            {
+              "target": [
+                ".mt-2"
+              ],
+              "html": "<p class=\"mt-2 text-sm leading-relaxed text-fog-500\">Sign in to the crash response console.</p>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            },
+            {
+              "target": [
+                ".gap-1\\.5.flex-col.flex:nth-child(3)"
+              ],
+              "html": "<div class=\"flex flex-col gap-1.5\">",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            },
+            {
+              "target": [
+                ".gap-1\\.5.flex-col.flex:nth-child(4)"
+              ],
+              "html": "<div class=\"flex flex-col gap-1.5\">",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            },
+            {
+              "target": [
+                ".mt-8"
+              ],
+              "html": "<p class=\"mt-8 text-center text-[11px] text-fog-500\">LifeLink<!-- -->. <!-- -->Crash detection and emergency response for every vehicle.</p>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            },
+            {
+              "target": [
+                ".sr-only"
+              ],
+              "html": "<span class=\"sr-only\">Crash detection and emergency response for every vehicle.</span>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "viewport": "desktop",
+      "route": "dashboard",
+      "url": "http://localhost:3000/en/dashboard",
+      "title": "Fleet overview | LifeLink",
+      "measured": true,
+      "counts": {
+        "critical": 0,
+        "serious": 1,
+        "moderate": 1,
+        "minor": 0,
+        "unknown": 0
+      },
+      "violations": [
+        {
+          "id": "region",
+          "impact": "moderate",
+          "help": "All page content should be contained by landmarks",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/region?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                "body > .sr-only"
+              ],
+              "html": "<span class=\"sr-only\">Crash detection and emergency response for every vehicle.</span>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            }
+          ]
+        },
+        {
+          "id": "scrollable-region-focusable",
+          "impact": "serious",
+          "help": "Scrollable region must have keyboard access",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/scrollable-region-focusable?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                "figure > .overflow-x-auto"
+              ],
+              "html": "<div class=\"overflow-x-auto\">",
+              "failureSummary": "Fix any of the following:\n  Element should have focusable content\n  Element should be focusable"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "viewport": "desktop",
+      "route": "incidents",
+      "url": "http://localhost:3000/en/incidents",
+      "title": "Incidents | LifeLink",
+      "measured": true,
+      "counts": {
+        "critical": 0,
+        "serious": 0,
+        "moderate": 1,
+        "minor": 0,
+        "unknown": 0
+      },
+      "violations": [
+        {
+          "id": "region",
+          "impact": "moderate",
+          "help": "All page content should be contained by landmarks",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/region?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                "body > .sr-only"
+              ],
+              "html": "<span class=\"sr-only\">Crash detection and emergency response for every vehicle.</span>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "viewport": "desktop",
+      "route": "map",
+      "url": "http://localhost:3000/en/map",
+      "title": "Live map | LifeLink",
+      "measured": true,
+      "counts": {
+        "critical": 0,
+        "serious": 0,
+        "moderate": 1,
+        "minor": 0,
+        "unknown": 0
+      },
+      "violations": [
+        {
+          "id": "region",
+          "impact": "moderate",
+          "help": "All page content should be contained by landmarks",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/region?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                "body > .sr-only"
+              ],
+              "html": "<span class=\"sr-only\">Crash detection and emergency response for every vehicle.</span>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "viewport": "desktop",
+      "route": "analytics",
+      "url": "http://localhost:3000/en/analytics",
+      "title": "Response analytics | LifeLink",
+      "measured": true,
+      "counts": {
+        "critical": 0,
+        "serious": 0,
+        "moderate": 1,
+        "minor": 0,
+        "unknown": 0
+      },
+      "violations": [
+        {
+          "id": "region",
+          "impact": "moderate",
+          "help": "All page content should be contained by landmarks",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/region?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                "body > .sr-only"
+              ],
+              "html": "<span class=\"sr-only\">Crash detection and emergency response for every vehicle.</span>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "viewport": "desktop",
+      "route": "settings",
+      "url": "http://localhost:3000/en/settings",
+      "title": "Settings | LifeLink",
+      "measured": true,
+      "counts": {
+        "critical": 0,
+        "serious": 0,
+        "moderate": 1,
+        "minor": 0,
+        "unknown": 0
+      },
+      "violations": [
+        {
+          "id": "region",
+          "impact": "moderate",
+          "help": "All page content should be contained by landmarks",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/region?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                "body > .sr-only"
+              ],
+              "html": "<span class=\"sr-only\">Crash detection and emergency response for every vehicle.</span>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "viewport": "desktop",
+      "route": "trackers",
+      "url": "http://localhost:3000/en/devices",
+      "title": "Trackers | LifeLink",
+      "measured": true,
+      "counts": {
+        "critical": 0,
+        "serious": 0,
+        "moderate": 1,
+        "minor": 0,
+        "unknown": 0
+      },
+      "violations": [
+        {
+          "id": "region",
+          "impact": "moderate",
+          "help": "All page content should be contained by landmarks",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/region?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                "body > .sr-only"
+              ],
+              "html": "<span class=\"sr-only\">Crash detection and emergency response for every vehicle.</span>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "viewport": "desktop",
+      "route": "vehicles",
+      "url": "http://localhost:3000/en/vehicles",
+      "title": "Vehicles | LifeLink",
+      "measured": true,
+      "counts": {
+        "critical": 0,
+        "serious": 0,
+        "moderate": 1,
+        "minor": 0,
+        "unknown": 0
+      },
+      "violations": [
+        {
+          "id": "region",
+          "impact": "moderate",
+          "help": "All page content should be contained by landmarks",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/region?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                "body > .sr-only"
+              ],
+              "html": "<span class=\"sr-only\">Crash detection and emergency response for every vehicle.</span>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "viewport": "desktop",
+      "route": "notifications",
+      "url": "http://localhost:3000/en/notifications",
+      "title": "Notifications | LifeLink",
+      "measured": true,
+      "counts": {
+        "critical": 0,
+        "serious": 0,
+        "moderate": 1,
+        "minor": 0,
+        "unknown": 0
+      },
+      "violations": [
+        {
+          "id": "region",
+          "impact": "moderate",
+          "help": "All page content should be contained by landmarks",
+          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/region?application=axeAPI",
+          "nodes": [
+            {
+              "target": [
+                "body > .sr-only"
+              ],
+              "html": "<span class=\"sr-only\">Crash detection and emergency response for every vehicle.</span>",
+              "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "summary": {
+    "status": "fail",
+    "measured": 9,
+    "expected": 9,
+    "critical": 0,
+    "serious": 1,
+    "moderate": 10,
+    "minor": 0
+  }
+}
