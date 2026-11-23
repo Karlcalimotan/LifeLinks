@@ -30,3 +30,15 @@ export function incidentCancelRequestPath(
 ): string {
 	return appendQuery(incidentReturnBase(locale, incidentId, returnTo), "cancel", "requested");
 }
+
+/**
+ * Where a queued bureau acknowledgement sends the operator. The incident keeps
+ * its status until the tracker answers, so this is not an "updated" path.
+ */
+export function incidentAckRequestPath(
+	locale: string,
+	incidentId: string,
+	returnTo: string,
+): string {
+	return appendQuery(incidentReturnBase(locale, incidentId, returnTo), "ack", "requested");
+}

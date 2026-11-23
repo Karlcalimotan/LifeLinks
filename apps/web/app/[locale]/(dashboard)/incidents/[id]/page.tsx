@@ -14,6 +14,10 @@ import {
 import { Link } from "@/i18n/routing";
 import { requireUser } from "@/lib/auth/session";
 import { mapLink } from "@/lib/geo";
+import {
+	acknowledgementRequiredBeforeResolve,
+	readBureauAckState,
+} from "@/lib/incidents/bureau-ack";
 import { readCancelAlertState } from "@/lib/incidents/cancel-alert";
 import {
 	incidentAuditLabelKey,
@@ -131,6 +135,31 @@ export default async function IncidentDetailPage({
 		now,
 	});
 
+	const ackCommands = await prisma.deviceCommand.findMany({
+		where: {
+			impactEventId: incident.id,
+			kind: "ACK_INCIDENT",
+		},
+		orderBy: { createdAt: "desc" },
+		take: 20,
+		select: {
+			id: true,
+			kind: true,
+			status: true,
+			payload: true,
+			impactEventId: true,
+			createdAt: true,
+			expiresAt: true,
+		},
+	});
+	const bureauAck = readBureauAckState({
+		incidentId: incident.id,
+		status: incident.status,
+		ackRequestedAt: incident.ackRequestedAt,
+		commands: ackCommands,
+		now,
+	});
+
 	const timeline = mergeIncidentTimeline(
 		auditRows.map((row) => ({
 			id: row.id,
@@ -198,7 +227,9 @@ export default async function IncidentDetailPage({
 						? "Your role cannot change incidents."
 						: error === "tracker_required"
 							? t("errorTrackerRequired")
-							: "That status transition is not allowed."}
+							: error === "ack_required"
+								? t("errorAckRequired")
+								: "That status transition is not allowed."}
 				</p>
 			) : null}
 
@@ -377,6 +408,11 @@ export default async function IncidentDetailPage({
 							status={incident.status}
 							role={current.role}
 							cancelAlert={cancelAlert}
+							bureauAck={bureauAck}
+							acknowledgementRequired={acknowledgementRequiredBeforeResolve({
+								status: incident.status,
+								deviceBacked: Boolean(incident.device),
+							})}
 							focusCancel={isCancelActionFocus(action)}
 						/>
 					</CardContent>

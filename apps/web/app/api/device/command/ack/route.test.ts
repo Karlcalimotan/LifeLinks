@@ -397,3 +397,245 @@ describe("POST /api/device/command/ack", () => {
 		expect(mocks.incidentUpdateMany).not.toHaveBeenCalled();
 	});
 });
+
+describe("POST /api/device/command/ack for ACK_INCIDENT", () => {
+	const ackPayload = { incident_id: "llk-1a2b3c4d-00001234" };
+
+	function ackCommand(overrides: Record<string, unknown> = {}) {
+		return command({
+			kind: "ACK_INCIDENT",
+			payload: ackPayload,
+			...overrides,
+		});
+	}
+
+	beforeEach(() => {
+		mocks.commandFindFirst.mockReset();
+		mocks.commandFindUnique.mockReset();
+		mocks.commandUpdate.mockReset();
+		mocks.commandUpdateMany.mockReset();
+		mocks.incidentFindFirst.mockReset();
+		mocks.incidentUpdateMany.mockReset();
+		mocks.auditCreate.mockReset();
+		mocks.transaction.mockReset();
+
+		mocks.commandFindFirst.mockResolvedValue(ackCommand());
+		mocks.commandFindUnique.mockResolvedValue({ status: "ACKED" });
+		mocks.commandUpdate.mockResolvedValue({ id: "cmd-1", status: "ACKED" });
+		mocks.commandUpdateMany.mockResolvedValue({ count: 1 });
+		mocks.incidentFindFirst.mockResolvedValue(serverIncident());
+		mocks.incidentUpdateMany.mockResolvedValue({ count: 1 });
+		mocks.auditCreate.mockResolvedValue({});
+		mocks.transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
+			fn({
+				deviceCommand: {
+					updateMany: mocks.commandUpdateMany,
+					findUnique: mocks.commandFindUnique,
+				},
+				impactEvent: {
+					findFirst: mocks.incidentFindFirst,
+					updateMany: mocks.incidentUpdateMany,
+				},
+				auditLog: { create: mocks.auditCreate },
+			}),
+		);
+	});
+
+	it("sets ACKNOWLEDGED only when the tracker confirms", async () => {
+		const response = await POST(request({ detail: "acknowledged" }));
+		const body = await response.json();
+
+		expect(response.status).toBe(200);
+		expect(body.data).toMatchObject({
+			received: true,
+			command_id: "cmd-1",
+			status: "ACKED",
+			result: "acknowledged",
+			incident_status: "ACKNOWLEDGED",
+			duplicate: false,
+			changed: true,
+		});
+		expect(mocks.incidentUpdateMany).toHaveBeenCalledWith({
+			where: {
+				id: "inc-1",
+				orgId: "org-1",
+				deviceId: "dev-1",
+				resolution: null,
+				status: { in: ["SUSPECTED", "CONFIRMED", "ACKNOWLEDGED"] },
+			},
+			data: { status: "ACKNOWLEDGED", ackRequestedAt: null },
+		});
+		expect(mocks.auditCreate).toHaveBeenCalledWith({
+			data: expect.objectContaining({
+				action: "incident.acknowledged",
+				target: "inc-1",
+				metadata: expect.objectContaining({
+					source: "device",
+					commandId: "cmd-1",
+					detail: "acknowledged",
+				}),
+			}),
+		});
+	});
+
+	it("accepts the ACK state in the contract's result field", async () => {
+		const response = await POST(request({ result: "acknowledged" }));
+		const body = await response.json();
+
+		expect(body.data.result).toBe("acknowledged");
+		expect(body.data.changed).toBe(true);
+	});
+
+	it("resolves the incident from impactEventId, never from the device payload", async () => {
+		mocks.commandFindFirst.mockResolvedValue(
+			ackCommand({ payload: { incident_id: "llk-attacker-controlled" } }),
+		);
+
+		await POST(request({ detail: "acknowledged" }));
+
+		expect(mocks.incidentFindFirst).toHaveBeenCalledWith({
+			where: { id: "inc-1", orgId: "org-1", deviceId: "dev-1" },
+			select: { id: true, status: true },
+		});
+	});
+
+	it("keeps the pre-ack status on unknown_incident and clears the request", async () => {
+		const response = await POST(request({ detail: "unknown_incident" }));
+		const body = await response.json();
+
+		expect(response.status).toBe(200);
+		expect(body.data).toMatchObject({
+			result: "unknown_incident",
+			incident_status: "CONFIRMED",
+			changed: false,
+		});
+		const [update] = mocks.incidentUpdateMany.mock.calls;
+		expect(update?.[0]).toEqual({
+			where: { id: "inc-1", orgId: "org-1", deviceId: "dev-1" },
+			data: { ackRequestedAt: null },
+		});
+		expect(update?.[0].data).not.toHaveProperty("status");
+		expect(mocks.auditCreate).toHaveBeenCalledWith({
+			data: expect.objectContaining({
+				action: "incident.ack_unconfirmed",
+				target: "inc-1",
+				metadata: expect.objectContaining({ result: "unknown_incident", from: "CONFIRMED" }),
+			}),
+		});
+	});
+
+	it("does not acknowledge on a generic ACK without a contract detail", async () => {
+		const response = await POST(request());
+		const body = await response.json();
+
+		expect(body.data.result).toBe("unconfirmed");
+		expect(body.data.changed).toBe(false);
+		expect(mocks.incidentUpdateMany).toHaveBeenCalledWith({
+			where: { id: "inc-1", orgId: "org-1", deviceId: "dev-1" },
+			data: { ackRequestedAt: null },
+		});
+		expect(mocks.auditCreate.mock.calls[0]?.[0].data.action).toBe("incident.ack_unconfirmed");
+	});
+
+	it("records a failed command without changing the incident status", async () => {
+		const response = await POST(request({ status: "FAILED", detail: "acknowledged" }));
+		const body = await response.json();
+
+		expect(body.data.result).toBe("failed");
+		expect(body.data.changed).toBe(false);
+		const [update] = mocks.incidentUpdateMany.mock.calls;
+		expect(update?.[0].data).toEqual({ ackRequestedAt: null });
+	});
+
+	it("is idempotent: a repeated ACK does not touch the incident", async () => {
+		mocks.commandUpdateMany.mockResolvedValue({ count: 0 });
+		mocks.commandFindUnique.mockResolvedValue({ status: "ACKED" });
+		mocks.commandFindFirst.mockResolvedValue(ackCommand({ status: "ACKED" }));
+
+		const response = await POST(request({ detail: "acknowledged" }));
+		const body = await response.json();
+
+		expect(body.data).toMatchObject({
+			result: null,
+			duplicate: true,
+			changed: false,
+			status: "ACKED",
+		});
+		expect(mocks.incidentFindFirst).not.toHaveBeenCalled();
+		expect(mocks.incidentUpdateMany).not.toHaveBeenCalled();
+		expect(mocks.auditCreate).not.toHaveBeenCalled();
+	});
+
+	it("does not acknowledge an incident that belongs to another device or org", async () => {
+		mocks.incidentFindFirst.mockResolvedValue(null);
+
+		const response = await POST(request({ detail: "acknowledged" }));
+		const body = await response.json();
+
+		expect(body.data.result).toBe("unknown_incident");
+		expect(body.data.changed).toBe(false);
+		expect(mocks.incidentUpdateMany).not.toHaveBeenCalled();
+		expect(mocks.auditCreate).toHaveBeenCalledWith({
+			data: expect.objectContaining({
+				action: "incident.ack_unconfirmed",
+				metadata: expect.objectContaining({ reason: "incident_not_found_for_device" }),
+			}),
+		});
+	});
+
+	it("accepts a late confirmation for an expired command once", async () => {
+		mocks.commandFindFirst.mockResolvedValue(ackCommand({ status: "EXPIRED" }));
+
+		const response = await POST(request({ detail: "acknowledged" }));
+		const body = await response.json();
+
+		expect(body.data.result).toBe("acknowledged");
+		expect(body.data.changed).toBe(true);
+		expect(mocks.commandUpdateMany).toHaveBeenCalledWith({
+			where: { id: "cmd-1", deviceId: "dev-1", status: { in: ["PENDING", "EXPIRED"] } },
+			data: expect.objectContaining({ status: "ACKED", ackedAt: expect.any(Date) }),
+		});
+		expect(mocks.incidentUpdateMany).toHaveBeenCalledOnce();
+	});
+
+	it("does not resurrect a terminal incident", async () => {
+		mocks.incidentFindFirst.mockResolvedValue(serverIncident({ status: "RESOLVED" }));
+
+		const response = await POST(request({ detail: "acknowledged" }));
+		const body = await response.json();
+
+		expect(body.data.result).toBe("already_closed");
+		expect(body.data.incident_status).toBe("RESOLVED");
+		expect(body.data.changed).toBe(false);
+		const [update] = mocks.incidentUpdateMany.mock.calls;
+		expect(update?.[0]).toEqual({
+			where: { id: "inc-1", orgId: "org-1", deviceId: "dev-1" },
+			data: { ackRequestedAt: null },
+		});
+		expect(update?.[0].data).not.toHaveProperty("status");
+		expect(mocks.auditCreate).toHaveBeenCalledWith({
+			data: expect.objectContaining({
+				action: "incident.ack_ignored",
+				metadata: expect.objectContaining({ result: "already_closed", reason: "status" }),
+			}),
+		});
+	});
+
+	it("records an ACK_INCIDENT without a server incident link", async () => {
+		mocks.commandFindFirst.mockResolvedValue(ackCommand({ impactEventId: null }));
+
+		const response = await POST(request({ detail: "acknowledged" }));
+		const body = await response.json();
+
+		expect(body.data.result).toBe("unconfirmed");
+		expect(body.data.changed).toBe(false);
+		expect(mocks.incidentFindFirst).not.toHaveBeenCalled();
+		expect(mocks.incidentUpdateMany).not.toHaveBeenCalled();
+		expect(mocks.auditCreate).toHaveBeenCalledWith({
+			data: expect.objectContaining({
+				action: "incident.ack_unconfirmed",
+				metadata: expect.objectContaining({ reason: "missing_impact_link" }),
+			}),
+		});
+	});
+});

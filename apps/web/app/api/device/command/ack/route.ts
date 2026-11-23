@@ -4,6 +4,12 @@ import { withApi } from "@/lib/api/instrumentation";
 import { isDeviceApproved, requireDevice } from "@/lib/device/auth";
 import { commandAckSchema } from "@/lib/device/schema";
 import {
+	ACK_INCIDENT_CONFIRMABLE_STATUSES,
+	type AckIncidentOutcome,
+	canConfirmAckIncident,
+	classifyAckIncident,
+} from "@/lib/incidents/bureau-ack";
+import {
 	CANCEL_ALERT_CLOSABLE_STATUSES,
 	CANCEL_ALERT_RESOLUTION,
 	type CancelAckOutcome,
@@ -26,6 +32,7 @@ function mergeAckPayload(payload: unknown, detail: string | null) {
 }
 
 type CancelAlertAckResult = CancelAckOutcome | "already_closed";
+type AckIncidentAckResult = AckIncidentOutcome | "already_closed";
 
 /**
  * A device confirms a command it actually executed (or reports a failure).
@@ -288,6 +295,228 @@ export const POST = withApi(
 				incident_status: result.incidentStatus,
 				duplicate: !result.applied,
 				changed: result.result === "cancelled",
+			});
+		}
+
+		if (command.kind === "ACK_INCIDENT") {
+			const result = await prisma.$transaction(async (tx) => {
+				// Idempotency matches CANCEL_ALERT: the acknowledgement applies once,
+				// and a retry answers with the command's current state.
+				const marked = await tx.deviceCommand.updateMany({
+					where: {
+						id: command.id,
+						deviceId: device.id,
+						status: { in: ["PENDING", "EXPIRED"] },
+					},
+					data: {
+						status: input.status,
+						ackedAt: now,
+						payload: mergeAckPayload(command.payload, detail),
+					},
+				});
+				if (marked.count === 0) {
+					const current = await tx.deviceCommand.findUnique({
+						where: { id: command.id },
+						select: { status: true },
+					});
+					return {
+						applied: false,
+						status: current?.status ?? command.status,
+						result: null,
+						incidentStatus: null,
+						changed: false,
+					};
+				}
+
+				const incidentId = command.impactEventId;
+				if (!incidentId) {
+					// Every ACK_INCIDENT this build creates carries the server incident.
+					// A command without it cannot be matched safely to an incident.
+					await tx.auditLog.create({
+						data: {
+							orgId: device.orgId,
+							action: "incident.ack_unconfirmed",
+							target: null,
+							metadata: {
+								commandId: command.id,
+								deviceId: device.id,
+								result: "unconfirmed",
+								reason: "missing_impact_link",
+							},
+						},
+					});
+					return {
+						applied: true,
+						status: input.status,
+						result: "unconfirmed" as const,
+						incidentStatus: null,
+						changed: false,
+					};
+				}
+
+				// The incident comes from the command row, never from the device
+				// payload. It must belong to the authenticated device and its org.
+				const incident = await tx.impactEvent.findFirst({
+					where: { id: incidentId, orgId: device.orgId, deviceId: device.id },
+					select: { id: true, status: true },
+				});
+				const outcome = classifyAckIncident({ status: input.status, detail });
+
+				if (!incident) {
+					await tx.auditLog.create({
+						data: {
+							orgId: device.orgId,
+							action: "incident.ack_unconfirmed",
+							target: incidentId,
+							metadata: {
+								commandId: command.id,
+								deviceId: device.id,
+								result: "unknown_incident",
+								reason: "incident_not_found_for_device",
+							},
+						},
+					});
+					return {
+						applied: true,
+						status: input.status,
+						result: "unknown_incident" as const,
+						incidentStatus: null,
+						changed: false,
+					};
+				}
+
+				if (outcome !== "acknowledged") {
+					// The tracker answered but did not confirm that the alarm stopped.
+					// Keep the pre-ack status, clear the pending request so a retry is
+					// possible, and leave the reason on the command and the audit trail.
+					await tx.impactEvent.updateMany({
+						where: { id: incident.id, orgId: device.orgId, deviceId: device.id },
+						data: { ackRequestedAt: null },
+					});
+					await tx.auditLog.create({
+						data: {
+							orgId: device.orgId,
+							action: "incident.ack_unconfirmed",
+							target: incident.id,
+							metadata: {
+								commandId: command.id,
+								deviceId: device.id,
+								result: outcome,
+								from: incident.status,
+							},
+						},
+					});
+					return {
+						applied: true,
+						status: input.status,
+						result: outcome,
+						incidentStatus: incident.status,
+						changed: false,
+					};
+				}
+
+				// A concurrent resolve or false alarm wins. A late acknowledgement
+				// never resurrects a closed incident.
+				if (!canConfirmAckIncident(incident.status as ImpactStatusName)) {
+					await tx.impactEvent.updateMany({
+						where: { id: incident.id, orgId: device.orgId, deviceId: device.id },
+						data: { ackRequestedAt: null },
+					});
+					await tx.auditLog.create({
+						data: {
+							orgId: device.orgId,
+							action: "incident.ack_ignored",
+							target: incident.id,
+							metadata: {
+								commandId: command.id,
+								deviceId: device.id,
+								result: "already_closed",
+								reason: "status",
+								from: incident.status,
+							},
+						},
+					});
+					return {
+						applied: true,
+						status: input.status,
+						result: "already_closed" as const,
+						incidentStatus: incident.status,
+						changed: false,
+					};
+				}
+
+				const confirmed = await tx.impactEvent.updateMany({
+					where: {
+						id: incident.id,
+						orgId: device.orgId,
+						deviceId: device.id,
+						resolution: null,
+						status: { in: [...ACK_INCIDENT_CONFIRMABLE_STATUSES] },
+					},
+					data: { status: "ACKNOWLEDGED", ackRequestedAt: null },
+				});
+				if (confirmed.count === 0) {
+					const current = await tx.impactEvent.findFirst({
+						where: { id: incident.id, orgId: device.orgId, deviceId: device.id },
+						select: { status: true },
+					});
+					await tx.impactEvent.updateMany({
+						where: { id: incident.id, orgId: device.orgId, deviceId: device.id },
+						data: { ackRequestedAt: null },
+					});
+					await tx.auditLog.create({
+						data: {
+							orgId: device.orgId,
+							action: "incident.ack_ignored",
+							target: incident.id,
+							metadata: {
+								commandId: command.id,
+								deviceId: device.id,
+								result: current ? "already_closed" : "unknown_incident",
+								from: current?.status ?? incident.status,
+							},
+						},
+					});
+					return {
+						applied: true,
+						status: input.status,
+						result: current ? ("already_closed" as const) : ("unknown_incident" as const),
+						incidentStatus: current?.status ?? null,
+						changed: false,
+					};
+				}
+
+				await tx.auditLog.create({
+					data: {
+						orgId: device.orgId,
+						action: "incident.acknowledged",
+						target: incident.id,
+						metadata: {
+							from: incident.status,
+							to: "ACKNOWLEDGED",
+							source: "device",
+							commandId: command.id,
+							detail: "acknowledged",
+						},
+					},
+				});
+				return {
+					applied: true,
+					status: input.status,
+					result: "acknowledged" as AckIncidentAckResult,
+					incidentStatus: "ACKNOWLEDGED",
+					changed: incident.status !== "ACKNOWLEDGED",
+				};
+			});
+
+			return ok({
+				received: true,
+				command_id: command.id,
+				status: result.status,
+				result: result.result,
+				incident_status: result.incidentStatus,
+				duplicate: !result.applied,
+				changed: result.changed,
 			});
 		}
 

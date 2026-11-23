@@ -39,6 +39,15 @@ export function canManageIncidents(_role: MemberRoleName): boolean {
 	return true;
 }
 
+/**
+ * Bureau acknowledgement is a command to the tracker, not a driver action.
+ * A vehicle owner (`USER`) may work their own incident, but cannot acknowledge
+ * on behalf of the responding bureau.
+ */
+export function canAcknowledgeAsBureau(role: MemberRoleName): boolean {
+	return role === "RESPONDER" || role === "ADMIN";
+}
+
 export function canAdminister(role: MemberRoleName): boolean {
 	return role === "ADMIN";
 }

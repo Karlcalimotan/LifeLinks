@@ -1,7 +1,13 @@
 "use server";
 
-import { canManageIncidents } from "@/lib/auth/roles";
+import { canAcknowledgeAsBureau, canManageIncidents } from "@/lib/auth/roles";
 import { requireUser } from "@/lib/auth/session";
+import {
+	ACK_INCIDENT_COMMAND_TTL_MS,
+	ACK_INCIDENT_KIND,
+	acknowledgementRequiredBeforeResolve,
+	buildAckIncidentPayload,
+} from "@/lib/incidents/bureau-ack";
 import {
 	CANCEL_ALERT_COMMAND_TTL_MS,
 	CANCEL_ALERT_ELIGIBLE_STATUSES,
@@ -9,7 +15,11 @@ import {
 	buildCancelAlertPayload,
 	canRequestCancelAlert,
 } from "@/lib/incidents/cancel-alert";
-import { incidentCancelRequestPath, incidentSuccessPath } from "@/lib/incidents/return-to";
+import {
+	incidentAckRequestPath,
+	incidentCancelRequestPath,
+	incidentSuccessPath,
+} from "@/lib/incidents/return-to";
 import { type ImpactStatusName, canTransition } from "@/lib/incidents/state";
 import prisma from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
@@ -36,7 +46,10 @@ async function transition(formData: FormData, to: ImpactStatusName) {
 
 	const incident = await prisma.impactEvent.findFirst({
 		where: { id: incidentId, orgId: current.org.id },
-		include: { vehicle: { select: { ownerId: true } } },
+		include: {
+			vehicle: { select: { ownerId: true } },
+			device: { select: { id: true } },
+		},
 	});
 	if (!incident) {
 		redirect(
@@ -69,6 +82,24 @@ async function transition(formData: FormData, to: ImpactStatusName) {
 			fromDashboard
 				? `/${locale}/dashboard?error=transition`
 				: `/${locale}/incidents/${incident.id}?error=transition`,
+		);
+	}
+
+	// The tracker latches its alarm until ACK_INCIDENT. Resolving before the
+	// device confirms would tell the operator the alarm is over while it is
+	// still sounding, so a dispatched device incident must be acknowledged
+	// first. A local incident has no tracker to wait for.
+	if (
+		to === "RESOLVED" &&
+		acknowledgementRequiredBeforeResolve({
+			status: incident.status,
+			deviceBacked: Boolean(incident.device),
+		})
+	) {
+		redirect(
+			fromDashboard
+				? `/${locale}/dashboard?error=ack_required`
+				: `/${locale}/incidents/${incident.id}?error=ack_required`,
 		);
 	}
 
@@ -109,8 +140,158 @@ async function transition(formData: FormData, to: ImpactStatusName) {
 	redirect(incidentSuccessPath(locale, incident.id, returnTo));
 }
 
+/**
+ * Acknowledge an incident as the responding bureau.
+ *
+ * The role gate is deliberate: a vehicle owner may work their own incident,
+ * but only `RESPONDER` and `ADMIN` acknowledge on behalf of the bureau.
+ *
+ * A device-backed `CONFIRMED` incident is dispatched and its tracker alarm is
+ * latched. The action queues `ACK_INCIDENT` with the device client incident id
+ * and records `ackRequestedAt`; it never sets `ACKNOWLEDGED` itself. The ACK
+ * route changes the status only when the tracker confirms. A `SUSPECTED`
+ * incident is before dispatch, and an incident without a device has no tracker
+ * to ask, so those keep the local acknowledgement path.
+ */
 export async function acknowledgeIncidentAction(formData: FormData) {
-	await transition(formData, "ACKNOWLEDGED");
+	const locale = value(formData, "locale") === "tl" ? "tl" : "en";
+	const incidentId = value(formData, "incidentId");
+	const returnTo = value(formData, "returnTo");
+	const fromDashboard = returnTo === "dashboard";
+	const current = await requireUser();
+
+	const forbiddenPath = fromDashboard
+		? `/${locale}/dashboard?error=forbidden`
+		: `/${locale}/incidents/${incidentId}?error=forbidden`;
+	if (!canAcknowledgeAsBureau(current.role)) redirect(forbiddenPath);
+
+	const incident = await prisma.impactEvent.findFirst({
+		where: { id: incidentId, orgId: current.org.id },
+		include: {
+			vehicle: { select: { ownerId: true } },
+			device: { select: { id: true } },
+		},
+	});
+	if (!incident) {
+		redirect(
+			fromDashboard ? `/${locale}/dashboard?error=notfound` : `/${locale}/incidents?error=notfound`,
+		);
+	}
+	// Keep the owner scope even though the bureau gate already excludes USER.
+	if (current.role === "USER" && incident.vehicle.ownerId !== current.user.id) {
+		redirect(forbiddenPath);
+	}
+
+	const transitionPath = fromDashboard
+		? `/${locale}/dashboard?error=transition`
+		: `/${locale}/incidents/${incident.id}?error=transition`;
+	if (!canTransition(incident.status as ImpactStatusName, "ACKNOWLEDGED")) {
+		redirect(transitionPath);
+	}
+
+	const now = new Date();
+	const deviceBacked = Boolean(incident.device);
+	const dispatched = incident.status === "CONFIRMED";
+
+	if (!deviceBacked || !dispatched) {
+		// No tracker to ask: record the acknowledgement locally. The conditional
+		// update keeps a concurrent terminal transition from being overwritten.
+		const claimed = await prisma.$transaction(async (tx) => {
+			const updated = await tx.impactEvent.updateMany({
+				where: {
+					id: incident.id,
+					orgId: current.org.id,
+					status: { in: ["SUSPECTED", "CONFIRMED"] },
+					resolution: null,
+				},
+				data: { status: "ACKNOWLEDGED", ackRequestedAt: null },
+			});
+			if (updated.count !== 1) return false;
+			await tx.auditLog.create({
+				data: {
+					orgId: current.org.id,
+					actorId: current.user.id,
+					action: "incident.acknowledged",
+					target: incident.id,
+					metadata: {
+						from: incident.status,
+						to: "ACKNOWLEDGED",
+						source: "operator",
+						deviceId: incident.deviceId,
+					},
+				},
+			});
+			return true;
+		});
+		if (!claimed) redirect(transitionPath);
+
+		revalidatePath(`/${locale}/dashboard`);
+		revalidatePath(`/${locale}/incidents`);
+		revalidatePath(`/${locale}/incidents/${incident.id}`);
+		redirect(incidentSuccessPath(locale, incident.id, returnTo));
+	}
+
+	const result = await prisma.$transaction(async (tx) => {
+		// Claim the request in the same write that records it. A terminal status
+		// from a concurrent operator wins instead of receiving a stale command.
+		// The update also locks the incident row, so a double submit serialises
+		// here and the second one sees the command the first one created.
+		const claimed = await tx.impactEvent.updateMany({
+			where: {
+				id: incident.id,
+				orgId: current.org.id,
+				status: "CONFIRMED",
+				resolution: null,
+			},
+			data: { ackRequestedAt: now },
+		});
+		if (claimed.count !== 1) return "blocked" as const;
+
+		const liveCommand = await tx.deviceCommand.findFirst({
+			where: {
+				impactEventId: incident.id,
+				kind: ACK_INCIDENT_KIND,
+				status: "PENDING",
+				OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+			},
+			select: { id: true },
+		});
+		if (liveCommand) return "duplicate" as const;
+
+		await tx.deviceCommand.create({
+			data: {
+				deviceId: incident.deviceId,
+				impactEventId: incident.id,
+				kind: ACK_INCIDENT_KIND,
+				// The device compares this with its own g_incidentId (`llk-...`).
+				payload: buildAckIncidentPayload(incident.clientIncidentId),
+				createdAt: now,
+				expiresAt: new Date(now.getTime() + ACK_INCIDENT_COMMAND_TTL_MS),
+			},
+		});
+		await tx.auditLog.create({
+			data: {
+				orgId: current.org.id,
+				actorId: current.user.id,
+				action: "incident.ack_requested",
+				target: incident.id,
+				metadata: {
+					from: incident.status,
+					deviceId: incident.deviceId,
+					clientIncidentId: incident.clientIncidentId,
+				},
+			},
+		});
+		return "created" as const;
+	});
+	if (result === "blocked") redirect(transitionPath);
+
+	revalidatePath(`/${locale}/dashboard`);
+	revalidatePath(`/${locale}/incidents`);
+	revalidatePath(`/${locale}/incidents/${incident.id}`);
+	// The incident status has not changed yet, so the page must not claim it was
+	// updated. The detail banner shows the pending tracker request.
+	redirect(incidentAckRequestPath(locale, incident.id, returnTo));
 }
 
 export async function resolveIncidentAction(formData: FormData) {

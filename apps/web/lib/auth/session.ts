@@ -12,6 +12,7 @@ import { resolveAuthSecret, shouldUseSecureSessionCookie } from "./secret";
 export type { MemberRoleName };
 export {
 	MEMBER_ROLES,
+	canAcknowledgeAsBureau,
 	canAdminister,
 	canManageIncidents,
 	canManageSettings,

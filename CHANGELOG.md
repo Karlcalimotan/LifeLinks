@@ -24,6 +24,13 @@ All notable changes to this project are documented here. The format follows
   fields, with shared envelope validation, a `SET_CONFIG` push, before/after
   audit and a pending/confirmed state driven by the device's echoed
   `config_rev` (#44).
+- Bureau acknowledgement for dispatched incidents: `ACK_INCIDENT` carries the
+  device client incident id and the command row keeps the server
+  `impactEventId`, `ackRequestedAt` records the request, and the incident
+  becomes `ACKNOWLEDGED` only when the tracker confirms. The detail shows
+  "Alarm latched, waiting for tracker", reports `unknown_incident`, retries an
+  expired command, and a latched device incident must be acknowledged before
+  it can be resolved (#105).
 
 ### Changed
 

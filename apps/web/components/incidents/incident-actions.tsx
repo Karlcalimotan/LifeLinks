@@ -7,7 +7,8 @@ import {
 	requestCancelAlertAction,
 	resolveIncidentAction,
 } from "@/lib/actions/incidents";
-import { type MemberRoleName, canManageIncidents } from "@/lib/auth/roles";
+import { type MemberRoleName, canAcknowledgeAsBureau, canManageIncidents } from "@/lib/auth/roles";
+import { type BureauAckView, bureauAckCopyKey } from "@/lib/incidents/bureau-ack";
 import {
 	type CancelAlertView,
 	canRequestCancelAlert,
@@ -15,7 +16,7 @@ import {
 } from "@/lib/incidents/cancel-alert";
 import { type ImpactStatusName, isTerminal } from "@/lib/incidents/state";
 import { formatDateTime } from "@/lib/utils";
-import { Clock, TriangleAlert } from "lucide-react";
+import { Check, Clock, TriangleAlert } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 export async function IncidentActions({
@@ -24,6 +25,8 @@ export async function IncidentActions({
 	status,
 	role,
 	cancelAlert,
+	bureauAck,
+	acknowledgementRequired,
 	focusCancel = false,
 }: {
 	incidentId: string;
@@ -31,6 +34,8 @@ export async function IncidentActions({
 	status: string;
 	role: MemberRoleName;
 	cancelAlert: CancelAlertView;
+	bureauAck: BureauAckView;
+	acknowledgementRequired: boolean;
 	focusCancel?: boolean;
 }) {
 	if (!canManageIncidents(role)) return null;
@@ -42,8 +47,58 @@ export async function IncidentActions({
 	const waiting = cancelAlert.state === "waiting";
 	const canRequest = canRequestCancelAlert(status as ImpactStatusName);
 
+	const ackCopy = bureauAckCopyKey(bureauAck);
+	const ackWaiting = bureauAck.state === "waiting";
+	const ackAcknowledged = bureauAck.state === "acknowledged";
+	const ackFailed = bureauAck.state === "not_confirmed" || bureauAck.state === "failed";
+	const canAcknowledge =
+		canAcknowledgeAsBureau(role) && (status === "SUSPECTED" || status === "CONFIRMED");
+	// A pending request already reached the tracker; a second submit is coalesced
+	// by the action but hiding the button makes the wait explicit.
+	const showAcknowledge = canAcknowledge && !ackWaiting;
+	const acknowledgeLabel = ackFailed ? t("ackRetry") : t("acknowledge");
+
 	return (
 		<div className="flex flex-col gap-3">
+			{ackCopy ? (
+				<div
+					className={`flex items-start gap-2.5 rounded-panel border px-3 py-2.5 ${
+						ackWaiting
+							? "border-caution-400/30 bg-caution-400/10"
+							: ackAcknowledged
+								? "border-clear-400/30 bg-clear-400/10"
+								: "border-alarm-500/30 bg-alarm-500/10"
+					}`}
+				>
+					{ackWaiting ? (
+						<Clock className="mt-0.5 size-4 shrink-0 text-caution-300" aria-hidden="true" />
+					) : ackAcknowledged ? (
+						<Check className="mt-0.5 size-4 shrink-0 text-clear-300" aria-hidden="true" />
+					) : (
+						<TriangleAlert className="mt-0.5 size-4 shrink-0 text-alarm-300" aria-hidden="true" />
+					)}
+					<div>
+						<p
+							className={`text-body font-medium ${
+								ackWaiting
+									? "text-caution-300"
+									: ackAcknowledged
+										? "text-clear-300"
+										: "text-alarm-300"
+							}`}
+						>
+							{t(ackCopy.title)}
+						</p>
+						<p className="mt-1 text-meta leading-relaxed text-fog-300">{t(ackCopy.body)}</p>
+						{(ackWaiting || ackFailed) && bureauAck.requestedAt ? (
+							<p className="mt-1 text-meta text-fog-500">
+								{formatDateTime(bureauAck.requestedAt, locale)}
+							</p>
+						) : null}
+					</div>
+				</div>
+			) : null}
+
 			{copy ? (
 				<div
 					className={`flex items-start gap-2.5 rounded-panel border px-3 py-2.5 ${
@@ -74,12 +129,12 @@ export async function IncidentActions({
 			) : null}
 
 			<div className="flex flex-wrap gap-2">
-				{status === "CONFIRMED" || status === "SUSPECTED" ? (
+				{showAcknowledge ? (
 					<form action={acknowledgeIncidentAction}>
 						<input type="hidden" name="locale" value={locale} />
 						<input type="hidden" name="incidentId" value={incidentId} />
 						<Button type="submit" size="sm" variant="secondary">
-							{t("acknowledge")}
+							{acknowledgeLabel}
 						</Button>
 					</form>
 				) : null}
@@ -133,18 +188,25 @@ export async function IncidentActions({
 				) : null}
 			</div>
 
-			<form action={resolveIncidentAction} className="flex flex-wrap items-center gap-2">
-				<input type="hidden" name="locale" value={locale} />
-				<input type="hidden" name="incidentId" value={incidentId} />
-				<Input
-					name="resolution"
-					placeholder="Resolution note (optional)"
-					className="h-9 max-w-xs"
-				/>
-				<Button type="submit" size="sm">
-					{t("resolve")}
-				</Button>
-			</form>
+			{acknowledgementRequired ? (
+				<div className="rounded-panel border border-caution-400/30 bg-caution-400/10 px-3 py-2.5">
+					<p className="text-body font-medium text-caution-300">{t("ackRequiredTitle")}</p>
+					<p className="mt-1 text-meta leading-relaxed text-fog-300">{t("ackRequiredBody")}</p>
+				</div>
+			) : (
+				<form action={resolveIncidentAction} className="flex flex-wrap items-center gap-2">
+					<input type="hidden" name="locale" value={locale} />
+					<input type="hidden" name="incidentId" value={incidentId} />
+					<Input
+						name="resolution"
+						placeholder="Resolution note (optional)"
+						className="h-9 max-w-xs"
+					/>
+					<Button type="submit" size="sm">
+						{t("resolve")}
+					</Button>
+				</form>
+			)}
 		</div>
 	);
 }
