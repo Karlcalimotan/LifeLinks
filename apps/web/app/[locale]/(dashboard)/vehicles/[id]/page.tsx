@@ -57,7 +57,36 @@ export default async function VehicleDetailPage({
 
 	const vehicle = await prisma.vehicle.findFirst({
 		where: { id, ...vehicleScope(current.role, current.org.id, current.user.id) },
-		include: { devices: { orderBy: { createdAt: "asc" }, take: 1 } },
+		// Explicit fields only: the overview needs the tracker summary, never
+		// the tracker's token hash.
+		select: {
+			id: true,
+			plateNo: true,
+			make: true,
+			model: true,
+			driverName: true,
+			driverPhone: true,
+			status: true,
+			devices: {
+				select: {
+					id: true,
+					label: true,
+					mac: true,
+					firmwareVersion: true,
+					configRev: true,
+					lastSeenAt: true,
+					lastLat: true,
+					lastLng: true,
+					lastFixAt: true,
+					lastSpeedKph: true,
+					batteryV: true,
+					satellites: true,
+					ignition: true,
+				},
+				orderBy: { createdAt: "asc" },
+				take: 1,
+			},
+		},
 	});
 	if (!vehicle) notFound();
 

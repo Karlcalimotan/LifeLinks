@@ -45,6 +45,22 @@ All notable changes to this project are documented here. The format follows
 - A per-member permission overlay (`MembershipPermission`) resolved as explicit
   override ?? role default, enforced by the incident acknowledge/resolve and
   device-configuration actions. Admin always keeps every permission (#11).
+- Platform administration (`/platform`) with a `PlatformAdmin` row separate
+  from tenant memberships and roles, a separate platform session cookie, and an
+  environment gate that stays closed until MFA exists or
+  `PLATFORM_ADMIN_ALLOW_WITHOUT_MFA=true` is explicitly set for development
+  (#12).
+- Organization suspension: `Organization.status`, `suspendedAt`,
+  `suspendedReason` and `suspendedBy`. A suspended organization is rejected at
+  login and resolves to no session on the next request, so existing cookies stop
+  working. Suspend and reinstate require a 5 to 500 character reason and the
+  operator's current password, and each writes a
+  `platform.org_suspended` / `platform.org_reinstated` audit row with actor,
+  organization, reason and before/after status (#12).
+- Explicit admin payload field lists for the platform organization list, tenant
+  member list, tracker list/detail and vehicle list/detail, so no `tokenHash`,
+  `passwordHash`, `p256dh`, `auth`, `endpoint` or raw device token is selected
+  into a list payload (#12).
 
 ### Changed
 

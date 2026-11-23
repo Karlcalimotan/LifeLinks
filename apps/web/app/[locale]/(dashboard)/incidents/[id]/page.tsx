@@ -81,11 +81,15 @@ export default async function IncidentDetailPage({
 		current.role === "USER" ? { vehicle: { is: { ownerId: current.user.id } } } : {};
 	const incident = await prisma.impactEvent.findFirst({
 		where: { id, orgId: current.org.id, ...ownership },
+		// Explicit fields only: the incident detail never needs the tracker's
+		// token hash or any other secret-bearing row.
 		include: {
-			vehicle: true,
-			device: true,
-			trip: true,
-			alerts: { orderBy: { createdAt: "asc" } },
+			vehicle: { select: { plateNo: true, driverName: true, driverPhone: true } },
+			device: { select: { label: true } },
+			alerts: {
+				select: { id: true, channel: true, target: true, status: true, attempts: true },
+				orderBy: { createdAt: "asc" },
+			},
 		},
 	});
 	if (!incident) notFound();

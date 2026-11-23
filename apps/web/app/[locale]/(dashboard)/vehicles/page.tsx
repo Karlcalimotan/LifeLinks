@@ -38,8 +38,22 @@ export default async function VehiclesPage({ params }: { params: Promise<{ local
 	const vehicles = await prisma.vehicle.findMany({
 		where: vehicleScope(current.role, current.org.id, current.user.id),
 		orderBy: { plateNo: "asc" },
-		include: {
-			devices: true,
+		// Explicit fields only. The vehicle list needs the tracker label and
+		// last-seen time, never the tracker's token hash.
+		select: {
+			id: true,
+			plateNo: true,
+			make: true,
+			model: true,
+			year: true,
+			driverName: true,
+			driverPhone: true,
+			status: true,
+			devices: {
+				select: { id: true, label: true, lastSeenAt: true },
+				orderBy: { createdAt: "asc" },
+				take: 1,
+			},
 			_count: { select: { impacts: true, trips: true } },
 		},
 	});

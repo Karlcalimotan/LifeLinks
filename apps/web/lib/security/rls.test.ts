@@ -27,6 +27,7 @@ describeRls("RLS organization isolation", () => {
 	let permissionB = "";
 	let inviteA = "";
 	let inviteB = "";
+	let platformAdminId = "";
 
 	function db() {
 		if (!prisma) throw new Error("RLS test database is not initialized");
@@ -136,6 +137,10 @@ describeRls("RLS organization isolation", () => {
 		});
 		userA = ua.id;
 		userB = ub.id;
+		const platformAdmin = await client.platformAdmin.create({
+			data: { userId: userA, createdBy: userA },
+		});
+		platformAdminId = platformAdmin.id;
 		const ma = await client.membership.create({
 			data: { orgId: orgA, userId: userA, role: "ADMIN" },
 		});
@@ -235,6 +240,10 @@ describeRls("RLS organization isolation", () => {
 			where: { id: { in: [inviteA, inviteB].filter(Boolean) } },
 		});
 		expect(leftoverInvites).toBe(0);
+		const leftoverPlatformAdmins = await client.platformAdmin.count({
+			where: { id: platformAdminId || "__none__" },
+		});
+		expect(leftoverPlatformAdmins).toBe(0);
 		await client.$disconnect();
 	});
 
@@ -482,6 +491,31 @@ describeRls("RLS organization isolation", () => {
 		).rejects.toThrow();
 	});
 
+	it("keeps the global platform administrator table out of every tenant", async () => {
+		// Either the verification role has no grant (the query throws) or the
+		// deny-all policy returns no rows. Both are a denial; neither leaks.
+		const visible = await asTenant(
+			orgA,
+			(tx) => tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "PlatformAdmin"`,
+		)
+			.then((rows) => rows.length)
+			.catch(() => 0);
+		expect(visible).toBe(0);
+
+		await expect(
+			asTenant(
+				orgA,
+				(tx) => tx.$executeRaw`
+					INSERT INTO "PlatformAdmin" ("id", "userId")
+					VALUES (
+						${`rls-platform-x-${Date.now()}-${Math.random().toString(36).slice(2)}`},
+						${userA}
+					)
+				`,
+			),
+		).rejects.toThrow();
+	});
+
 	it("fails closed when no organization is set", async () => {
 		const vehicles = await asTenant(
 			null,
@@ -518,6 +552,14 @@ describeRls("RLS organization isolation", () => {
 			(tx) => tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "InvitationToken"`,
 		);
 		expect(invites).toHaveLength(0);
+
+		const platformAdmins = await asTenant(
+			null,
+			(tx) => tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "PlatformAdmin"`,
+		)
+			.then((rows) => rows.length)
+			.catch(() => 0);
+		expect(platformAdmins).toBe(0);
 	});
 
 	it("rejects an insert when no organization is set", async () => {

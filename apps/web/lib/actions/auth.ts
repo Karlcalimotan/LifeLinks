@@ -1,8 +1,10 @@
 "use server";
 
 import { verifyPassword } from "@/lib/auth/password";
+import { createPlatformSession, destroyPlatformSession } from "@/lib/auth/platform-session";
 import { loginSchema } from "@/lib/auth/schemas";
 import { createSession, destroySession, getSession } from "@/lib/auth/session";
+import { isPlatformAdminEnabled } from "@/lib/platform/gate";
 import prisma from "@/lib/prisma";
 import { revokePushOnLogout } from "@/lib/push/revoke";
 import { clampUserAgent } from "@/lib/push/schema";
@@ -39,27 +41,66 @@ export async function loginAction(formData: FormData) {
 				// membership is revoked fails the same generic check as a wrong
 				// password.
 				where: { revokedAt: null },
-				include: { org: true },
-				take: 1,
+				include: { org: { select: { id: true, status: true } } },
+				orderBy: { createdAt: "asc" },
 			},
+			// The platform row is separate from the membership. It is only
+			// usable when the environment gate is open.
+			platformAdmin: { select: { id: true } },
 		},
 	});
 	const passwordOk = user ? await verifyPassword(parsed.data.password, user.passwordHash) : false;
-	const membership = user?.memberships[0];
 
-	if (!user || !passwordOk || !membership) {
-		redirect(`/${locale}/login?error=invalid`);
+	// Verify the password before saying anything about the organization. A
+	// wrong password and an unknown account stay indistinguishable.
+	if (!user || !passwordOk) redirect(`/${locale}/login?error=invalid`);
+
+	// Prefer an active organization when the account belongs to more than one.
+	// A suspended membership must not hide an active one.
+	const membership =
+		user.memberships.find((entry) => entry.org.status === "ACTIVE") ?? user.memberships[0];
+	const platformAdmin = user.platformAdmin && isPlatformAdminEnabled() ? user.platformAdmin : null;
+
+	if (membership && membership.org.status === "ACTIVE") {
+		await createSession({
+			sub: user.id,
+			orgId: membership.orgId,
+			role: membership.role,
+			email: user.email,
+			name: user.name,
+		});
+		if (platformAdmin) {
+			await createPlatformSession({ sub: user.id, email: user.email, name: user.name });
+		}
+		redirect(`/${locale}/dashboard`);
 	}
 
-	await createSession({
-		sub: user.id,
-		orgId: membership.orgId,
-		role: membership.role,
-		email: user.email,
-		name: user.name,
-	});
+	if (platformAdmin) {
+		// The platform console is independent of the tenant organization. A
+		// platform admin whose only organization is suspended can still sign in
+		// here to reinstate it. Clear any stale tenant cookie first.
+		await createPlatformSession({ sub: user.id, email: user.email, name: user.name });
+		await destroySession();
+		redirect(`/${locale}/platform`);
+	}
 
-	redirect(`/${locale}/dashboard`);
+	if (membership && membership.org.status === "SUSPENDED") {
+		// The password was correct, so this is the organization's own member.
+		// Say that access is unavailable without exposing the internal note.
+		redirect(`/${locale}/login?error=suspended`);
+	}
+
+	redirect(`/${locale}/login?error=invalid`);
+}
+
+/**
+ * Platform sign-out. The tenant session is left alone: a user who is both a
+ * platform admin and a tenant member keeps their tenant sign-in.
+ */
+export async function platformLogoutAction(formData: FormData) {
+	const locale = localeFrom(formData);
+	await destroyPlatformSession();
+	redirect(`/${locale}/login`);
 }
 
 export async function logoutAction(formData: FormData) {
@@ -86,6 +127,8 @@ export async function logoutAction(formData: FormData) {
 		// the session open.
 	}
 
+	// Tenant sign-out only. The platform console has its own session and
+	// sign-out, so a user who holds both does not lose the other by accident.
 	await destroySession();
 	redirect(`/${locale}/login`);
 }

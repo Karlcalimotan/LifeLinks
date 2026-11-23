@@ -402,7 +402,15 @@ async function MembersSection({
 	const roleNames = await getTranslations({ locale, namespace: "roles" });
 	const members = await prisma.membership.findMany({
 		where: { orgId },
-		include: { user: true },
+		// Explicit fields only: the member list never needs `passwordHash`.
+		select: {
+			id: true,
+			role: true,
+			userId: true,
+			createdAt: true,
+			revokedAt: true,
+			user: { select: { id: true, name: true, email: true } },
+		},
 		orderBy: { createdAt: "asc" },
 	});
 	const activeAdmins = members.filter(

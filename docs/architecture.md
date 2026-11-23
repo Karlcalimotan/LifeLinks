@@ -83,8 +83,8 @@ A7670E AT transport, buzzer NPN output, battery/ignition ADC.
 ## Data model
 
 ```
-Organization ── Membership ── User
-     │
+Organization ── Membership ── User ── PlatformAdmin
+     │                         (global, not a tenant role)
      ├── Vehicle ── TrackerDevice ── DeviceStateEvent
      │        │            │
      │        │            └── DeviceConfigOverride
@@ -106,7 +106,16 @@ InvitationToken, MembershipPermission
   A null column inherits the organisation value; the row is deleted when every
   field inherits again.
 - `AuditLog` records member changes (acknowledge, resolve, false alarm,
-  configuration, device token rotation, invite, accept, revoke, re-invite).
+  configuration, device token rotation, invite, accept, revoke, re-invite) and
+  platform changes (`platform.org_suspended`, `platform.org_reinstated` with the
+  reason and before/after status).
+- `Organization.status` is the tenant kill switch. `ACTIVE` is the default;
+  `SUSPENDED` resolves to no session on the next request and is rejected at
+  login. `suspendedAt`, `suspendedReason` and `suspendedBy` are cleared on
+  reinstate.
+- `PlatformAdmin` is a global row keyed to a `User`, not a `Membership` and not
+  a `MemberRole`. It grants the separate `/platform` console only. Its migration
+  enables RLS with a deny-all policy, so only the owner/Prisma path can read it.
 - `InvitationToken` stores the SHA-256 of a single-use invitation link. The
   plaintext exists only in the link shown to the admin who minted it; there is
   no email sender, so the admin copies the link. `MembershipPermission` holds
@@ -134,21 +143,32 @@ resolves explicit override ?? role default. Admin is never downgraded, so the
 last admin cannot lock themselves out. Revoking a membership (`revokedAt`) keeps
 the row for re-invite but resolves it as absent on every request.
 
+The platform administrator is deliberately **not** a fourth tenant role. It is
+a `PlatformAdmin` row keyed to a user and a separate `/platform` session. A
+tenant `ADMIN` cannot reach `/platform`, and a platform admin without a
+membership cannot use any tenant page or action. If the same user also has a
+membership, they get both consoles with their separate scopes.
+
 ## Auth and tenancy
 
 The console uses a self-contained session:
 
 1. `loginAction` validates the credentials, rate-limits per email + IP, verifies
    bcrypt, and signs a short JWT (HS256) into an HttpOnly cookie.
-2. `getCurrentUser()` verifies the cookie and re-reads the membership row. The
-   returned `orgId` is the only tenant scope any query may use. A revoked
-   membership resolves to null, and the permission overlay is resolved in the
-   same read.
+2. `getCurrentUser()` verifies the cookie and re-reads the membership row and its
+   organization. The returned `orgId` is the only tenant scope any query may
+   use. A revoked membership or a `SUSPENDED` organization resolves to null, and
+   the permission overlay is resolved in the same read.
 3. `requireUser()` redirects to the localized login. `requireRole()` narrows the
    page to admins where required.
+4. `/platform` is a separate area with its own `lifelink_platform_session`
+   cookie (`scope: "platform"`), `requirePlatformAdmin()` guard and
+   `PlatformAdmin` row. The environment gate must be open; otherwise the route
+   returns not-found. The tenant session is not accepted there.
 
-There is no external identity provider. That keeps the capstone runnable with
-one database, and it makes the tenancy rule visible in one file.
+There is no external identity provider and no MFA provider. The platform gate
+and its development-only allow-without-MFA flag are documented in
+`SECURITY.md`; do not treat the flag as MFA.
 
 ## Configuration contract
 
@@ -188,11 +208,13 @@ The server and firmware tables are kept in sync by
 
 ## Deliberately left out
 
-LifeLink is a **lean** fleet console. It does not include the multi-tenant
-platform console, an AI assistant, import/export, a calendar, a 3D viewer, or a
-superadmin surface. Those are valid extensions, but they add a lot of surface to
-a safety-critical capstone. The generators in `stack/` are the intended way to
-add a new feature without copying a large domain pack.
+LifeLink is a **lean** fleet console. It does not include an AI assistant,
+import/export, a calendar, a 3D viewer, or a general-purpose tenant
+administration suite. The `/platform` area is intentionally narrow: it lists
+organizations and suspends or reinstates one, with a required reason, password
+step-up and an audit row. It is not a super-tenant role and does not grant
+tenant permissions. The generators in `stack/` are the intended way to add a
+new feature without copying a large domain pack.
 
 ## Extension points
 

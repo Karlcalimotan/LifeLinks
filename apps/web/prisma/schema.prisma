@@ -23,6 +23,13 @@ enum MemberRole {
   ADMIN
 }
 
+/// Tenant lifecycle. A SUSPENDED organization grants nothing: login is
+/// rejected and `getCurrentUser` resolves to null on the next request.
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+}
+
 enum VehicleStatus {
   ACTIVE
   MAINTENANCE
@@ -111,14 +118,23 @@ model User {
   auditLogs          AuditLog[]         @relation("AuditActor")
   pushSubscriptions  PushSubscription[]
   invitationsCreated InvitationToken[]  @relation("InvitationCreator")
+  /// Global platform operator. Deliberately separate from `Membership` and
+  /// `MemberRole`: it grants `/platform` only, never tenant permissions.
+  platformAdmin      PlatformAdmin?
 }
 
 model Organization {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String             @id @default(cuid())
+  name            String
+  slug            String             @unique
+  status          OrganizationStatus @default(ACTIVE)
+  /// Set while suspended; cleared on reinstate. `suspendedBy` is the actor
+  /// user id (a plain string, so the audit breadcrumb survives user deletion).
+  suspendedAt     DateTime?
+  suspendedReason String?
+  suspendedBy     String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
 
   memberships       Membership[]
   vehicles          Vehicle[]
@@ -132,6 +148,24 @@ model Organization {
   auditLogs         AuditLog[]
   pushSubscriptions PushSubscription[]
   invitationTokens  InvitationToken[]
+
+  @@index([status, createdAt])
+}
+
+/// Global platform operator. This is not a tenant role: it is keyed to a User
+/// and grants only the separate `/platform` console. A platform admin with no
+/// Membership has no tenant access at all. The table is intentionally global
+/// (not org-scoped) because the operator must see every organization; the
+/// migration enables RLS with a deny-all policy so only the owner/Prisma path
+/// can read it.
+model PlatformAdmin {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+  /// User id of the operator who created this row, when known.
+  createdBy String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Membership {

@@ -56,7 +56,33 @@ export default async function MapPage({
 		prisma.vehicle.findMany({
 			where: scope,
 			orderBy: { plateNo: "asc" },
-			include: { devices: true },
+			// Explicit fields only: the map needs the approved tracker's live
+			// position, never its token hash.
+			select: {
+				id: true,
+				plateNo: true,
+				make: true,
+				model: true,
+				year: true,
+				driverName: true,
+				driverPhone: true,
+				devices: {
+					select: {
+						id: true,
+						label: true,
+						mac: true,
+						approvalStatus: true,
+						lastSeenAt: true,
+						lastLat: true,
+						lastLng: true,
+						lastFixAt: true,
+						lastSpeedKph: true,
+						batteryV: true,
+						rssiDbm: true,
+						satellites: true,
+					},
+				},
+			},
 		}),
 		prisma.impactEvent.findMany({
 			where: {

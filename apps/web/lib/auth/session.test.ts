@@ -52,6 +52,7 @@ vi.mock("@/lib/prisma", () => ({
 	default: { membership: { findUnique: mocks.membershipFindUnique } },
 }));
 
+import { PLATFORM_SESSION_COOKIE } from "@/lib/constants";
 import { getCurrentUser } from "./session";
 
 const payload = {
@@ -70,7 +71,7 @@ function membership(overrides: Record<string, unknown> = {}) {
 		role: "RESPONDER",
 		revokedAt: null,
 		user: { id: "user-1", email: payload.email, name: payload.name },
-		org: { id: "org-1", name: "Org", slug: "org" },
+		org: { id: "org-1", name: "Org", slug: "org", status: "ACTIVE" },
 		permissions: [],
 		...overrides,
 	};
@@ -91,8 +92,8 @@ describe("getCurrentUser", () => {
 		expect(mocks.membershipFindUnique).toHaveBeenCalledWith({
 			where: { orgId_userId: { orgId: "org-1", userId: "user-1" } },
 			include: {
-				user: true,
-				org: true,
+				user: { select: { id: true, email: true, name: true } },
+				org: { select: { id: true, name: true, slug: true, status: true } },
 				permissions: { select: { key: true, allowed: true } },
 			},
 		});
@@ -130,6 +131,16 @@ describe("getCurrentUser", () => {
 		await expect(getCurrentUser()).resolves.toBeNull();
 	});
 
+	it("returns null for a suspended organization, even with a valid cookie", async () => {
+		mocks.membershipFindUnique.mockResolvedValue(
+			membership({
+				org: { id: "org-1", name: "Org", slug: "org", status: "SUSPENDED" },
+			}),
+		);
+
+		await expect(getCurrentUser()).resolves.toBeNull();
+	});
+
 	it("returns null when the membership no longer exists", async () => {
 		mocks.membershipFindUnique.mockResolvedValue(null);
 		await expect(getCurrentUser()).resolves.toBeNull();
@@ -137,6 +148,15 @@ describe("getCurrentUser", () => {
 
 	it("returns null without a cookie", async () => {
 		mocks.cookieGet.mockReturnValue(undefined);
+
+		await expect(getCurrentUser()).resolves.toBeNull();
+		expect(mocks.membershipFindUnique).not.toHaveBeenCalled();
+	});
+
+	it("does not treat a platform session as a tenant session", async () => {
+		mocks.cookieGet.mockImplementation((name: string) =>
+			name === PLATFORM_SESSION_COOKIE ? { value: "platform-token" } : undefined,
+		);
 
 		await expect(getCurrentUser()).resolves.toBeNull();
 		expect(mocks.membershipFindUnique).not.toHaveBeenCalled();
