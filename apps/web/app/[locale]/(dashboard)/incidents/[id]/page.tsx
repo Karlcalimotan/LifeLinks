@@ -14,6 +14,11 @@ import {
 import { Link } from "@/i18n/routing";
 import { requireUser } from "@/lib/auth/session";
 import { mapLink } from "@/lib/geo";
+import {
+	acknowledgementRequiredBeforeResolve,
+	canResolveWithoutTracker,
+	readBureauAckState,
+} from "@/lib/incidents/bureau-ack";
 import { readCancelAlertState } from "@/lib/incidents/cancel-alert";
 import {
 	incidentAuditLabelKey,
@@ -59,10 +64,16 @@ export default async function IncidentDetailPage({
 	searchParams,
 }: {
 	params: Promise<{ locale: string; id: string }>;
-	searchParams: Promise<{ updated?: string; error?: string; cancel?: string; action?: string }>;
+	searchParams: Promise<{
+		updated?: string;
+		error?: string;
+		cancel?: string;
+		ack?: string;
+		action?: string;
+	}>;
 }) {
 	const { locale, id } = await params;
-	const { updated, error, cancel, action } = await searchParams;
+	const { updated, error, cancel, ack, action } = await searchParams;
 	const current = await requireUser();
 	const t = await getTranslations({ locale, namespace: "incidents" });
 
@@ -131,6 +142,36 @@ export default async function IncidentDetailPage({
 		now,
 	});
 
+	const ackCommands = await prisma.deviceCommand.findMany({
+		where: {
+			impactEventId: incident.id,
+			kind: "ACK_INCIDENT",
+		},
+		orderBy: { createdAt: "desc" },
+		take: 20,
+		select: {
+			id: true,
+			kind: true,
+			status: true,
+			payload: true,
+			impactEventId: true,
+			createdAt: true,
+			expiresAt: true,
+		},
+	});
+	const bureauAck = readBureauAckState({
+		incidentId: incident.id,
+		status: incident.status,
+		ackRequestedAt: incident.ackRequestedAt,
+		commands: ackCommands,
+		now,
+	});
+	const resolveWithoutTrackerAvailable = canResolveWithoutTracker({
+		status: incident.status,
+		deviceBacked: Boolean(incident.device),
+		ack: bureauAck,
+	});
+
 	const timeline = mergeIncidentTimeline(
 		auditRows.map((row) => ({
 			id: row.id,
@@ -192,13 +233,28 @@ export default async function IncidentDetailPage({
 					{t("cancelRequested")}
 				</p>
 			) : null}
+			{ack === "requested" && bureauAck.state === "waiting" ? (
+				<p className="mb-4 rounded border border-caution-400/30 bg-caution-400/10 px-3 py-2 text-xs text-caution-300">
+					{t("ackRequested")}
+				</p>
+			) : null}
 			{error ? (
 				<p className="mb-4 rounded border border-alarm-500/30 bg-alarm-500/10 px-3 py-2 text-xs text-alarm-300">
 					{error === "forbidden"
 						? "Your role cannot change incidents."
 						: error === "tracker_required"
 							? t("errorTrackerRequired")
-							: "That status transition is not allowed."}
+							: error === "ack_required"
+								? t("errorAckRequired")
+								: error === "ack_not_dispatched"
+									? t("errorAckNotDispatched")
+									: error === "ack_recovery_unavailable"
+										? t("errorAckRecoveryUnavailable")
+										: error === "ack_confirmation_required"
+											? t("errorAckConfirmationRequired")
+											: error === "command_conflict"
+												? t("errorCommandConflict")
+												: "That status transition is not allowed."}
 				</p>
 			) : null}
 
@@ -377,6 +433,13 @@ export default async function IncidentDetailPage({
 							status={incident.status}
 							role={current.role}
 							cancelAlert={cancelAlert}
+							bureauAck={bureauAck}
+							acknowledgementRequired={acknowledgementRequiredBeforeResolve({
+								status: incident.status,
+								deviceBacked: Boolean(incident.device),
+							})}
+							deviceBacked={Boolean(incident.device)}
+							resolveWithoutTrackerAvailable={resolveWithoutTrackerAvailable}
 							focusCancel={isCancelActionFocus(action)}
 						/>
 					</CardContent>

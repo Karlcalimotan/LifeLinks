@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { incidentCancelRequestPath, incidentSuccessPath } from "./return-to";
+import {
+	incidentAckRequestPath,
+	incidentCancelRequestPath,
+	incidentSuccessPath,
+} from "./return-to";
 
 describe("incidentSuccessPath", () => {
 	it("sends the dashboard acknowledgement back to the dashboard", () => {
@@ -40,6 +44,16 @@ describe("incidentCancelRequestPath", () => {
 		);
 		expect(incidentCancelRequestPath("en", "inc-1", "/incidents?status=CONFIRMED")).toBe(
 			"/en/incidents?status=CONFIRMED&cancel=requested",
+		);
+	});
+});
+
+describe("incidentAckRequestPath", () => {
+	it("marks the request without claiming the incident changed", () => {
+		expect(incidentAckRequestPath("en", "inc-1", "")).toBe("/en/incidents/inc-1?ack=requested");
+		expect(incidentAckRequestPath("tl", "inc-1", "/incidents")).toBe("/tl/incidents?ack=requested");
+		expect(incidentAckRequestPath("en", "inc-1", "/incidents?status=CONFIRMED")).toBe(
+			"/en/incidents?status=CONFIRMED&ack=requested",
 		);
 	});
 });

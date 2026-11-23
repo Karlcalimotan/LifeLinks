@@ -24,9 +24,24 @@ All notable changes to this project are documented here. The format follows
   fields, with shared envelope validation, a `SET_CONFIG` push, before/after
   audit and a pending/confirmed state driven by the device's echoed
   `config_rev` (#44).
+- Bureau acknowledgement for dispatched incidents: `ACK_INCIDENT` carries the
+  device client incident id and the command row keeps the server
+  `impactEventId`, `ackRequestedAt` records the request, and the incident
+  becomes `ACKNOWLEDGED` only when the tracker confirms. The detail shows
+  "Alarm latched, waiting for tracker", reports `unknown_incident`, retries an
+  expired command, and a latched device incident must be acknowledged before
+  it can be resolved (#105).
 
 ### Changed
 
+- A device-backed `SUSPECTED` incident can no longer be acknowledged locally;
+  the bureau waits for dispatch. A legacy local `ACKNOWLEDGED` is reopened when
+  the tracker reports `CONFIRMED`, and an ADMIN-only recovery path can resolve
+  a dispatched incident after its acknowledgement expired, failed, or came back
+  `unknown_incident`/`unconfirmed` (including a reboot or power loss), with an
+  audit row and honest copy that the alarm may still sound. The recovery
+  requires a server-checked typed `RESOLVE`, and an `ACK_INCIDENT` and
+  `CANCEL_ALERT` cannot be pending for the same incident at once (#105).
 - `CANCEL_ALERT` acknowledgements decide the incident: only `cancelled` sets
   `FALSE_ALARM`. `too_late`, `unknown_incident`, a missing detail, an expired
   command or a failed command keep the status and record the reason. A
