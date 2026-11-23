@@ -50,6 +50,20 @@
 		"notificationsLoading": "Updating.",
 		"viewAll": "View all incidents"
 	},
+	"push": {
+		"title": "Browser alerts",
+		"hint": "Get a notification when a new incident is detected.",
+		"checking": "Checking this browser…",
+		"working": "Updating…",
+		"enable": "Enable alerts",
+		"disable": "Turn off",
+		"retry": "Try again",
+		"subscribed": "Browser alerts are on for this device.",
+		"unsupported": "This browser does not support web push.",
+		"unconfigured": "Push is not configured on this server. An administrator needs to add the VAPID keys.",
+		"denied": "Notifications are blocked for this site. Allow them in your browser settings, then try again.",
+		"error": "Browser alerts could not be changed. Try again."
+	},
 	"nav": {
 		"dashboard": "Dashboard",
 		"map": "Live map",

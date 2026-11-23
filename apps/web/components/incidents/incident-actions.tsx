@@ -24,12 +24,14 @@ export async function IncidentActions({
 	status,
 	role,
 	cancelAlert,
+	focusCancel = false,
 }: {
 	incidentId: string;
 	locale: string;
 	status: string;
 	role: MemberRoleName;
 	cancelAlert: CancelAlertView;
+	focusCancel?: boolean;
 }) {
 	if (!canManageIncidents(role)) return null;
 	if (isTerminal(status as ImpactStatusName)) return null;
@@ -123,6 +125,7 @@ export async function IncidentActions({
 							confirmLabel={t("cancel")}
 							cancelLabel={common("cancel")}
 							variant="ghost"
+							autoFocus={focusCancel}
 						>
 							{t("cancel")}
 						</ConfirmSubmit>

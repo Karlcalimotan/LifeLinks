@@ -13,7 +13,7 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
 	poweredByHeader: false,
-	serverExternalPackages: ["@prisma/client"],
+	serverExternalPackages: ["@prisma/client", "web-push"],
 	experimental: {
 		serverActions: {
 			bodySizeLimit: "2mb",
@@ -23,7 +23,25 @@ const nextConfig: NextConfig = {
 		root: path.resolve(import.meta.dirname ?? process.cwd(), "../.."),
 	},
 	async headers() {
-		return [{ source: "/(.*)", headers: securityHeaders }];
+		const workerHeaders = [
+			{ key: "Cache-Control", value: "no-cache" },
+			{ key: "Service-Worker-Allowed", value: "/" },
+		];
+		return [
+			{ source: "/(.*)", headers: securityHeaders },
+			{
+				// Registered at the root so one worker covers every locale path.
+				// Browsers revalidate the script themselves; no-cache keeps proxies
+				// from pinning an old worker after a deploy.
+				source: "/sw.js",
+				headers: workerHeaders,
+			},
+			{
+				// Imported by the worker; the same staleness rules apply.
+				source: "/sw-url.js",
+				headers: workerHeaders,
+			},
+		];
 	},
 };
 

@@ -7,11 +7,32 @@ import { incidentSchema } from "@/lib/device/schema";
 import { resolveDeviceTime } from "@/lib/device/time";
 import { isValidCoordinate } from "@/lib/geo";
 import prisma from "@/lib/prisma";
+import { notifyIncidentPush } from "@/lib/push/send";
 import { rateLimit } from "@/lib/rate-limit";
 import { getOrgSettings } from "@/lib/settings/org";
 import { Prisma } from "@prisma/client";
+import { after } from "next/server";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * Push is a confirmed-incident channel. The route schedules this after the
+ * transaction has committed and after the response is on its way, so a slow
+ * push service cannot delay the device and a failure cannot fail the write.
+ */
+function scheduleIncidentPush(input: {
+	orgId: string;
+	incidentId: string;
+	vehicleId: string;
+}): void {
+	after(async () => {
+		try {
+			await notifyIncidentPush(input);
+		} catch {
+			console.warn("[push] notification dispatch failed after commit.");
+		}
+	});
+}
 
 /**
  * Crash report endpoint. The device is the source of truth for detection; the
@@ -41,6 +62,9 @@ export const POST = withApi(
 		if (!device.vehicleId) {
 			throw conflict("Tracker is not assigned to a vehicle. Assign it before reporting incidents.");
 		}
+		// Kept as a local because the deferred push callback runs after this
+		// scope's narrowing has ended.
+		const vehicleId = device.vehicleId;
 
 		const detectedAt = resolveDeviceTime(input.detected_at);
 		const hasFix =
@@ -65,9 +89,12 @@ export const POST = withApi(
 				const settingsForUpdate = await getOrgSettings(device.orgId);
 				const targets = alertTargetsFromSettings(settingsForUpdate);
 				let queued = 0;
+				let transitioned = false;
 				await prisma.$transaction(async (tx) => {
-					await tx.impactEvent.update({
-						where: { id: existing.id },
+					// Only the request that actually flips SUSPECTED to CONFIRMED
+					// queues alerts, records the event and sends the one push.
+					const updated = await tx.impactEvent.updateMany({
+						where: { id: existing.id, status: "SUSPECTED" },
 						data: {
 							status: "CONFIRMED",
 							lat: hasFix ? input.lat : existing.lat,
@@ -76,6 +103,8 @@ export const POST = withApi(
 							evidence: (input.evidence ?? existing.evidence ?? {}) as Prisma.InputJsonValue,
 						},
 					});
+					if (updated.count === 0) return;
+					transitioned = true;
 					const existingAlerts = await tx.alertDelivery.count({
 						where: { impactEventId: existing.id },
 					});
@@ -104,6 +133,15 @@ export const POST = withApi(
 						},
 					});
 				});
+				if (transitioned) {
+					// A suspected report sent nothing; this transition is the one
+					// confirmed notification for the incident.
+					scheduleIncidentPush({
+						orgId: device.orgId,
+						incidentId: existing.id,
+						vehicleId,
+					});
+				}
 				return ok({
 					received: true,
 					incident_id: existing.id,
@@ -136,7 +174,7 @@ export const POST = withApi(
 					data: {
 						orgId: device.orgId,
 						deviceId: device.id,
-						vehicleId: device.vehicleId as string,
+						vehicleId,
 						tripId: activeTrip?.id,
 						clientIncidentId: input.incident_id,
 						detectedAt,
@@ -194,6 +232,16 @@ export const POST = withApi(
 
 				return { created, deliveries };
 			});
+
+			// Confirmed incidents only. The initial SUSPECTED report stays quiet;
+			// if the tracker later confirms, that transition schedules one push.
+			if (status === "CONFIRMED") {
+				scheduleIncidentPush({
+					orgId: device.orgId,
+					incidentId: incident.created.id,
+					vehicleId,
+				});
+			}
 
 			return ok({
 				received: true,

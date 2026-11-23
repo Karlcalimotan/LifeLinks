@@ -15,6 +15,10 @@ describeRls("RLS organization isolation", () => {
 	let impactB = "";
 	let deviceA = "";
 	let deviceB = "";
+	let userA = "";
+	let userB = "";
+	let pushA = "";
+	let pushB = "";
 
 	function db() {
 		if (!prisma) throw new Error("RLS test database is not initialized");
@@ -105,6 +109,54 @@ describeRls("RLS organization isolation", () => {
 
 		await client.orgSettings.create({ data: { orgId: orgA } });
 		await client.orgSettings.create({ data: { orgId: orgB } });
+
+		// PushSubscriptions need a real user. These are the only users in the
+		// fixture, one per tenant, so the ownership columns are exercised too.
+		const ua = await client.user.create({
+			data: {
+				email: `rls-a-${suffix}@example.test`,
+				name: "RLS A user",
+				passwordHash: "rls-test-not-a-valid-hash",
+			},
+		});
+		const ub = await client.user.create({
+			data: {
+				email: `rls-b-${suffix}@example.test`,
+				name: "RLS B user",
+				passwordHash: "rls-test-not-a-valid-hash",
+			},
+		});
+		userA = ua.id;
+		userB = ub.id;
+		await client.membership.create({
+			data: { orgId: orgA, userId: userA, role: "ADMIN" },
+		});
+		await client.membership.create({
+			data: { orgId: orgB, userId: userB, role: "ADMIN" },
+		});
+
+		const pa = await client.pushSubscription.create({
+			data: {
+				userId: userA,
+				orgId: orgA,
+				endpoint: `https://push.example.test/rls-a-${suffix}`,
+				p256dh: "B".repeat(87),
+				auth: "a".repeat(22),
+				locale: "en",
+			},
+		});
+		const pb = await client.pushSubscription.create({
+			data: {
+				userId: userB,
+				orgId: orgB,
+				endpoint: `https://push.example.test/rls-b-${suffix}`,
+				p256dh: "C".repeat(87),
+				auth: "b".repeat(22),
+				locale: "en",
+			},
+		});
+		pushA = pa.id;
+		pushB = pb.id;
 	});
 
 	afterAll(async () => {
@@ -112,7 +164,12 @@ describeRls("RLS organization isolation", () => {
 		if (!client) return;
 		const ids = [orgA, orgB].filter(Boolean);
 		if (ids.length > 0) {
+			// PushSubscription, Membership and the rest cascade from Organization.
 			await client.organization.deleteMany({ where: { id: { in: ids } } });
+		}
+		const userIds = [userA, userB].filter(Boolean);
+		if (userIds.length > 0) {
+			await client.user.deleteMany({ where: { id: { in: userIds } } });
 		}
 		await client.$disconnect();
 	});
@@ -170,6 +227,60 @@ describeRls("RLS organization isolation", () => {
 		expect(still).not.toBeNull();
 	});
 
+	it("sees only the current organization's push subscriptions", async () => {
+		const a = await asTenant(
+			orgA,
+			(tx) => tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "PushSubscription" ORDER BY "id"`,
+		);
+		expect(a.map((row) => row.id)).toEqual([pushA]);
+
+		const b = await asTenant(
+			orgB,
+			(tx) => tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "PushSubscription" ORDER BY "id"`,
+		);
+		expect(b.map((row) => row.id)).toEqual([pushB]);
+	});
+
+	it("cannot update or delete another organization's push subscription", async () => {
+		const updated = await asTenant(
+			orgA,
+			(tx) =>
+				tx.$executeRaw`UPDATE "PushSubscription" SET "locale" = ${"tl"} WHERE "id" = ${pushB}`,
+		);
+		expect(updated).toBe(0);
+
+		const deleted = await asTenant(
+			orgA,
+			(tx) => tx.$executeRaw`DELETE FROM "PushSubscription" WHERE "id" = ${pushB}`,
+		);
+		expect(deleted).toBe(0);
+
+		const still = await db().pushSubscription.findUnique({ where: { id: pushB } });
+		expect(still?.locale).toBe("en");
+	});
+
+	it("rejects a push subscription inserted for another organization", async () => {
+		await expect(
+			asTenant(
+				orgA,
+				(tx) => tx.$executeRaw`
+					INSERT INTO "PushSubscription"
+						("id", "userId", "orgId", "endpoint", "p256dh", "auth", "locale", "updatedAt")
+					VALUES (
+						${`rls-push-${Date.now()}-${Math.random().toString(36).slice(2)}`},
+						${userA},
+						${orgB},
+						${`https://push.example.test/rls-x-${Date.now()}`},
+						${"D".repeat(87)},
+						${"c".repeat(22)},
+						${"en"},
+						${new Date()}
+					)
+				`,
+			),
+		).rejects.toThrow();
+	});
+
 	it("fails closed when no organization is set", async () => {
 		const vehicles = await asTenant(
 			null,
@@ -182,6 +293,12 @@ describeRls("RLS organization isolation", () => {
 			(tx) => tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "ImpactEvent"`,
 		);
 		expect(incidents).toHaveLength(0);
+
+		const subscriptions = await asTenant(
+			null,
+			(tx) => tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "PushSubscription"`,
+		);
+		expect(subscriptions).toHaveLength(0);
 	});
 
 	it("rejects an insert when no organization is set", async () => {

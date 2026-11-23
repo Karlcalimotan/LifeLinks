@@ -1,6 +1,7 @@
 "use client";
 
 import { IncidentStatusBadge } from "@/components/domain/badges";
+import { PushToggle } from "@/components/notifications/push-toggle";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -161,6 +162,8 @@ export function IncidentBell({
 							{t("notificationsLoading")}
 						</p>
 					) : null}
+
+					<PushToggle />
 
 					<Link
 						href="/incidents"
