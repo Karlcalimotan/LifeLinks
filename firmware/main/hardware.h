@@ -24,6 +24,8 @@ constexpr int kMpuInterrupt = PIN_MPU_INT;
 
 constexpr int kVibrationSensor = PIN_SW420_DO;
 constexpr int kCancelButton = PIN_CANCEL_BTN;
+constexpr int kWifiResetButton = PIN_WIFI_RESET;
+constexpr int kFactoryResetButton = PIN_FACTORY_RESET;
 
 constexpr int kGpsRx = PIN_GPS_RX;
 constexpr int kGpsTx = PIN_GPS_TX;

@@ -3,6 +3,8 @@
 // clang-format off
 constexpr int PIN_SW420_DO     = 32;
 constexpr int PIN_CANCEL_BTN   = 33;  // INPUT_PULLUP, active LOW
+constexpr int PIN_WIFI_RESET   = 13;  // INPUT_PULLUP, active LOW, boot only
+constexpr int PIN_FACTORY_RESET = 14; // INPUT_PULLUP, active LOW, boot only
 constexpr int PIN_BUZZER       = 25;  // active HIGH -> 1k -> NPN base
 constexpr int PIN_GPS_RX       = 26;  // UART1 remap (GPS TXD)
 constexpr int PIN_GPS_TX       = 27;  // UART1 remap (GPS RXD)
