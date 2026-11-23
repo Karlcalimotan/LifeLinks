@@ -81,7 +81,7 @@ export function Sidebar({
 				<ol className="mt-2 flex flex-col gap-1.5">
 					{safetyPath.map((step, index) => (
 						<li key={step} className="flex items-baseline gap-2 text-meta text-fog-500">
-							<span className="w-4 shrink-0 font-display text-signal-500">{`0${index + 1}`}</span>
+							<span className="w-4 shrink-0 font-display text-signal-ink">{`0${index + 1}`}</span>
 							{step}
 						</li>
 					))}

@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Light and dark appearance modes with a system default, a persisted
+  preference, and a toggle on the login board and in the console header. The
+  dark palette is unchanged; light mode maps the ink/fog scales to paper and
+  text so existing components switch without per-screen overrides.
 - Firmware: dedicated WiFi and factory reset buttons on GPIO 13/14, aligned pin
   map and provisioning tests (#107).
 - Tracker detail: an admin WiFi setup panel with the AP name derived from the

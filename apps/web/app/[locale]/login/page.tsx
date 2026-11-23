@@ -1,10 +1,12 @@
 import { Logo } from "@/components/brand/logo";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Label } from "@/components/ui/field";
 import { loginAction } from "@/lib/actions/auth";
 import { DEMO_ACCOUNTS, demoModeEnabled } from "@/lib/auth/demo";
 import { getCurrentUser } from "@/lib/auth/session";
 import { APP_NAME, APP_TAGLINE } from "@/lib/constants";
+import { readThemePreference } from "@/lib/theme-server";
 import { Activity, Hand, Radio, Timer } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { redirect } from "next/navigation";
@@ -23,6 +25,8 @@ export default async function LoginPage({
 
 	const t = await getTranslations({ locale, namespace: "auth" });
 	const common = await getTranslations({ locale, namespace: "common" });
+	const theme = await getTranslations({ locale, namespace: "theme" });
+	const themePreference = await readThemePreference();
 
 	const errorMessage =
 		error === "rate" ? t("rateLimited") : error === "invalid" ? t("invalid") : null;
@@ -47,7 +51,7 @@ export default async function LoginPage({
 				</div>
 
 				<div className="relative mt-16 max-w-2xl">
-					<div className="flex items-center gap-2 text-[11px] font-medium text-signal-400">
+					<div className="flex items-center gap-2 text-[11px] font-medium text-signal-ink">
 						<span className="size-1.5 bg-signal-500 beacon-pulse" aria-hidden="true" />
 						{t("consoleLabel")}
 					</div>
@@ -63,7 +67,7 @@ export default async function LoginPage({
 							key={item.label}
 							className="grid grid-cols-[2rem_1fr_auto] items-center gap-4 border-b border-ink-700/70 py-3.5 last:border-0"
 						>
-							<span className="font-display text-2xl leading-none text-signal-500">
+							<span className="font-display text-2xl leading-none text-signal-ink">
 								{`0${index + 1}`}
 							</span>
 							<span className="text-sm font-medium text-fog-100">{item.label}</span>
@@ -76,6 +80,17 @@ export default async function LoginPage({
 			</section>
 
 			<section className="relative flex items-center justify-center bg-ink-900 p-6 sm:p-10">
+				<div className="absolute right-4 top-4 sm:right-6 sm:top-6">
+					<ThemeToggle
+						initialPreference={themePreference}
+						labels={{
+							label: theme("label"),
+							light: theme("light"),
+							dark: theme("dark"),
+							system: theme("system"),
+						}}
+					/>
+				</div>
 				<div className="w-full max-w-sm">
 					<div className="mb-8 lg:hidden">
 						<Logo />

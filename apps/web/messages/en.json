@@ -67,6 +67,12 @@
 		"responder": "CDRRMO / Pulis",
 		"admin": "Admin"
 	},
+	"theme": {
+		"label": "Appearance",
+		"light": "Light",
+		"dark": "Dark",
+		"system": "System"
+	},
 	"auth": {
 		"signIn": "Sign in",
 		"signInSubtitle": "Sign in to the crash response console.",

@@ -67,6 +67,12 @@
 		"responder": "CDRRMO / Pulis",
 		"admin": "Admin"
 	},
+	"theme": {
+		"label": "Itsura",
+		"light": "Maliwanag",
+		"dark": "Madilim",
+		"system": "Sistema"
+	},
 	"auth": {
 		"signIn": "Mag-sign in",
 		"signInSubtitle": "Pumasok sa crash response console.",

@@ -2,11 +2,13 @@ import { LogoMark } from "@/components/brand/logo";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { LogoutButton } from "@/components/layout/logout-button";
 import { MobileNav, Sidebar } from "@/components/layout/sidebar";
+import { type ThemeLabels, ThemeToggle } from "@/components/layout/theme-toggle";
 import { CommandPalette } from "@/components/search/command-palette";
 import { IncidentBell } from "@/components/search/incident-bell";
 import { Badge } from "@/components/ui/badge";
 import type { MemberRoleName } from "@/lib/auth/roles";
 import { loadAwaitingIncidents } from "@/lib/search/notifications";
+import type { ThemePreference } from "@/lib/theme";
 
 function roleTone(role: MemberRoleName) {
 	switch (role) {
@@ -28,6 +30,8 @@ export async function AppShell({
 	navLabels,
 	signOutLabel,
 	skipLabel,
+	themePreference,
+	themeLabels,
 	children,
 }: {
 	locale: string;
@@ -38,6 +42,8 @@ export async function AppShell({
 	navLabels: Record<string, string>;
 	signOutLabel: string;
 	skipLabel: string;
+	themePreference: ThemePreference;
+	themeLabels: ThemeLabels;
 	children: React.ReactNode;
 }) {
 	const awaiting: Awaited<ReturnType<typeof loadAwaitingIncidents>> = { count: 0, items: [] };
@@ -92,6 +98,7 @@ export async function AppShell({
 							<IncidentBell locale={locale} initial={awaiting} />
 							<span className="hidden sm:inline-flex">{roleBadge}</span>
 							<div className="hidden items-center gap-2 sm:flex">
+								<ThemeToggle initialPreference={themePreference} labels={themeLabels} />
 								<LocaleSwitcher />
 								<LogoutButton locale={locale} label={signOutLabel} />
 							</div>
@@ -101,6 +108,7 @@ export async function AppShell({
 					<div className="mt-2 flex items-center justify-between gap-2 border-t border-ink-700/70 pt-2 sm:hidden">
 						{roleBadge}
 						<div className="flex items-center gap-2">
+							<ThemeToggle initialPreference={themePreference} labels={themeLabels} />
 							<LocaleSwitcher />
 							<LogoutButton locale={locale} label={signOutLabel} />
 						</div>

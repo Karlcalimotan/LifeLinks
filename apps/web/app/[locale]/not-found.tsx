@@ -7,7 +7,7 @@ export default function NotFound() {
 			<div className="w-full max-w-md">
 				<Logo />
 				<div className="mt-12 border-t border-ink-700 pt-8">
-					<p className="font-display text-6xl leading-none text-signal-500">404</p>
+					<p className="font-display text-6xl leading-none text-signal-ink">404</p>
 					<h1 className="mt-3 font-display text-4xl font-semibold tracking-tight text-fog-50">
 						Page not found
 					</h1>
@@ -16,7 +16,7 @@ export default function NotFound() {
 					</p>
 					<Link
 						href="/dashboard"
-						className="mt-6 inline-flex h-9 items-center rounded bg-signal-500 px-4 text-sm font-medium text-ink-950 transition-colors hover:bg-signal-400"
+						className="mt-6 inline-flex h-9 items-center rounded bg-signal-500 px-4 text-sm font-medium text-on-accent transition-colors hover:bg-signal-400"
 					>
 						Back to dashboard
 					</Link>

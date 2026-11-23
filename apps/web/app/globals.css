@@ -17,10 +17,17 @@
 	--color-signal-400: #ff7a45;
 	--color-signal-500: #ff5a1f;
 	--color-signal-600: #e94a12;
+	/* Brand text stays legible on both canvases. */
+	--color-signal-ink: #ff5a1f;
 
 	--color-alarm-300: #ffa39e;
 	--color-alarm-400: #ff6b61;
 	--color-alarm-500: #e5342b;
+	--color-alarm-hover: #ffa39e;
+
+	/* Invariants: the signal plate keeps dark ink and a light beacon. */
+	--color-on-accent: #071013;
+	--color-brand-beacon: #f4fbfc;
 
 	--color-caution-300: #ffd27a;
 	--color-caution-400: #ffb020;
@@ -58,6 +65,42 @@
 
 :root {
 	color-scheme: dark;
+	--grid-line: rgb(143 163 166 / 0.055);
+	--focus-ring: var(--color-signal-400);
+}
+
+/*
+ * Daylight Dispatch: the light counterpart of the dark console. The ink scale
+ * becomes the paper surface, the fog scale becomes the text, and the accent
+ * *-300 steps become the text-safe accents. Filled accents (400/500) and the
+ * brand plate stay fixed so status colour still reads the same on both.
+ */
+:root[data-theme="light"] {
+	color-scheme: light;
+	--color-ink-950: #eef3f2;
+	--color-ink-900: #e4ebea;
+	--color-ink-800: #ffffff;
+	--color-ink-700: #cfdad8;
+	--color-ink-600: #aec0bc;
+
+	--color-fog-50: #061114;
+	--color-fog-100: #0d2024;
+	--color-fog-300: #2e4447;
+	--color-fog-400: #40595c;
+	--color-fog-500: #526b6e;
+
+	--color-signal-300: #a83405;
+	--color-signal-ink: #a83405;
+
+	--color-alarm-300: #a82018;
+	--color-caution-300: #7a4c00;
+	--color-rescue-300: #0a6485;
+	--color-clear-300: #086348;
+
+	--shadow-panel: inset 0 1px 0 rgb(255 255 255 / 0.9);
+	--shadow-overlay: 0 18px 48px rgb(7 16 19 / 0.18);
+	--grid-line: rgb(18 42 48 / 0.1);
+	--focus-ring: var(--color-signal-300);
 }
 
 * {
@@ -81,7 +124,7 @@ body {
 }
 
 :focus-visible {
-	outline: 2px solid var(--color-signal-400);
+	outline: 2px solid var(--focus-ring);
 	outline-offset: 2px;
 }
 
@@ -105,8 +148,8 @@ body {
 }
 
 .console-grid {
-	background-image: linear-gradient(rgb(143 163 166 / 0.055) 1px, transparent 1px),
-		linear-gradient(90deg, rgb(143 163 166 / 0.055) 1px, transparent 1px);
+	background-image: linear-gradient(var(--grid-line) 1px, transparent 1px),
+		linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
 	background-size: 44px 44px;
 }
 
