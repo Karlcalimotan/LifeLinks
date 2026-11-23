@@ -10,6 +10,11 @@ All notable changes to this project are documented here. The format follows
 
 - Firmware: dedicated WiFi and factory reset buttons on GPIO 13/14, aligned pin
   map and provisioning tests (#107).
+- Tracker detail: an admin WiFi setup panel with the AP name derived from the
+  MAC, the current setup state, the GPIO 13/14 reset instructions and a
+  rotate-and-show token action (#43).
+- A repeatable axe accessibility gate (`pnpm a11y`) with JSON and Markdown
+  evidence; the dashboard chart scroller is keyboard accessible (#46).
 
 ## [0.3.0] - 2026-11-23
 

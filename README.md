@@ -76,8 +76,15 @@ the `DIRECT_URL` used by migrations, and the seed guard.
 | `pnpm gen <command> <name>` | Generate a feature, device route, firmware module or model |
 | `pnpm stack:check` | Static template checks + contract drift |
 | `pnpm api:latency` | Warm-up + p95/max latency check for API endpoints |
+| `pnpm a11y` | axe accessibility gate against a running app |
 | `pnpm self-check` | Full local gate |
 | `bash scripts/verify.sh` | Firmware build, native tests, static analysis, formatting |
+
+`pnpm a11y` needs the app running (`pnpm dev`, or `E2E_BASE_URL` pointing at
+another server) and Playwright Chromium. It signs in with the demo admin, checks
+the console routes and writes `reports/a11y/latest.md` with the JSON evidence
+beside it. The command exits nonzero on serious or critical axe violations. If
+the app cannot be reached the report says **not run**, never pass.
 
 ## Structure
 

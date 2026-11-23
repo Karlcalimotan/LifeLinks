@@ -24,11 +24,14 @@
 		"gen": "node stack/generators/gen.mjs",
 		"stack:check": "node stack/src/verify.mjs --self",
 		"api:latency": "node scripts/api-latency.mjs",
+		"a11y": "node scripts/a11y.mjs",
 		"overlap:check": "node scripts/overlap-check.mjs",
 		"self-check": "node scripts/self-check.mjs"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
+		"@playwright/test": "^1.65.0",
+		"axe-core": "^4.14.1",
 		"husky": "^9.1.7",
 		"lint-staged": "^17.6.0"
 	},
