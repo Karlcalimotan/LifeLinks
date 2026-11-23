@@ -153,6 +153,7 @@ describe("POST /api/device/command/ack", () => {
 				resolution: "False alarm confirmed by tracker",
 				resolvedAt: expect.any(Date),
 				cancelRequestedAt: null,
+				ackRequestedAt: null,
 			}),
 		});
 		expect(mocks.auditCreate).toHaveBeenCalledWith({
@@ -326,7 +327,7 @@ describe("POST /api/device/command/ack", () => {
 		expect(body.data.result).toBe("already_closed");
 		expect(body.data.incident_status).toBe("CANCELLED");
 		const [update] = mocks.incidentUpdateMany.mock.calls;
-		expect(update?.[0].data).toEqual({ cancelRequestedAt: null });
+		expect(update?.[0].data).toEqual({ cancelRequestedAt: null, ackRequestedAt: null });
 		expect(update?.[0].data).not.toHaveProperty("status");
 		expect(mocks.auditCreate).toHaveBeenCalledWith({
 			data: expect.objectContaining({
@@ -346,7 +347,7 @@ describe("POST /api/device/command/ack", () => {
 
 		expect(body.data.result).toBe("already_closed");
 		const [update] = mocks.incidentUpdateMany.mock.calls;
-		expect(update?.[0].data).toEqual({ cancelRequestedAt: null });
+		expect(update?.[0].data).toEqual({ cancelRequestedAt: null, ackRequestedAt: null });
 		expect(mocks.auditCreate).toHaveBeenCalledWith({
 			data: expect.objectContaining({
 				action: "incident.cancel_ack_ignored",
@@ -364,7 +365,7 @@ describe("POST /api/device/command/ack", () => {
 		expect(body.data.result).toBe("already_closed");
 		expect(body.data.incident_status).toBe("RESOLVED");
 		const [update] = mocks.incidentUpdateMany.mock.calls;
-		expect(update?.[0].data).toEqual({ cancelRequestedAt: null });
+		expect(update?.[0].data).toEqual({ cancelRequestedAt: null, ackRequestedAt: null });
 		expect(mocks.auditCreate).toHaveBeenCalledWith({
 			data: expect.objectContaining({
 				action: "incident.cancel_ack_ignored",
@@ -460,7 +461,6 @@ describe("POST /api/device/command/ack for ACK_INCIDENT", () => {
 				id: "inc-1",
 				orgId: "org-1",
 				deviceId: "dev-1",
-				resolution: null,
 				status: { in: ["SUSPECTED", "CONFIRMED", "ACKNOWLEDGED"] },
 			},
 			data: { status: "ACKNOWLEDGED", ackRequestedAt: null },
@@ -474,6 +474,34 @@ describe("POST /api/device/command/ack for ACK_INCIDENT", () => {
 					commandId: "cmd-1",
 					detail: "acknowledged",
 				}),
+			}),
+		});
+	});
+
+	it("reconciles an acknowledged command when the incident still has a resolution", async () => {
+		mocks.incidentFindFirst.mockResolvedValue(
+			serverIncident({ status: "CONFIRMED", resolution: "Operator note" }),
+		);
+
+		const response = await POST(request({ detail: "acknowledged" }));
+		const body = await response.json();
+
+		expect(body.data.result).toBe("acknowledged");
+		expect(body.data.incident_status).toBe("ACKNOWLEDGED");
+		expect(body.data.changed).toBe(true);
+		expect(mocks.incidentUpdateMany).toHaveBeenCalledWith({
+			where: {
+				id: "inc-1",
+				orgId: "org-1",
+				deviceId: "dev-1",
+				status: { in: ["SUSPECTED", "CONFIRMED", "ACKNOWLEDGED"] },
+			},
+			data: { status: "ACKNOWLEDGED", ackRequestedAt: null },
+		});
+		expect(mocks.auditCreate).toHaveBeenCalledWith({
+			data: expect.objectContaining({
+				action: "incident.acknowledged",
+				metadata: expect.objectContaining({ source: "device", detail: "acknowledged" }),
 			}),
 		});
 	});

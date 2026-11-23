@@ -104,20 +104,24 @@ The acknowledgement command carries the device client incident id:
 ### Portal recovery when the tracker cannot confirm
 
 The portal requires a tracker acknowledgement before a dispatched incident can
-be resolved. If the acknowledgement command expired or failed and the tracker
-cannot be reached, an ADMIN may use **Resolve without tracker confirmation** on
-the incident detail page. The path is deliberately narrow:
+be resolved. If the acknowledgement command expired or failed, or the tracker
+answered `unknown_incident` or `unconfirmed`, an ADMIN may use **Resolve without
+tracker confirmation** on the incident detail page. This includes a tracker
+that rebooted or lost power: the unit boots to `Idle`, no longer knows the
+incident, and answers `unknown_incident`. The path is deliberately narrow:
 
 - only an ADMIN sees it, and only for a device-backed `CONFIRMED` incident;
 - it is not offered while a fresh acknowledgement command is still pending;
-- the UI requires a typed `RESOLVE` confirmation, not a single click;
-- the action audits `incident.resolved_unconfirmed` with the actor and the last
-  command state, sets `RESOLVED`, and clears the pending acknowledgement.
+- the UI requires typing `RESOLVE`, and the server verifies the same field;
+- the action audits `incident.resolved_unconfirmed` with the actor, the
+  acknowledgement state, and the last command state, sets `RESOLVED`, and
+  clears the pending acknowledgement.
 
 This recovery does **not** stop the device. The alarm may keep sounding until
 the unit is powered off or the tracker acknowledges. That is the same
 power-loss limit described above: the portal can close its record, but it cannot
-silence a tracker it cannot reach.
+silence a tracker it cannot reach. After a reboot the alarm is already silent,
+but the portal cannot prove that from the record, so the warning still applies.
 
 The pure latch/ack decision is covered by native tests. The physical bench run
 (synthetic impact, wait past the countdown, ACK, silence) is issue #54 and stays

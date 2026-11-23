@@ -15,6 +15,7 @@ import {
 	canRequestCancelAlert,
 	cancelAlertCopyKey,
 } from "@/lib/incidents/cancel-alert";
+import { MAX_RESOLUTION_LENGTH } from "@/lib/incidents/resolution";
 import { type ImpactStatusName, isTerminal } from "@/lib/incidents/state";
 import { formatDateTime } from "@/lib/utils";
 import { Check, Clock, TriangleAlert } from "lucide-react";
@@ -63,11 +64,12 @@ export async function IncidentActions({
 	const canAcknowledge =
 		canAcknowledgeAsBureau(role) &&
 		(status === "CONFIRMED" || (status === "SUSPECTED" && !deviceBacked));
-	// A pending request already reached the tracker; a second submit is coalesced
-	// by the action but hiding the button makes the wait explicit.
-	const showAcknowledge = canAcknowledge && !ackWaiting;
+	// A pending command already reached the tracker; a second, contradictory
+	// command is refused by the action as well.
+	const showAcknowledge = canAcknowledge && !ackWaiting && !waiting;
 	const acknowledgeLabel = ackFailed ? t("ackRetry") : t("acknowledge");
 	const showResolveWithoutTracker = resolveWithoutTrackerAvailable && role === "ADMIN";
+	const userWaitingForBureau = !canAcknowledgeAsBureau(role) && acknowledgementRequired;
 
 	return (
 		<div className="flex flex-col gap-3">
@@ -101,6 +103,9 @@ export async function IncidentActions({
 							{t(ackCopy.title)}
 						</p>
 						<p className="mt-1 text-meta leading-relaxed text-fog-300">{t(ackCopy.body)}</p>
+						{ackWaiting ? (
+							<p className="mt-1 text-meta text-fog-400">{t("ackWaitingBlocksActions")}</p>
+						) : null}
 						{(ackWaiting || ackFailed) && bureauAck.requestedAt ? (
 							<p className="mt-1 text-meta text-fog-500">
 								{formatDateTime(bureauAck.requestedAt, locale)}
@@ -137,6 +142,9 @@ export async function IncidentActions({
 							{t(copy.title)}
 						</p>
 						<p className="mt-1 text-meta leading-relaxed text-fog-300">{t(copy.body)}</p>
+						{waiting ? (
+							<p className="mt-1 text-meta text-fog-400">{t("cancelWaitingBlocksAck")}</p>
+						) : null}
 						{waiting && cancelAlert.requestedAt ? (
 							<p className="mt-1 text-meta text-fog-500">
 								{formatDateTime(cancelAlert.requestedAt, locale)}
@@ -157,7 +165,7 @@ export async function IncidentActions({
 					</form>
 				) : null}
 
-				{!waiting ? (
+				{!waiting && !ackWaiting ? (
 					canRequest ? (
 						<form action={requestCancelAlertAction}>
 							<input type="hidden" name="locale" value={locale} />
@@ -188,7 +196,7 @@ export async function IncidentActions({
 					)
 				) : null}
 
-				{!waiting && canRequest ? (
+				{!waiting && !ackWaiting && canRequest ? (
 					<form action={requestCancelAlertAction}>
 						<input type="hidden" name="locale" value={locale} />
 						<input type="hidden" name="incidentId" value={incidentId} />
@@ -208,8 +216,12 @@ export async function IncidentActions({
 
 			{acknowledgementRequired ? (
 				<div className="rounded-panel border border-caution-400/30 bg-caution-400/10 px-3 py-2.5">
-					<p className="text-body font-medium text-caution-300">{t("ackRequiredTitle")}</p>
-					<p className="mt-1 text-meta leading-relaxed text-fog-300">{t("ackRequiredBody")}</p>
+					<p className="text-body font-medium text-caution-300">
+						{userWaitingForBureau ? t("ackWaitingForBureauTitle") : t("ackRequiredTitle")}
+					</p>
+					<p className="mt-1 text-meta leading-relaxed text-fog-300">
+						{userWaitingForBureau ? t("ackWaitingForBureauBody") : t("ackRequiredBody")}
+					</p>
 				</div>
 			) : (
 				<form action={resolveIncidentAction} className="flex flex-wrap items-center gap-2">
@@ -218,6 +230,7 @@ export async function IncidentActions({
 					<Input
 						name="resolution"
 						placeholder="Resolution note (optional)"
+						maxLength={MAX_RESOLUTION_LENGTH}
 						className="h-9 max-w-xs"
 					/>
 					<Button type="submit" size="sm">
@@ -242,17 +255,30 @@ export async function IncidentActions({
 					<Input
 						name="resolution"
 						placeholder={t("resolveUnconfirmedNote")}
+						maxLength={MAX_RESOLUTION_LENGTH}
 						className="h-9 max-w-sm"
 					/>
-					<ConfirmSubmit
-						message={t("resolveUnconfirmedConfirm")}
-						confirmLabel={t("resolveUnconfirmedAction")}
-						confirmText="RESOLVE"
-						cancelLabel={common("cancel")}
-						variant="danger"
+					<label
+						htmlFor={`resolve-confirm-${incidentId}`}
+						className="flex max-w-sm flex-col gap-1 text-meta text-fog-300"
 					>
+						<span>{t("resolveUnconfirmedConfirmLabel")}</span>
+						<Input
+							id={`resolve-confirm-${incidentId}`}
+							name="confirm"
+							placeholder="RESOLVE"
+							autoComplete="off"
+							spellCheck={false}
+							required
+							className="h-9 font-mono"
+						/>
+					</label>
+					<p className="text-meta leading-relaxed text-fog-400">
+						{t("resolveUnconfirmedConfirmHelp")}
+					</p>
+					<Button type="submit" size="sm" variant="danger" className="self-start">
 						{t("resolveUnconfirmedAction")}
-					</ConfirmSubmit>
+					</Button>
 				</form>
 			) : null}
 		</div>

@@ -64,10 +64,16 @@ export default async function IncidentDetailPage({
 	searchParams,
 }: {
 	params: Promise<{ locale: string; id: string }>;
-	searchParams: Promise<{ updated?: string; error?: string; cancel?: string; action?: string }>;
+	searchParams: Promise<{
+		updated?: string;
+		error?: string;
+		cancel?: string;
+		ack?: string;
+		action?: string;
+	}>;
 }) {
 	const { locale, id } = await params;
-	const { updated, error, cancel, action } = await searchParams;
+	const { updated, error, cancel, ack, action } = await searchParams;
 	const current = await requireUser();
 	const t = await getTranslations({ locale, namespace: "incidents" });
 
@@ -227,6 +233,11 @@ export default async function IncidentDetailPage({
 					{t("cancelRequested")}
 				</p>
 			) : null}
+			{ack === "requested" && bureauAck.state === "waiting" ? (
+				<p className="mb-4 rounded border border-caution-400/30 bg-caution-400/10 px-3 py-2 text-xs text-caution-300">
+					{t("ackRequested")}
+				</p>
+			) : null}
 			{error ? (
 				<p className="mb-4 rounded border border-alarm-500/30 bg-alarm-500/10 px-3 py-2 text-xs text-alarm-300">
 					{error === "forbidden"
@@ -239,7 +250,11 @@ export default async function IncidentDetailPage({
 									? t("errorAckNotDispatched")
 									: error === "ack_recovery_unavailable"
 										? t("errorAckRecoveryUnavailable")
-										: "That status transition is not allowed."}
+										: error === "ack_confirmation_required"
+											? t("errorAckConfirmationRequired")
+											: error === "command_conflict"
+												? t("errorCommandConflict")
+												: "That status transition is not allowed."}
 				</p>
 			) : null}
 

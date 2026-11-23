@@ -20,6 +20,7 @@ import {
 	buildCancelAlertPayload,
 	canRequestCancelAlert,
 } from "@/lib/incidents/cancel-alert";
+import { boundResolution } from "@/lib/incidents/resolution";
 import {
 	incidentAckRequestPath,
 	incidentCancelRequestPath,
@@ -33,6 +34,13 @@ import { redirect } from "next/navigation";
 function value(formData: FormData, key: string): string {
 	return String(formData.get(key) ?? "").trim();
 }
+
+/**
+ * Thrown inside a transaction when the other command kind is still pending.
+ * Throwing rolls back the request claim so a conflicting action leaves no
+ * partial state behind.
+ */
+class CommandConflictError extends Error {}
 
 async function transition(formData: FormData, to: ImpactStatusName) {
 	const locale = value(formData, "locale") === "tl" ? "tl" : "en";
@@ -111,7 +119,7 @@ async function transition(formData: FormData, to: ImpactStatusName) {
 	const now = new Date();
 	const resolution =
 		to === "RESOLVED"
-			? value(formData, "resolution") || "Resolved by operator"
+			? boundResolution(value(formData, "resolution"), "Resolved by operator")
 			: to === "FALSE_ALARM"
 				? "False alarm"
 				: to === "CANCELLED"
@@ -190,6 +198,9 @@ export async function acknowledgeIncidentAction(formData: FormData) {
 	const transitionPath = fromDashboard
 		? `/${locale}/dashboard?error=transition`
 		: `/${locale}/incidents/${incident.id}?error=transition`;
+	const commandConflictPath = fromDashboard
+		? `/${locale}/dashboard?error=command_conflict`
+		: `/${locale}/incidents/${incident.id}?error=command_conflict`;
 	if (!canTransition(incident.status as ImpactStatusName, "ACKNOWLEDGED")) {
 		redirect(transitionPath);
 	}
@@ -248,59 +259,79 @@ export async function acknowledgeIncidentAction(formData: FormData) {
 
 	// The remaining eligible status is a dispatched CONFIRMED incident. Queue
 	// ACK_INCIDENT; only the tracker may move it to ACKNOWLEDGED.
-	const result = await prisma.$transaction(async (tx) => {
-		// Claim the request in the same write that records it. A terminal status
-		// from a concurrent operator wins instead of receiving a stale command.
-		// The update also locks the incident row, so a double submit serialises
-		// here and the second one sees the command the first one created.
-		const claimed = await tx.impactEvent.updateMany({
-			where: {
-				id: incident.id,
-				orgId: current.org.id,
-				status: "CONFIRMED",
-				resolution: null,
-			},
-			data: { ackRequestedAt: now },
-		});
-		if (claimed.count !== 1) return "blocked" as const;
-
-		const liveCommand = await tx.deviceCommand.findFirst({
-			where: {
-				impactEventId: incident.id,
-				kind: ACK_INCIDENT_KIND,
-				status: "PENDING",
-				OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
-			},
-			select: { id: true },
-		});
-		if (liveCommand) return "duplicate" as const;
-
-		await tx.deviceCommand.create({
-			data: {
-				deviceId: incident.deviceId,
-				impactEventId: incident.id,
-				kind: ACK_INCIDENT_KIND,
-				// The device compares this with its own g_incidentId (`llk-...`).
-				payload: buildAckIncidentPayload(incident.clientIncidentId),
-				createdAt: now,
-				expiresAt: new Date(now.getTime() + ACK_INCIDENT_COMMAND_TTL_MS),
-			},
-		});
-		await tx.auditLog.create({
-			data: {
-				orgId: current.org.id,
-				actorId: current.user.id,
-				action: "incident.ack_requested",
-				target: incident.id,
-				metadata: {
-					from: incident.status,
-					deviceId: incident.deviceId,
-					clientIncidentId: incident.clientIncidentId,
+	let result: "blocked" | "duplicate" | "created";
+	try {
+		result = await prisma.$transaction(async (tx) => {
+			// Claim the request in the same write that records it. A terminal status
+			// from a concurrent operator wins instead of receiving a stale command.
+			// The update also locks the incident row, so a double submit serialises
+			// here and the second one sees the command the first one created.
+			const claimed = await tx.impactEvent.updateMany({
+				where: {
+					id: incident.id,
+					orgId: current.org.id,
+					status: "CONFIRMED",
+					resolution: null,
 				},
-			},
+				data: { ackRequestedAt: now },
+			});
+			if (claimed.count !== 1) return "blocked" as const;
+
+			// A stand-down is already waiting for the same tracker. Sending an
+			// acknowledgement as well would put two contradictory commands in
+			// flight, so refuse and let the operator wait for the answer.
+			const conflicting = await tx.deviceCommand.findFirst({
+				where: {
+					impactEventId: incident.id,
+					kind: CANCEL_ALERT_KIND,
+					status: "PENDING",
+					OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+				},
+				select: { id: true },
+			});
+			if (conflicting) throw new CommandConflictError();
+
+			const liveCommand = await tx.deviceCommand.findFirst({
+				where: {
+					impactEventId: incident.id,
+					kind: ACK_INCIDENT_KIND,
+					status: "PENDING",
+					OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+				},
+				select: { id: true },
+			});
+			if (liveCommand) return "duplicate" as const;
+
+			await tx.deviceCommand.create({
+				data: {
+					deviceId: incident.deviceId,
+					impactEventId: incident.id,
+					kind: ACK_INCIDENT_KIND,
+					// The device compares this with its own g_incidentId (`llk-...`).
+					payload: buildAckIncidentPayload(incident.clientIncidentId),
+					createdAt: now,
+					expiresAt: new Date(now.getTime() + ACK_INCIDENT_COMMAND_TTL_MS),
+				},
+			});
+			await tx.auditLog.create({
+				data: {
+					orgId: current.org.id,
+					actorId: current.user.id,
+					action: "incident.ack_requested",
+					target: incident.id,
+					metadata: {
+						from: incident.status,
+						deviceId: incident.deviceId,
+						clientIncidentId: incident.clientIncidentId,
+					},
+				},
+			});
+			return "created" as const;
 		});
-		return "created" as const;
-	});
+	} catch (error) {
+		if (error instanceof CommandConflictError) redirect(commandConflictPath);
+		throw error;
+	}
 	if (result === "blocked") redirect(transitionPath);
 
 	revalidatePath(`/${locale}/dashboard`);
@@ -319,10 +350,11 @@ export async function resolveIncidentAction(formData: FormData) {
  * ADMIN-only recovery for a tracker that cannot confirm.
  *
  * The normal resolve path requires ACKNOWLEDGED for a device-backed incident.
- * When the acknowledgement command expired or failed and the tracker cannot be
- * reached, an admin may close the incident anyway. This never claims the alarm
- * stopped: the audit row records the last command state and the copy warns that
- * the alarm may keep sounding until the device is powered off or acknowledges.
+ * When the acknowledgement command expired or failed, or the tracker answered
+ * `unknown_incident`/`unconfirmed` after a reboot or power loss, an admin may
+ * close the incident anyway. This never claims the alarm stopped: the audit row
+ * records the last command state and the copy warns that the alarm may keep
+ * sounding until the device is powered off or acknowledges.
  */
 export async function resolveWithoutTrackerAction(formData: FormData) {
 	const locale = value(formData, "locale") === "tl" ? "tl" : "en";
@@ -335,6 +367,16 @@ export async function resolveWithoutTrackerAction(formData: FormData) {
 		? `/${locale}/dashboard?error=forbidden`
 		: `/${locale}/incidents/${incidentId}?error=forbidden`;
 	if (current.role !== "ADMIN") redirect(forbiddenPath);
+
+	// The typed confirmation is enforced here, not only by the dialog. A direct
+	// action call without the exact word is refused before any write.
+	if (value(formData, "confirm") !== "RESOLVE") {
+		redirect(
+			fromDashboard
+				? `/${locale}/dashboard?error=ack_confirmation_required`
+				: `/${locale}/incidents/${incidentId}?error=ack_confirmation_required`,
+		);
+	}
 
 	const incident = await prisma.impactEvent.findFirst({
 		where: { id: incidentId, orgId: current.org.id },
@@ -389,7 +431,7 @@ export async function resolveWithoutTrackerAction(formData: FormData) {
 
 	const lastCommand = latestAckIncidentCommand(incident.id, commands);
 	const now = new Date();
-	const resolution = value(formData, "resolution") || UNCONFIRMED_RESOLUTION;
+	const resolution = boundResolution(value(formData, "resolution"), UNCONFIRMED_RESOLUTION);
 	const resolved = await prisma.$transaction(async (tx) => {
 		const updated = await tx.impactEvent.updateMany({
 			where: {
@@ -416,6 +458,8 @@ export async function resolveWithoutTrackerAction(formData: FormData) {
 					from: incident.status,
 					to: "RESOLVED",
 					source: "admin_recovery",
+					ackState: ack.state,
+					ackDetail: ack.detail,
 					lastCommandId: lastCommand?.id ?? null,
 					lastCommandStatus: lastCommand?.status ?? null,
 					lastCommandDetail: lastCommand ? readAckIncidentDetail(lastCommand.payload) : null,
@@ -480,63 +524,85 @@ export async function requestCancelAlertAction(formData: FormData) {
 	const transitionPath = fromDashboard
 		? `/${locale}/dashboard?error=transition`
 		: `/${locale}/incidents/${incident.id}?error=transition`;
+	const commandConflictPath = fromDashboard
+		? `/${locale}/dashboard?error=command_conflict`
+		: `/${locale}/incidents/${incident.id}?error=command_conflict`;
 	if (!canRequestCancelAlert(incident.status as ImpactStatusName)) redirect(transitionPath);
 
 	const now = new Date();
-	const result = await prisma.$transaction(async (tx) => {
-		// Claim the request in the same write that records it. A terminal status
-		// from a concurrent operator wins instead of receiving a stale command.
-		// The update also locks the incident row, so a double submit serialises
-		// here and the second one sees the command the first one created.
-		const claimed = await tx.impactEvent.updateMany({
-			where: {
-				id: incident.id,
-				orgId: current.org.id,
-				status: { in: [...CANCEL_ALERT_ELIGIBLE_STATUSES] },
-			},
-			data: { cancelRequestedAt: now },
-		});
-		if (claimed.count !== 1) return "blocked" as const;
-
-		const liveCommand = await tx.deviceCommand.findFirst({
-			where: {
-				impactEventId: incident.id,
-				kind: CANCEL_ALERT_KIND,
-				status: "PENDING",
-				OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
-			},
-			select: { id: true },
-		});
-		if (liveCommand) return "duplicate" as const;
-
-		await tx.deviceCommand.create({
-			data: {
-				deviceId: incident.deviceId,
-				impactEventId: incident.id,
-				kind: CANCEL_ALERT_KIND,
-				// The device compares this with its own g_incidentId (`llk-...`).
-				payload: buildCancelAlertPayload(incident.clientIncidentId),
-				createdAt: now,
-				expiresAt: new Date(now.getTime() + CANCEL_ALERT_COMMAND_TTL_MS),
-			},
-		});
-		await tx.auditLog.create({
-			data: {
-				orgId: current.org.id,
-				actorId: current.user.id,
-				action:
-					intent === "cancel" ? "incident.cancel_requested" : "incident.false_alarm_requested",
-				target: incident.id,
-				metadata: {
-					from: incident.status,
-					intent,
-					deviceId: incident.deviceId,
-					clientIncidentId: incident.clientIncidentId,
+	let result: "blocked" | "duplicate" | "created";
+	try {
+		result = await prisma.$transaction(async (tx) => {
+			// Claim the request in the same write that records it. A terminal status
+			// from a concurrent operator wins instead of receiving a stale command.
+			// The update also locks the incident row, so a double submit serialises
+			// here and the second one sees the command the first one created.
+			const claimed = await tx.impactEvent.updateMany({
+				where: {
+					id: incident.id,
+					orgId: current.org.id,
+					status: { in: [...CANCEL_ALERT_ELIGIBLE_STATUSES] },
 				},
-			},
+				data: { cancelRequestedAt: now },
+			});
+			if (claimed.count !== 1) return "blocked" as const;
+
+			// An acknowledgement is already waiting for the same tracker. Sending a
+			// stand-down as well would put two contradictory commands in flight.
+			const conflicting = await tx.deviceCommand.findFirst({
+				where: {
+					impactEventId: incident.id,
+					kind: ACK_INCIDENT_KIND,
+					status: "PENDING",
+					OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+				},
+				select: { id: true },
+			});
+			if (conflicting) throw new CommandConflictError();
+
+			const liveCommand = await tx.deviceCommand.findFirst({
+				where: {
+					impactEventId: incident.id,
+					kind: CANCEL_ALERT_KIND,
+					status: "PENDING",
+					OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+				},
+				select: { id: true },
+			});
+			if (liveCommand) return "duplicate" as const;
+
+			await tx.deviceCommand.create({
+				data: {
+					deviceId: incident.deviceId,
+					impactEventId: incident.id,
+					kind: CANCEL_ALERT_KIND,
+					// The device compares this with its own g_incidentId (`llk-...`).
+					payload: buildCancelAlertPayload(incident.clientIncidentId),
+					createdAt: now,
+					expiresAt: new Date(now.getTime() + CANCEL_ALERT_COMMAND_TTL_MS),
+				},
+			});
+			await tx.auditLog.create({
+				data: {
+					orgId: current.org.id,
+					actorId: current.user.id,
+					action:
+						intent === "cancel" ? "incident.cancel_requested" : "incident.false_alarm_requested",
+					target: incident.id,
+					metadata: {
+						from: incident.status,
+						intent,
+						deviceId: incident.deviceId,
+						clientIncidentId: incident.clientIncidentId,
+					},
+				},
+			});
+			return "created" as const;
 		});
-		return "created" as const;
-	});
+	} catch (error) {
+		if (error instanceof CommandConflictError) redirect(commandConflictPath);
+		throw error;
+	}
 	if (result === "blocked") redirect(transitionPath);
 
 	revalidatePath(`/${locale}/dashboard`);

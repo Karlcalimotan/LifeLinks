@@ -153,12 +153,29 @@ describe("canResolveWithoutTracker", () => {
 		).toBe(false);
 	});
 
-	it("does not treat an unknown incident as an expired command", () => {
+	it("allows a tracker that rebooted or could not confirm the incident", () => {
 		expect(
 			canResolveWithoutTracker({
 				status: "CONFIRMED",
 				deviceBacked: true,
 				ack: view({ state: "not_confirmed", detail: "unknown_incident" }),
+			}),
+		).toBe(true);
+		expect(
+			canResolveWithoutTracker({
+				status: "CONFIRMED",
+				deviceBacked: true,
+				ack: view({ state: "not_confirmed", detail: "unconfirmed" }),
+			}),
+		).toBe(true);
+	});
+
+	it("does not accept an arbitrary non-contract detail", () => {
+		expect(
+			canResolveWithoutTracker({
+				status: "CONFIRMED",
+				deviceBacked: true,
+				ack: view({ state: "not_confirmed", detail: "done" }),
 			}),
 		).toBe(false);
 	});

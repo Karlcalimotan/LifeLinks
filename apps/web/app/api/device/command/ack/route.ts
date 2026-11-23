@@ -196,7 +196,7 @@ export const POST = withApi(
 				if (notClosable) {
 					await tx.impactEvent.updateMany({
 						where: { id: incident.id, orgId: device.orgId, deviceId: device.id },
-						data: { cancelRequestedAt: null },
+						data: { cancelRequestedAt: null, ackRequestedAt: null },
 					});
 					await tx.auditLog.create({
 						data: {
@@ -233,6 +233,7 @@ export const POST = withApi(
 						resolvedAt: now,
 						resolution: CANCEL_ALERT_RESOLUTION,
 						cancelRequestedAt: null,
+						ackRequestedAt: null,
 					},
 				});
 				if (closed.count === 0) {
@@ -242,7 +243,7 @@ export const POST = withApi(
 					});
 					await tx.impactEvent.updateMany({
 						where: { id: incident.id, orgId: device.orgId, deviceId: device.id },
-						data: { cancelRequestedAt: null },
+						data: { cancelRequestedAt: null, ackRequestedAt: null },
 					});
 					await tx.auditLog.create({
 						data: {
@@ -450,7 +451,6 @@ export const POST = withApi(
 						id: incident.id,
 						orgId: device.orgId,
 						deviceId: device.id,
-						resolution: null,
 						status: { in: [...ACK_INCIDENT_CONFIRMABLE_STATUSES] },
 					},
 					data: { status: "ACKNOWLEDGED", ackRequestedAt: null },

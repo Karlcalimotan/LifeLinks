@@ -172,9 +172,11 @@ export default async function DashboardPage({
 					? { tone: "error" as const, text: t("errorTransition") }
 					: error === "ack_not_dispatched"
 						? { tone: "error" as const, text: t("errorAckNotDispatched") }
-						: error === "notfound"
-							? { tone: "error" as const, text: t("errorNotFound") }
-							: null;
+						: error === "command_conflict"
+							? { tone: "error" as const, text: t("errorCommandConflict") }
+							: error === "notfound"
+								? { tone: "error" as const, text: t("errorNotFound") }
+								: null;
 
 	const stateLabels: Record<FleetMarkerState, string> = {
 		incident: t("legendIncident"),
@@ -409,7 +411,7 @@ export default async function DashboardPage({
 												/>
 											</span>
 											<div className="flex items-center gap-2">
-												{canAcknowledgeAsBureau(current.role) ? (
+												{canAcknowledgeAsBureau(current.role) && incident.status === "CONFIRMED" ? (
 													<form action={acknowledgeIncidentAction}>
 														<input type="hidden" name="locale" value={locale} />
 														<input type="hidden" name="incidentId" value={incident.id} />

@@ -57,7 +57,6 @@ async function hasDeviceAcknowledgement(
 	const commands = await tx.deviceCommand.findMany({
 		where: { impactEventId: incidentId, kind: "ACK_INCIDENT", status: "ACKED" },
 		orderBy: { createdAt: "desc" },
-		take: 5,
 		select: { payload: true },
 	});
 	return commands.some((command) => readAckIncidentDetail(command.payload) === "acknowledged");

@@ -194,6 +194,11 @@ export default async function IncidentsPage({
 					{t("errorAckNotDispatched")}
 				</p>
 			) : null}
+			{error === "command_conflict" ? (
+				<p className="mb-4 rounded-panel border border-alarm-400/30 bg-alarm-400/10 px-3 py-2 text-meta text-alarm-300">
+					{t("errorCommandConflict")}
+				</p>
+			) : null}
 
 			<Card className="min-w-0 overflow-hidden">
 				<CardContent className="min-w-0 pt-5">
@@ -246,7 +251,7 @@ export default async function IncidentsPage({
 									incidents={incidents}
 									acknowledgedAt={acknowledgedAt}
 									now={now}
-									canManage={canAcknowledgeAsBureau(current.role)}
+									canAcknowledge={canAcknowledgeAsBureau(current.role)}
 									returnTo={returnTo}
 								/>
 							</div>
@@ -288,8 +293,7 @@ export default async function IncidentsPage({
 												(alert) => alert.status === "SENT" || alert.status === "ACKNOWLEDGED",
 											).length;
 											const canAcknowledge =
-												canAcknowledgeAsBureau(current.role) &&
-												(incident.status === "CONFIRMED" || incident.status === "SUSPECTED");
+												canAcknowledgeAsBureau(current.role) && incident.status === "CONFIRMED";
 
 											return (
 												<TableRow key={incident.id}>

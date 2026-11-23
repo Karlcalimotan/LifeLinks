@@ -286,7 +286,6 @@ describe("POST /api/device/incident", () => {
 		expect(mocks.notifyIncidentPush).not.toHaveBeenCalled();
 	});
 
-<<<<<<< HEAD
 	it("uses the organisation cancel window when the tracker has no override", async () => {
 		await POST(request());
 
@@ -342,7 +341,6 @@ describe("POST /api/device/incident", () => {
 		expect(mocks.commandFindMany).toHaveBeenCalledWith({
 			where: { impactEventId: "inc-1", kind: "ACK_INCIDENT", status: "ACKED" },
 			orderBy: { createdAt: "desc" },
-			take: 5,
 			select: { payload: true },
 		});
 		expect(mocks.impactUpdate).toHaveBeenCalledWith({

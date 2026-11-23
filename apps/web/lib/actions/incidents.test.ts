@@ -44,6 +44,7 @@ vi.mock("next/navigation", () => ({
 	},
 }));
 
+import { MAX_RESOLUTION_LENGTH } from "@/lib/incidents/resolution";
 import {
 	acknowledgeIncidentAction,
 	cancelIncidentAction,
@@ -61,6 +62,8 @@ function form(
 		intent?: string;
 		returnTo?: string;
 		locale?: string;
+		confirm?: string;
+		resolution?: string;
 	} = {},
 ): FormData {
 	const data = new FormData();
@@ -68,6 +71,8 @@ function form(
 	data.set("incidentId", values.incidentId ?? "inc-1");
 	if (values.intent) data.set("intent", values.intent);
 	if (values.returnTo) data.set("returnTo", values.returnTo);
+	if (values.confirm) data.set("confirm", values.confirm);
+	if (values.resolution) data.set("resolution", values.resolution);
 	return data;
 }
 
@@ -229,7 +234,7 @@ describe("requestCancelAlertAction", () => {
 	});
 
 	it("keeps a second submit from queueing a duplicate command", async () => {
-		mocks.commandFindFirst.mockResolvedValue({ id: "cmd-live" });
+		mocks.commandFindFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: "cmd-live" });
 
 		const path = await redirectOf(form({ intent: "false_alarm" }));
 
@@ -258,6 +263,16 @@ describe("requestCancelAlertAction", () => {
 		const [create] = mocks.commandCreate.mock.calls;
 		const expiresAt = create?.[0].data.expiresAt as Date;
 		expect(expiresAt.getTime()).toBeGreaterThan(Date.now());
+	});
+
+	it("refuses to send a stand-down while an acknowledgement is pending", async () => {
+		mocks.commandFindFirst.mockResolvedValueOnce({ id: "cmd-ack" });
+
+		const path = await redirectOf(form({ intent: "false_alarm" }));
+
+		expect(path).toBe("/en/incidents/inc-1?error=command_conflict");
+		expect(mocks.commandCreate).not.toHaveBeenCalled();
+		expect(mocks.auditCreate).not.toHaveBeenCalled();
 	});
 
 	it("returns to the board when the operator came from there", async () => {
@@ -471,7 +486,7 @@ describe("acknowledgeIncidentAction", () => {
 	});
 
 	it("keeps a second submit from queueing a duplicate command", async () => {
-		mocks.commandFindFirst.mockResolvedValue({ id: "cmd-live" });
+		mocks.commandFindFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: "cmd-live" });
 
 		const path = await ackRedirect(form());
 
@@ -485,6 +500,16 @@ describe("acknowledgeIncidentAction", () => {
 			},
 			select: { id: true },
 		});
+		expect(mocks.commandCreate).not.toHaveBeenCalled();
+		expect(mocks.auditCreate).not.toHaveBeenCalled();
+	});
+
+	it("refuses to acknowledge while a stand-down command is pending", async () => {
+		mocks.commandFindFirst.mockResolvedValueOnce({ id: "cmd-cancel" });
+
+		const path = await ackRedirect(form());
+
+		expect(path).toBe("/en/incidents/inc-1?error=command_conflict");
 		expect(mocks.commandCreate).not.toHaveBeenCalled();
 		expect(mocks.auditCreate).not.toHaveBeenCalled();
 	});
@@ -614,6 +639,18 @@ describe("resolve safety for a latched device incident", () => {
 		expect(path).toBe("/en/incidents/inc-1?updated=1");
 		expect(mocks.incidentUpdate).toHaveBeenCalledOnce();
 	});
+
+	it("bounds the resolution note", async () => {
+		mocks.incidentFindFirst.mockResolvedValue(incident({ status: "ACKNOWLEDGED" }));
+
+		const path = await resolveRedirect(
+			form({ resolution: "x".repeat(MAX_RESOLUTION_LENGTH + 100) }),
+		);
+
+		expect(path).toBe("/en/incidents/inc-1?updated=1");
+		const [update] = mocks.incidentUpdate.mock.calls;
+		expect(update?.[0].data.resolution).toHaveLength(MAX_RESOLUTION_LENGTH);
+	});
 });
 
 describe("resolveWithoutTrackerAction", () => {
@@ -636,10 +673,14 @@ describe("resolveWithoutTrackerAction", () => {
 		return catchRedirect(() => resolveWithoutTrackerAction(data));
 	}
 
+	function confirmedForm(values: Parameters<typeof form>[0] = {}): FormData {
+		return form({ ...values, confirm: "RESOLVE" });
+	}
+
 	it("lets an ADMIN resolve a device incident after the ack command expired", async () => {
 		mocks.commandFindMany.mockResolvedValue([ackCommand()]);
 
-		const path = await recoveryRedirect(form());
+		const path = await recoveryRedirect(confirmedForm());
 
 		expect(path).toBe("/en/incidents/inc-1?updated=1");
 		expect(mocks.commandFindMany).toHaveBeenCalledWith({
@@ -680,6 +721,8 @@ describe("resolveWithoutTrackerAction", () => {
 					from: "CONFIRMED",
 					to: "RESOLVED",
 					source: "admin_recovery",
+					ackState: "not_confirmed",
+					ackDetail: "expired",
 					lastCommandId: "cmd-ack-1",
 					lastCommandStatus: "EXPIRED",
 				}),
@@ -690,13 +733,56 @@ describe("resolveWithoutTrackerAction", () => {
 	it("lets an ADMIN resolve after a failed ack command", async () => {
 		mocks.commandFindMany.mockResolvedValue([ackCommand({ status: "FAILED" })]);
 
-		const path = await recoveryRedirect(form());
+		const path = await recoveryRedirect(confirmedForm());
 
 		expect(path).toBe("/en/incidents/inc-1?updated=1");
 		expect(mocks.auditCreate).toHaveBeenCalledWith({
 			data: expect.objectContaining({
 				action: "incident.resolved_unconfirmed",
 				metadata: expect.objectContaining({ lastCommandStatus: "FAILED" }),
+			}),
+		});
+	});
+
+	it("lets an ADMIN resolve after the tracker answers unknown_incident", async () => {
+		mocks.commandFindMany.mockResolvedValue([
+			ackCommand({
+				status: "ACKED",
+				payload: { incident_id: CLIENT_ID, ackDetail: "unknown_incident" },
+			}),
+		]);
+
+		const path = await recoveryRedirect(confirmedForm());
+
+		expect(path).toBe("/en/incidents/inc-1?updated=1");
+		expect(mocks.incidentUpdateMany).toHaveBeenCalledOnce();
+		expect(mocks.auditCreate).toHaveBeenCalledWith({
+			data: expect.objectContaining({
+				action: "incident.resolved_unconfirmed",
+				metadata: expect.objectContaining({
+					ackState: "not_confirmed",
+					ackDetail: "unknown_incident",
+				}),
+			}),
+		});
+	});
+
+	it("lets an ADMIN resolve after an unconfirmed ACK", async () => {
+		mocks.commandFindMany.mockResolvedValue([
+			ackCommand({ status: "ACKED", payload: { incident_id: CLIENT_ID } }),
+		]);
+
+		const path = await recoveryRedirect(confirmedForm());
+
+		expect(path).toBe("/en/incidents/inc-1?updated=1");
+		expect(mocks.incidentUpdateMany).toHaveBeenCalledOnce();
+		expect(mocks.auditCreate).toHaveBeenCalledWith({
+			data: expect.objectContaining({
+				action: "incident.resolved_unconfirmed",
+				metadata: expect.objectContaining({
+					ackState: "not_confirmed",
+					ackDetail: "unconfirmed",
+				}),
 			}),
 		});
 	});
@@ -708,9 +794,20 @@ describe("resolveWithoutTrackerAction", () => {
 			role: "RESPONDER",
 		});
 
-		const path = await recoveryRedirect(form());
+		const path = await recoveryRedirect(confirmedForm());
 
 		expect(path).toBe("/en/incidents/inc-1?error=forbidden");
+		expect(mocks.commandFindMany).not.toHaveBeenCalled();
+		expect(mocks.incidentUpdateMany).not.toHaveBeenCalled();
+	});
+
+	it("requires the typed confirmation on the server", async () => {
+		mocks.commandFindMany.mockResolvedValue([ackCommand()]);
+
+		const path = await recoveryRedirect(form({ confirm: "NOPE" }));
+
+		expect(path).toBe("/en/incidents/inc-1?error=ack_confirmation_required");
+		expect(mocks.incidentFindFirst).not.toHaveBeenCalled();
 		expect(mocks.commandFindMany).not.toHaveBeenCalled();
 		expect(mocks.incidentUpdateMany).not.toHaveBeenCalled();
 	});
@@ -723,7 +820,7 @@ describe("resolveWithoutTrackerAction", () => {
 			}),
 		]);
 
-		const path = await recoveryRedirect(form());
+		const path = await recoveryRedirect(confirmedForm());
 
 		expect(path).toBe("/en/incidents/inc-1?error=ack_recovery_unavailable");
 		expect(mocks.incidentUpdateMany).not.toHaveBeenCalled();
@@ -733,7 +830,7 @@ describe("resolveWithoutTrackerAction", () => {
 	it("refuses an incident with no device", async () => {
 		mocks.incidentFindFirst.mockResolvedValue(incident({ device: null }));
 
-		const path = await recoveryRedirect(form());
+		const path = await recoveryRedirect(confirmedForm());
 
 		expect(path).toBe("/en/incidents/inc-1?error=ack_recovery_unavailable");
 		expect(mocks.commandFindMany).not.toHaveBeenCalled();
@@ -743,7 +840,7 @@ describe("resolveWithoutTrackerAction", () => {
 	it("refuses an incident that was never acknowledged", async () => {
 		mocks.commandFindMany.mockResolvedValue([]);
 
-		const path = await recoveryRedirect(form());
+		const path = await recoveryRedirect(confirmedForm());
 
 		expect(path).toBe("/en/incidents/inc-1?error=ack_recovery_unavailable");
 		expect(mocks.incidentUpdateMany).not.toHaveBeenCalled();
@@ -753,9 +850,21 @@ describe("resolveWithoutTrackerAction", () => {
 		mocks.commandFindMany.mockResolvedValue([ackCommand()]);
 		mocks.incidentUpdateMany.mockResolvedValue({ count: 0 });
 
-		const path = await recoveryRedirect(form());
+		const path = await recoveryRedirect(confirmedForm());
 
 		expect(path).toBe("/en/incidents/inc-1?error=transition");
 		expect(mocks.auditCreate).not.toHaveBeenCalled();
+	});
+
+	it("bounds the resolution note", async () => {
+		mocks.commandFindMany.mockResolvedValue([ackCommand()]);
+
+		const path = await recoveryRedirect(
+			confirmedForm({ resolution: "x".repeat(MAX_RESOLUTION_LENGTH + 100) }),
+		);
+
+		expect(path).toBe("/en/incidents/inc-1?updated=1");
+		const [update] = mocks.incidentUpdateMany.mock.calls;
+		expect(update?.[0].data.resolution).toHaveLength(MAX_RESOLUTION_LENGTH);
 	});
 });

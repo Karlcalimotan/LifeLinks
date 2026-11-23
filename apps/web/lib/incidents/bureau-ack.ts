@@ -83,9 +83,12 @@ export const UNCONFIRMED_RESOLUTION = "Resolved without tracker confirmation";
 
 /**
  * The ADMIN recovery path is deliberately narrow: only a dispatched device
- * incident whose acknowledgement command expired or failed. A fresh PENDING
- * command may still reach the tracker, and an acknowledged incident uses the
- * normal resolve path. A non-device incident has no tracker to wait for.
+ * incident whose acknowledgement command did not confirm the alarm. That
+ * includes an expired or failed command, and a tracker that answered
+ * `unknown_incident` or `unconfirmed` after a reboot or power loss. A fresh
+ * PENDING command may still reach the tracker, and an acknowledged incident
+ * uses the normal resolve path. A non-device incident has no tracker to wait
+ * for.
  */
 export function canResolveWithoutTracker({
 	status,
@@ -97,7 +100,11 @@ export function canResolveWithoutTracker({
 	ack: BureauAckView;
 }): boolean {
 	if (!deviceBacked || status !== "CONFIRMED") return false;
-	return ack.state === "failed" || (ack.state === "not_confirmed" && ack.detail === "expired");
+	if (ack.state === "failed") return true;
+	if (ack.state !== "not_confirmed") return false;
+	return (
+		ack.detail === "expired" || ack.detail === "unknown_incident" || ack.detail === "unconfirmed"
+	);
 }
 
 function payloadRecord(value: unknown): Record<string, unknown> {
