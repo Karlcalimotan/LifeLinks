@@ -8,6 +8,10 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- Firmware: optional SSD1306 status display with provisioning, joining, WiFi OK
+  and home screens. The home screen shows the WiFi state (`setup` / `joining` /
+  `joined`), the device ID and an optional UUID, never the device token. WiFi is
+  commissioning-only and telemetry stays on the 4G modem (#108).
 - Firmware: dedicated WiFi and factory reset buttons on GPIO 13/14, aligned pin
   map and provisioning tests (#107).
 - Tracker detail: an admin WiFi setup panel with the AP name derived from the

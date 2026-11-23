@@ -5,11 +5,13 @@
   verified wiring diagram and must not be changed casually.
 
   MPU-6050      SDA 21, SCL 22, INT 23 (optional)
-  SW-420        DO 32
+  SSD1306       SDA 21, SCL 22, address 0x3C (optional)
+  SW-420        DO 27
   Cancel button 33 (INPUT_PULLUP, active LOW)
-  NEO-6M        TX 26 (ESP32 RX1), RX 27 (ESP32 TX1)
-  A7670E        TX 17 (ESP32 TX2), RX 16 (ESP32 RX2), PWRKEY 4
+  NEO-6M        TX 16 (ESP32 RX1), RX 17 (ESP32 TX1)
+  A7670E        TX 18 (ESP32 RX2), RX 19 (ESP32 TX2), PWRKEY 4
   Buzzer        NPN base 25 (active HIGH)
+  Status LED    26 (active HIGH)
   Power         VIN 5V from the buck + 18650 shield; 1000 uF across 5V/GND
 */
 #pragma once
