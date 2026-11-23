@@ -4,7 +4,7 @@ import {
 	SeverityBadge,
 	VehicleStatusBadge,
 } from "@/components/domain/badges";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState, PageHeader } from "@/components/ui/page-header";
 import {
 	Table,
@@ -14,186 +14,171 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { MaintenanceControl } from "@/components/vehicles/maintenance-control";
+import { VehicleOverview } from "@/components/vehicles/vehicle-overview";
+import { VehicleTabs } from "@/components/vehicles/vehicle-tabs";
 import { Link } from "@/i18n/routing";
 import { canAdminister, vehicleScope } from "@/lib/auth/roles";
 import { requireUser } from "@/lib/auth/session";
-import { deviceConnectionState, gpsAgeSeconds } from "@/lib/device/status";
+import { deviceConnectionState } from "@/lib/device/status";
 import { isValidCoordinate, mapLink } from "@/lib/geo";
 import prisma from "@/lib/prisma";
-import { formatCoord, formatDateTime, formatRelative } from "@/lib/utils";
-import { ExternalLink, MapPin } from "lucide-react";
+import { formatDateTime } from "@/lib/utils";
+import { type VehicleTab, parseVehicleTab } from "@/lib/vehicles/detail";
+import { ExternalLink } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
+type SearchParams = Record<string, string | string[] | undefined>;
+
+function first(value: string | string[] | undefined): string {
+	if (Array.isArray(value)) return value[0] ?? "";
+	return value ?? "";
+}
+
 export default async function VehicleDetailPage({
 	params,
+	searchParams,
 }: {
 	params: Promise<{ locale: string; id: string }>;
+	searchParams: Promise<SearchParams>;
 }) {
 	const { locale, id } = await params;
+	const raw = await searchParams;
+	const tab = parseVehicleTab(raw.tab);
+	const updated = first(raw.updated) === "1";
+	const error = first(raw.error);
+
 	const current = await requireUser();
 	const t = await getTranslations({ locale, namespace: "vehicles" });
 	const inc = await getTranslations({ locale, namespace: "incidents" });
 
 	const vehicle = await prisma.vehicle.findFirst({
 		where: { id, ...vehicleScope(current.role, current.org.id, current.user.id) },
-		include: {
-			devices: true,
-			trips: { orderBy: { startedAt: "desc" }, take: 5 },
-			impacts: {
-				orderBy: { detectedAt: "desc" },
-				take: 5,
-				include: { alerts: true },
-			},
-		},
+		include: { devices: { orderBy: { createdAt: "asc" }, take: 1 } },
 	});
 	if (!vehicle) notFound();
 
-	const device = vehicle.devices[0];
-	const state = deviceConnectionState(device?.lastSeenAt);
-	const hasFix =
-		device?.lastLat != null &&
-		device?.lastLng != null &&
-		isValidCoordinate(device.lastLat, device.lastLng);
+	const device = vehicle.devices[0] ?? null;
+	const lat = device?.lastLat ?? null;
+	const lng = device?.lastLng ?? null;
+	const mapHref =
+		lat != null && lng != null && isValidCoordinate(lat, lng) ? mapLink(lat, lng) : null;
+
+	const trips =
+		tab === "trips"
+			? await prisma.trip.findMany({
+					where: { orgId: current.org.id, vehicleId: vehicle.id },
+					orderBy: { startedAt: "desc" },
+					take: 5,
+				})
+			: [];
+	const incidents =
+		tab === "incidents"
+			? await prisma.impactEvent.findMany({
+					where: { orgId: current.org.id, vehicleId: vehicle.id },
+					orderBy: { detectedAt: "desc" },
+					take: 5,
+					include: { _count: { select: { alerts: true } } },
+				})
+			: [];
+
+	const tabLabels: Record<VehicleTab, string> = {
+		overview: t("tabOverview"),
+		trips: t("tabTrips"),
+		incidents: t("tabIncidents"),
+		settings: t("tabSettings"),
+	};
 
 	return (
 		<>
 			<PageHeader
 				title={`${vehicle.plateNo} ${vehicle.make} ${vehicle.model}`}
-				subtitle={vehicle.driverName ? `${t("driver")}: ${vehicle.driverName}` : undefined}
+				subtitle={vehicle.driverName ? t("driverLine", { name: vehicle.driverName }) : undefined}
 				actions={
-					hasFix ? (
+					mapHref ? (
 						<a
-							href={mapLink(device.lastLat as number, device.lastLng as number)}
+							href={mapHref}
 							target="_blank"
 							rel="noreferrer"
-							className="inline-flex h-8 items-center gap-1.5 rounded border border-ink-600 px-3 text-xs text-fog-300 hover:border-ink-600 hover:text-fog-50"
+							className="inline-flex h-8 items-center gap-1.5 rounded-panel border border-ink-600 px-3 text-meta text-fog-100 hover:border-ink-600 hover:bg-ink-700/60"
 						>
-							<ExternalLink className="size-3.5" />
+							<ExternalLink className="size-4" aria-hidden="true" />
 							{t("viewMap")}
 						</a>
-					) : null
+					) : undefined
 				}
 			/>
 
+			{tab === "settings" && updated ? (
+				<p
+					aria-live="polite"
+					className="mb-4 rounded-panel border border-clear-400/30 bg-clear-400/10 px-3 py-2 text-meta text-clear-300"
+				>
+					{t("maintenanceUpdated")}
+				</p>
+			) : null}
+			{tab === "settings" && error ? (
+				<p
+					role="alert"
+					className="mb-4 rounded-panel border border-alarm-400/30 bg-alarm-400/10 px-3 py-2 text-meta text-alarm-300"
+				>
+					{error === "forbidden" ? t("maintenanceAdminOnly") : t("maintenanceError")}
+				</p>
+			) : null}
+
 			<div className="mb-4 flex flex-wrap items-center gap-2">
 				<VehicleStatusBadge status={vehicle.status} />
-				{device ? <DeviceStatusBadge state={state} /> : null}
+				{device ? <DeviceStatusBadge state={deviceConnectionState(device.lastSeenAt)} /> : null}
 			</div>
 
-			<div className="grid gap-6 xl:grid-cols-[1fr_0.9fr]">
-				<Card>
-					<CardHeader>
-						<CardTitle>{t("location")}</CardTitle>
-					</CardHeader>
-					<CardContent>
-						{hasFix ? (
-							<div className="flex items-start gap-3">
-								<span className="mt-0.5 grid size-9 place-items-center rounded border border-rescue-500/30 bg-rescue-500/10 text-rescue-300">
-									<MapPin className="size-4" />
-								</span>
-								<div>
-									<p className="text-sm text-fog-100">
-										{formatCoord(device.lastLat)}, {formatCoord(device.lastLng)}
-									</p>
-									<p className="mt-1 text-[11px] text-fog-500">
-										GPS age {gpsAgeSeconds(device.lastFixAt) ?? "unknown"}s / {t("lastSeen")}{" "}
-										{formatRelative(device.lastSeenAt)}
-									</p>
-								</div>
-							</div>
-						) : (
-							<EmptyState
-								title="No GPS fix yet"
-								body="The tracker has not reported a valid position."
-							/>
-						)}
+			<VehicleTabs
+				vehicleId={vehicle.id}
+				active={tab}
+				labels={tabLabels}
+				ariaLabel={t("sections")}
+			/>
 
-						<div className="mt-5 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
-							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
-								<p className="text-[11px] font-medium text-fog-500">{t("speed")}</p>
-								<p className="mt-1 text-sm text-fog-100">
-									{device?.lastSpeedKph != null ? `${Math.round(device.lastSpeedKph)} kph` : "—"}
-								</p>
-							</div>
-							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
-								<p className="text-[11px] font-medium text-fog-500">{t("battery")}</p>
-								<p className="mt-1 text-sm text-fog-100">
-									{device?.batteryV != null ? `${device.batteryV.toFixed(1)} V` : "—"}
-								</p>
-							</div>
-							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
-								<p className="text-[11px] font-medium text-fog-500">Satellites</p>
-								<p className="mt-1 text-sm text-fog-100">{device?.satellites ?? "—"}</p>
-							</div>
-							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
-								<p className="text-[11px] font-medium text-fog-500">{t("ignition")}</p>
-								<p className="mt-1 text-sm text-fog-100">
-									{device?.ignition == null ? "—" : device.ignition ? "On" : "Off"}
-								</p>
-							</div>
-						</div>
-					</CardContent>
-				</Card>
+			{tab === "overview" ? (
+				<VehicleOverview
+					locale={locale}
+					driverName={vehicle.driverName}
+					driverPhone={vehicle.driverPhone}
+					device={device}
+					linkTracker={canAdminister(current.role)}
+				/>
+			) : null}
 
-				<Card>
-					<CardHeader>
-						<CardTitle>{t("device")}</CardTitle>
-					</CardHeader>
-					<CardContent>
-						{device ? (
-							<div className="flex flex-col gap-2 text-sm">
-								{canAdminister(current.role) ? (
-									<Link
-										href={`/devices/${device.id}`}
-										className="text-signal-400 hover:text-signal-300"
-									>
-										{device.label}
-									</Link>
-								) : (
-									<span className="text-fog-100">{device.label}</span>
-								)}
-								<p className="text-xs text-fog-500">MAC {device.mac}</p>
-								<p className="text-xs text-fog-500">
-									Firmware {device.firmwareVersion ?? "unknown"} / config rev{" "}
-									{device.configRev ?? "—"}
-								</p>
-								<p className="text-xs text-fog-500">
-									Last seen {formatDateTime(device.lastSeenAt, locale)}
-								</p>
-							</div>
-						) : (
-							<EmptyState title="No tracker assigned" />
-						)}
-					</CardContent>
-				</Card>
-			</div>
-
-			<div className="mt-6 grid gap-6 xl:grid-cols-2">
+			{tab === "trips" ? (
 				<Card>
 					<CardHeader>
 						<CardTitle>{t("trips")}</CardTitle>
+						<CardDescription>{t("tripsHint")}</CardDescription>
 					</CardHeader>
 					<CardContent>
-						{vehicle.trips.length === 0 ? (
-							<EmptyState title={t("noTrips")} />
+						{trips.length === 0 ? (
+							<EmptyState title={t("noTrips")} body={t("noTripsBody")} />
 						) : (
 							<Table>
 								<TableHeader>
 									<TableRow>
-										<TableHead>Started</TableHead>
-										<TableHead>Ended</TableHead>
-										<TableHead>Distance</TableHead>
-										<TableHead>Max speed</TableHead>
+										<TableHead>{t("tripStarted")}</TableHead>
+										<TableHead>{t("tripEnded")}</TableHead>
+										<TableHead>{t("tripDistance")}</TableHead>
+										<TableHead>{t("tripMaxSpeed")}</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
-									{vehicle.trips.map((trip) => (
+									{trips.map((trip) => (
 										<TableRow key={trip.id}>
-											<TableCell>{formatDateTime(trip.startedAt, locale)}</TableCell>
-											<TableCell>{formatDateTime(trip.endedAt, locale)}</TableCell>
+											<TableCell className="whitespace-nowrap">
+												{formatDateTime(trip.startedAt, locale)}
+											</TableCell>
+											<TableCell className="whitespace-nowrap">
+												{formatDateTime(trip.endedAt, locale)}
+											</TableCell>
 											<TableCell>
 												{trip.distanceM != null ? `${(trip.distanceM / 1000).toFixed(1)} km` : "—"}
 											</TableCell>
@@ -207,14 +192,17 @@ export default async function VehicleDetailPage({
 						)}
 					</CardContent>
 				</Card>
+			) : null}
 
+			{tab === "incidents" ? (
 				<Card>
 					<CardHeader>
 						<CardTitle>{t("recentIncidents")}</CardTitle>
+						<CardDescription>{t("incidentsHint")}</CardDescription>
 					</CardHeader>
 					<CardContent>
-						{vehicle.impacts.length === 0 ? (
-							<EmptyState title={inc("empty")} />
+						{incidents.length === 0 ? (
+							<EmptyState title={inc("empty")} body={t("incidentsEmptyBody")} />
 						) : (
 							<Table>
 								<TableHeader>
@@ -226,12 +214,12 @@ export default async function VehicleDetailPage({
 									</TableRow>
 								</TableHeader>
 								<TableBody>
-									{vehicle.impacts.map((incident) => (
+									{incidents.map((incident) => (
 										<TableRow key={incident.id}>
-											<TableCell>
+											<TableCell className="whitespace-nowrap">
 												<Link
 													href={`/incidents/${incident.id}`}
-													className="text-signal-400 hover:text-signal-300"
+													className="font-medium text-fog-100 hover:underline"
 												>
 													{formatDateTime(incident.detectedAt, locale)}
 												</Link>
@@ -245,9 +233,7 @@ export default async function VehicleDetailPage({
 											<TableCell>
 												<IncidentStatusBadge status={incident.status} />
 											</TableCell>
-											<TableCell className="text-xs text-fog-500">
-												{incident.alerts.length}
-											</TableCell>
+											<TableCell className="text-fog-500">{incident._count.alerts}</TableCell>
 										</TableRow>
 									))}
 								</TableBody>
@@ -255,7 +241,17 @@ export default async function VehicleDetailPage({
 						)}
 					</CardContent>
 				</Card>
-			</div>
+			) : null}
+
+			{tab === "settings" ? (
+				<MaintenanceControl
+					locale={locale}
+					vehicleId={vehicle.id}
+					plateNo={vehicle.plateNo}
+					status={vehicle.status}
+					editable={canAdminister(current.role)}
+				/>
+			) : null}
 		</>
 	);
 }

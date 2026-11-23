@@ -2,8 +2,11 @@ import { LogoMark } from "@/components/brand/logo";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { LogoutButton } from "@/components/layout/logout-button";
 import { MobileNav, Sidebar } from "@/components/layout/sidebar";
+import { CommandPalette } from "@/components/search/command-palette";
+import { IncidentBell } from "@/components/search/incident-bell";
 import { Badge } from "@/components/ui/badge";
 import type { MemberRoleName } from "@/lib/auth/roles";
+import { loadAwaitingIncidents } from "@/lib/search/notifications";
 
 function roleTone(role: MemberRoleName) {
 	switch (role) {
@@ -16,7 +19,7 @@ function roleTone(role: MemberRoleName) {
 	}
 }
 
-export function AppShell({
+export async function AppShell({
 	locale,
 	user,
 	org,
@@ -24,17 +27,33 @@ export function AppShell({
 	roleLabel,
 	navLabels,
 	signOutLabel,
+	skipLabel,
 	children,
 }: {
 	locale: string;
-	user: { name: string; email: string };
-	org: { name: string; slug: string };
+	user: { id: string; name: string; email: string };
+	org: { id: string; name: string; slug: string };
 	role: MemberRoleName;
 	roleLabel: string;
 	navLabels: Record<string, string>;
 	signOutLabel: string;
+	skipLabel: string;
 	children: React.ReactNode;
 }) {
+	const awaiting: Awaited<ReturnType<typeof loadAwaitingIncidents>> = { count: 0, items: [] };
+	try {
+		Object.assign(
+			awaiting,
+			await loadAwaitingIncidents({
+				role,
+				orgId: org.id,
+				userId: user.id,
+			}),
+		);
+	} catch {
+		// The bell is secondary: a failed count must not take down every page.
+	}
+
 	const initials = user.name
 		.split(/\s+/)
 		.filter((part) => /^[A-Za-z]/.test(part))
@@ -51,6 +70,12 @@ export function AppShell({
 
 	return (
 		<div className="min-h-screen">
+			<a
+				href="#main"
+				className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-panel focus:border focus:border-signal-500 focus:bg-ink-800 focus:px-3 focus:py-2 focus:text-body focus:text-fog-50"
+			>
+				{skipLabel}
+			</a>
 			<Sidebar labels={navLabels} role={role} />
 			<div className="lg:pl-[248px]">
 				<header className="sticky top-0 z-20 border-b border-ink-700 bg-ink-950 px-4 py-3 md:px-6">
@@ -63,6 +88,8 @@ export function AppShell({
 							</div>
 						</div>
 						<div className="flex shrink-0 items-center gap-2">
+							<CommandPalette role={role} />
+							<IncidentBell locale={locale} initial={awaiting} />
 							<span className="hidden sm:inline-flex">{roleBadge}</span>
 							<div className="hidden items-center gap-2 sm:flex">
 								<LocaleSwitcher />
@@ -79,7 +106,11 @@ export function AppShell({
 						</div>
 					</div>
 				</header>
-				<main className="mx-auto w-full max-w-7xl px-4 pb-24 pt-6 md:px-6 lg:pb-10">
+				<main
+					id="main"
+					tabIndex={-1}
+					className="mx-auto w-full max-w-7xl px-4 pb-24 pt-6 md:px-6 lg:pb-10"
+				>
 					{children}
 				</main>
 			</div>

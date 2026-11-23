@@ -1,3 +1,4 @@
+import { ConfirmSubmit } from "@/components/devices/confirm-submit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import {
@@ -8,8 +9,9 @@ import {
 } from "@/lib/actions/incidents";
 import { type MemberRoleName, canManageIncidents } from "@/lib/auth/roles";
 import { type ImpactStatusName, isTerminal } from "@/lib/incidents/state";
+import { getTranslations } from "next-intl/server";
 
-export function IncidentActions({
+export async function IncidentActions({
 	incidentId,
 	locale,
 	status,
@@ -23,6 +25,9 @@ export function IncidentActions({
 	if (!canManageIncidents(role)) return null;
 	if (isTerminal(status as ImpactStatusName)) return null;
 
+	const t = await getTranslations({ locale, namespace: "incidents" });
+	const common = await getTranslations({ locale, namespace: "common" });
+
 	return (
 		<div className="flex flex-col gap-3">
 			<div className="flex flex-wrap gap-2">
@@ -31,7 +36,7 @@ export function IncidentActions({
 						<input type="hidden" name="locale" value={locale} />
 						<input type="hidden" name="incidentId" value={incidentId} />
 						<Button type="submit" size="sm" variant="secondary">
-							Acknowledge
+							{t("acknowledge")}
 						</Button>
 					</form>
 				) : null}
@@ -39,18 +44,28 @@ export function IncidentActions({
 				<form action={falseAlarmAction}>
 					<input type="hidden" name="locale" value={locale} />
 					<input type="hidden" name="incidentId" value={incidentId} />
-					<Button type="submit" size="sm" variant="outline">
-						False alarm
-					</Button>
+					<ConfirmSubmit
+						message={t("confirmFalseAlarm")}
+						confirmLabel={t("falseAlarm")}
+						cancelLabel={common("cancel")}
+						variant="outline"
+					>
+						{t("falseAlarm")}
+					</ConfirmSubmit>
 				</form>
 
 				{status !== "CANCELLED" ? (
 					<form action={cancelIncidentAction}>
 						<input type="hidden" name="locale" value={locale} />
 						<input type="hidden" name="incidentId" value={incidentId} />
-						<Button type="submit" size="sm" variant="ghost">
-							Cancel
-						</Button>
+						<ConfirmSubmit
+							message={t("confirmCancel")}
+							confirmLabel={t("cancel")}
+							cancelLabel={common("cancel")}
+							variant="ghost"
+						>
+							{t("cancel")}
+						</ConfirmSubmit>
 					</form>
 				) : null}
 			</div>
@@ -64,7 +79,7 @@ export function IncidentActions({
 					className="h-9 max-w-xs"
 				/>
 				<Button type="submit" size="sm">
-					Resolve
+					{t("resolve")}
 				</Button>
 			</form>
 		</div>

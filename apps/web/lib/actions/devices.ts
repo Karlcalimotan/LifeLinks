@@ -2,6 +2,7 @@
 
 import { canAdminister, requireUser } from "@/lib/auth/session";
 import { generateDeviceToken, hashDeviceToken } from "@/lib/device/auth";
+import { parseBulkDeviceIds } from "@/lib/device/bulk";
 import {
 	commandSchema,
 	createDeviceSchema,
@@ -37,6 +38,16 @@ export interface DeviceTokenState {
 export interface DeviceEditState {
 	ok: boolean;
 	error?: string;
+}
+
+export type BulkApproveError = "forbidden" | "invalid" | "too_many" | "none" | "failed";
+
+export interface BulkApproveState {
+	ok: boolean;
+	approved?: number;
+	skipped?: number;
+	failed?: number;
+	error?: BulkApproveError;
 }
 
 const DEVICE_FIELDS = new Set(["mac", "label", "vehicleId"]);
@@ -243,6 +254,88 @@ export async function approveDeviceAction(formData: FormData) {
 	revalidatePath(`/${locale}/devices/${device.id}`);
 	revalidatePath(`/${locale}/devices`);
 	redirect(`/${locale}/devices/${device.id}?approved=1`);
+}
+
+export async function bulkApproveDevicesAction(
+	_previous: BulkApproveState,
+	formData: FormData,
+): Promise<BulkApproveState> {
+	const current = await requireUser();
+	if (!canAdminister(current.role)) {
+		return { ok: false, error: "forbidden" };
+	}
+
+	const selection = parseBulkDeviceIds(formData.getAll("deviceIds").map(String));
+	if (selection.overflow) return { ok: false, error: "too_many" };
+	if (selection.ids.length === 0) return { ok: false, error: "invalid" };
+
+	const pending = await prisma.trackerDevice.findMany({
+		where: {
+			id: { in: selection.ids },
+			orgId: current.org.id,
+			approvalStatus: "PENDING",
+		},
+		select: { id: true, mac: true },
+	});
+
+	if (pending.length === 0) {
+		return {
+			ok: false,
+			approved: 0,
+			skipped: selection.ids.length,
+			failed: 0,
+			error: "none",
+		};
+	}
+
+	let approved = 0;
+	let skipped = selection.ids.length - pending.length;
+	let failed = 0;
+	for (const device of pending) {
+		try {
+			const updated = await prisma.$transaction(async (tx) => {
+				const result = await tx.trackerDevice.updateMany({
+					where: {
+						id: device.id,
+						orgId: current.org.id,
+						approvalStatus: "PENDING",
+					},
+					data: { approvalStatus: "APPROVED" },
+				});
+				if (result.count !== 1) return 0;
+
+				await tx.auditLog.create({
+					data: {
+						orgId: current.org.id,
+						actorId: current.user.id,
+						action: "device.approved",
+						target: device.id,
+						metadata: { mac: device.mac, previousStatus: "PENDING", bulk: true },
+					},
+				});
+				return 1;
+			});
+			if (updated === 1) approved += 1;
+			else skipped += 1;
+		} catch {
+			// A database failure is reported separately from an id that the
+			// candidate query filtered out. Other devices still proceed.
+			failed += 1;
+		}
+	}
+
+	revalidatePath(`/${localeFrom(formData)}/devices`);
+
+	if (approved === 0) {
+		return {
+			ok: false,
+			approved,
+			skipped,
+			failed,
+			error: failed > 0 ? "failed" : "none",
+		};
+	}
+	return { ok: true, approved, skipped, failed };
 }
 
 export async function rejectDeviceAction(formData: FormData) {

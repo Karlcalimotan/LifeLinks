@@ -6,6 +6,111 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-23
+
+### Added
+
+- Trackers page redesign: a registration drawer, fleet summary, pending-approval
+  callout, combined status column with exact-time hover, battery threshold bar,
+  neutral labels and monospaced MAC addresses.
+- Tracker search, filters, sortable columns and server-side pagination (20 per
+  page), including empty and clear-filter states.
+- Design-system contract and tokens: JetBrains Mono for machine data, a six-step
+  type scale, radius and shadow tokens, measured contrast, component states and
+  `scripts/design-lint.sh`.
+- Dashboard loading, error and type-scale states.
+- WiFi provisioning portal and runtime provisioning on the tracker firmware.
+- Firmware: queue configuration changes until idle and expose serial
+  configuration controls (#66).
+- Dashboard command center: six scoped KPIs, a needs-attention queue with
+  inline acknowledge, an offline schematic fleet map, a recent-activity feed
+  and a 14-day incident trend.
+- Incidents workspace: search across plate, driver, incident id and
+  coordinates; status chips with counts; severity and date-range filters;
+  sortable detected column; server-side pagination; alert-delivery ratio and
+  time to acknowledge per row.
+- Analytics page: incidents, real crashes, false-alarm rate, acknowledgement
+  and resolve time, daily trend, severity distribution, top vehicles,
+  hour-of-day and slowest acknowledgements.
+- Settings workspace: organization, crash thresholds, retention, members and
+  role matrix, paginated audit log and read-only health counts.
+- Live map page: vehicle list, search and status filters, schematic positions,
+  selected-vehicle panel, legend and stale-fix handling.
+- Command palette (Ctrl/Cmd+K and `/`) with authenticated, scoped search, and a
+  header bell for incidents awaiting acknowledgement.
+- Tracker table polish: copyable MAC addresses, signal bands, firmware update
+  marker, combined connection detail and bulk approve with separate
+  approved/skipped/failed reporting.
+- Vehicle detail tabs (overview, trips, incidents, settings) and an audited
+  maintenance-mode action.
+- Notifications page: alert targets, emergency contacts, paginated delivery log
+  and a policy summary that matches the implemented intake behaviour.
+- Realistic demo seed: 11 vehicles, 13 trackers, 26 trips, telemetry, device
+  events and 13 incidents across every workflow status.
+- Route-level loading skeletons and error boundaries for vehicles, incidents,
+  trackers and settings.
+- Mobile card lists for incidents and trackers, so Acknowledge and Approve stay
+  visible at 390 px without a horizontal table swipe.
+
+### Changed
+
+- Tracker registration moved from a full-width page panel to a right-side drawer
+  on desktop and a full-width sheet on mobile.
+- Dashboard and analytics now share the Manila day bucketing, acknowledgement
+  sampling and duration formatting in `lib/analytics`.
+- Incident transitions accept an optional `returnTo` so acknowledging from the
+  dashboard or the filtered incident list returns the operator to that view.
+- The tracker signal bands are named Strong, Good, Fair and Poor, so they no
+  longer collide with the heartbeat connection state "Weak signal".
+- The header search trigger shows the word Search; the Ctrl/Cmd+K hint moves to
+  the palette and the button's `aria-keyshortcuts`.
+- Incident detail now shows the driver call link, a map link and the
+  acknowledgement/resolution audit events in the timeline.
+- Disarm, Rotate token, Mark false alarm and Cancel incident ask for
+  confirmation. The console has a skip link, `aria-current` navigation and
+  per-route page titles.
+- Notifications leads with a "Sender not connected" banner; the dashboard hint
+  says alert rows are queued, not delivered.
+
+### Fixed
+
+- Low-battery detection now uses the 12 V tracker threshold (11.5 V) instead of
+  the single-cell voltage value.
+- The Trackers table preserves the current filters when sorting or paging.
+- Dashboard acknowledgement KPI is scoped before the audit query and uses the
+  same earliest-acknowledgement semantics as analytics.
+- Bulk tracker approval reports database failures separately from trackers that
+  were no longer pending, instead of counting both as skipped.
+- Copy MAC controls and route error copy are translated and distinguish each
+  row.
+- Primary buttons keep the dark ink text colour at the design-system contrast
+  ratio. Custom type-scale utilities are now classified as font sizes by
+  `tailwind-merge`, so a colour such as `text-ink-950` is no longer dropped when
+  combined with `text-body` or `text-meta`.
+- Destructive buttons use dark ink text on the lighter alarm fill, raising the
+  contrast from 4.12:1 to 6.89:1.
+- The command-palette trigger's accessible name matches its visible label.
+- The one-time tracker token, rejection and incident banners use defined
+  palette tokens; the design linter rejects the old non-existent classes.
+- Inputs keep the global 2 px focus ring, and KPI hints wrap instead of
+  truncating.
+
+### Security
+
+- The device cancel endpoint enforces the server-side countdown and audits late
+  attempts; command, acknowledgement, cancel and search have rate limits and
+  the in-process bucket map is pruned and capped.
+- Demo account credentials are no longer in the message bundle or the client
+  payload. The login hint is server-gated to development/test, and a non-local
+  seed requires both `SEED_DEMO=yes` and `SEED_ALLOW_REMOTE=yes`.
+- Production sessions fail closed without a 32-byte `AUTH_SECRET`; HTTPS
+  deployments set the Secure cookie. `/api/health` no longer discloses
+  configuration presence, and device evidence/meta JSON is capped at 32 keys
+  and 8 KiB.
+- The privacy notice now states that retention is configurable but automatic
+  deletion is not yet enabled, instead of promising a job that does not exist.
+
+
 ## [0.2.0] - 2026-11-22
 
 ### Added

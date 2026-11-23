@@ -7,6 +7,7 @@ import { getLocale } from "next-intl/server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { type MemberRoleName, isMemberRole } from "./roles";
+import { resolveAuthSecret, shouldUseSecureSessionCookie } from "./secret";
 
 export type { MemberRoleName };
 export {
@@ -30,16 +31,7 @@ export interface SessionPayload {
 }
 
 function secretKey(): Uint8Array {
-	const secret = process.env.AUTH_SECRET?.trim();
-	if (!secret) {
-		// A dev fallback keeps `next dev` usable without a full env setup, but a
-		// deployment without AUTH_SECRET is a configuration error we surface loudly.
-		if (process.env.NODE_ENV === "production") {
-			throw new Error("AUTH_SECRET is required in production.");
-		}
-		return new TextEncoder().encode("lifelink-dev-only-secret-change-me");
-	}
-	return new TextEncoder().encode(secret);
+	return resolveAuthSecret();
 }
 
 export async function createSession(payload: SessionPayload): Promise<void> {
@@ -54,7 +46,7 @@ export async function createSession(payload: SessionPayload): Promise<void> {
 	store.set(SESSION_COOKIE, token, {
 		httpOnly: true,
 		sameSite: "lax",
-		secure: process.env.NODE_ENV === "production",
+		secure: shouldUseSecureSessionCookie(),
 		path: "/",
 		maxAge: SESSION_MAX_AGE_SECONDS,
 	});
@@ -65,8 +57,12 @@ export async function getSession(): Promise<SessionPayload | null> {
 	const token = store.get(SESSION_COOKIE)?.value;
 	if (!token) return null;
 
+	// Resolve the key before the try block: a production configuration error
+	// must surface as an error, not as a silent "signed out" response.
+	const key = secretKey();
+
 	try {
-		const { payload } = await jwtVerify(token, secretKey(), { algorithms: ["HS256"] });
+		const { payload } = await jwtVerify(token, key, { algorithms: ["HS256"] });
 		if (
 			typeof payload.sub !== "string" ||
 			typeof payload.orgId !== "string" ||

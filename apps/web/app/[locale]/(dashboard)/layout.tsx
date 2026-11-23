@@ -14,11 +14,15 @@ export default async function DashboardLayout({
 	const current = await requireUser();
 	const t = await getTranslations({ locale, namespace: "nav" });
 	const roles = await getTranslations({ locale, namespace: "roles" });
+	const common = await getTranslations({ locale, namespace: "common" });
 
 	const labels = {
 		dashboard: t("dashboard"),
+		map: t("map"),
 		vehicles: t("vehicles"),
 		incidents: t("incidents"),
+		analytics: t("analytics"),
+		notifications: t("notifications"),
 		devices: t("devices"),
 		settings: t("settings"),
 	};
@@ -32,6 +36,7 @@ export default async function DashboardLayout({
 			roleLabel={roles(roleLabelKey(current.role))}
 			navLabels={labels}
 			signOutLabel={t("signOut")}
+			skipLabel={common("skipToContent")}
 		>
 			{children}
 		</AppShell>

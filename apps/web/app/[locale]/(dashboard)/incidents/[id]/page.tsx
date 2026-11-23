@@ -14,13 +14,27 @@ import {
 import { Link } from "@/i18n/routing";
 import { requireUser } from "@/lib/auth/session";
 import { mapLink } from "@/lib/geo";
+import {
+	incidentAuditLabelKey,
+	mergeIncidentTimeline,
+	timelineHasCancellation,
+} from "@/lib/incidents/timeline";
 import prisma from "@/lib/prisma";
-import { formatDateTime } from "@/lib/utils";
-import { ExternalLink, MapPin } from "lucide-react";
+import { formatDateTime, telHref } from "@/lib/utils";
+import { ExternalLink, MapPin, Phone, UserRound } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
+
+const STATUS_LABEL_KEYS: Record<string, string> = {
+	SUSPECTED: "statusSuspected",
+	CONFIRMED: "statusConfirmed",
+	ACKNOWLEDGED: "statusAcknowledged",
+	RESOLVED: "statusResolved",
+	CANCELLED: "statusCancelled",
+	FALSE_ALARM: "statusFalseAlarm",
+};
 
 interface EvidenceShape {
 	samples?: Array<{ t?: number; accel_g?: number; tilt_deg?: number }>;
@@ -74,14 +88,41 @@ export default async function IncidentDetailPage({
 		orderBy: { createdAt: "asc" },
 	});
 
+	const auditRows = await prisma.auditLog.findMany({
+		where: {
+			orgId: current.org.id,
+			target: incident.id,
+			action: { startsWith: "incident." },
+		},
+		orderBy: { createdAt: "asc" },
+		select: {
+			id: true,
+			action: true,
+			createdAt: true,
+			actor: { select: { name: true } },
+		},
+	});
+
+	const timeline = mergeIncidentTimeline(
+		auditRows.map((row) => ({
+			id: row.id,
+			action: row.action,
+			createdAt: row.createdAt,
+			actorName: row.actor?.name ?? null,
+		})),
+		events.map((event) => ({ id: event.id, type: event.type, createdAt: event.createdAt })),
+	);
+	const cancellationInTimeline = timelineHasCancellation(timeline);
+	const driverPhone = telHref(incident.vehicle.driverPhone);
+	const statusLabel = t(STATUS_LABEL_KEYS[incident.status] ?? "statusSuspected");
 	const points = readEvidence(incident.evidence);
 	const hasFix = incident.lat != null && incident.lng != null;
 
 	return (
 		<>
 			<PageHeader
-				title={`${t("detailTitle")} ${incident.vehicle.plateNo}`}
-				subtitle={formatDateTime(incident.detectedAt, locale)}
+				title={`${incident.vehicle.plateNo} · ${statusLabel}`}
+				subtitle={`${t("detailTitle")} · ${formatDateTime(incident.detectedAt, locale)}`}
 				actions={
 					hasFix ? (
 						<a
@@ -90,15 +131,31 @@ export default async function IncidentDetailPage({
 							rel="noreferrer"
 							className="inline-flex h-8 items-center gap-1.5 rounded border border-ink-600 px-3 text-xs text-fog-300 hover:border-ink-600 hover:text-fog-50"
 						>
-							<ExternalLink className="size-3.5" />
-							Open map
+							<ExternalLink className="size-3.5" aria-hidden="true" />
+							{t("openInMaps")}
 						</a>
 					) : null
 				}
 			/>
 
+			<div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-body">
+				<span className="inline-flex items-center gap-1.5 text-fog-300">
+					<UserRound className="size-4 text-fog-500" aria-hidden="true" />
+					{incident.vehicle.driverName ?? t("driverNotRecorded")}
+				</span>
+				{driverPhone ? (
+					<a
+						href={driverPhone}
+						className="inline-flex items-center gap-1.5 text-signal-400 underline-offset-2 hover:text-signal-300 hover:underline"
+					>
+						<Phone className="size-3.5" aria-hidden="true" />
+						{t("callDriver")}
+					</a>
+				) : null}
+			</div>
+
 			{updated ? (
-				<p className="mb-4 rounded border border-clear-500/30 bg-clear-500/10 px-3 py-2 text-xs text-clear-300">
+				<p className="mb-4 rounded border border-clear-400/30 bg-clear-400/10 px-3 py-2 text-xs text-clear-300">
 					{t("statusUpdated")}
 				</p>
 			) : null}
@@ -136,19 +193,19 @@ export default async function IncidentDetailPage({
 						<EvidenceChart points={points} />
 						<div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
 							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
-								<p className="text-[11px] font-medium text-fog-500">{t("peakAccel")}</p>
+								<p className="text-meta font-medium text-fog-500">{t("peakAccel")}</p>
 								<p className="mt-1 text-sm text-fog-100">{incident.peakAccelG.toFixed(2)} g</p>
 							</div>
 							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
-								<p className="text-[11px] font-medium text-fog-500">{t("tilt")}</p>
+								<p className="text-meta font-medium text-fog-500">{t("tilt")}</p>
 								<p className="mt-1 text-sm text-fog-100">{Math.round(incident.tiltDeg)}°</p>
 							</div>
 							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
-								<p className="text-[11px] font-medium text-fog-500">{t("vibration")}</p>
+								<p className="text-meta font-medium text-fog-500">{t("vibration")}</p>
 								<p className="mt-1 text-sm text-fog-100">{incident.vibrationCount}</p>
 							</div>
 							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
-								<p className="text-[11px] font-medium text-fog-500">{t("speed")}</p>
+								<p className="text-meta font-medium text-fog-500">{t("speed")}</p>
 								<p className="mt-1 text-sm text-fog-100">
 									{incident.speedKph != null ? `${Math.round(incident.speedKph)} kph` : "—"}
 								</p>
@@ -181,40 +238,53 @@ export default async function IncidentDetailPage({
 						<ol className="relative flex flex-col gap-4 border-l border-ink-700 pl-4">
 							<li className="relative">
 								<span className="absolute -left-[21px] top-1 size-2 rounded-full bg-alarm-400" />
-								<p className="text-xs font-medium text-fog-100">Incident detected</p>
-								<p className="text-[11px] text-fog-500">
+								<p className="text-xs font-medium text-fog-100">{t("timelineDetected")}</p>
+								<p className="text-meta text-fog-500">
 									{formatDateTime(incident.detectedAt, locale)}
 								</p>
 							</li>
 							{incident.cancelDeadline ? (
 								<li className="relative">
 									<span className="absolute -left-[21px] top-1 size-2 rounded-full bg-caution-400" />
-									<p className="text-xs font-medium text-fog-100">Driver cancel window closes</p>
-									<p className="text-[11px] text-fog-500">
+									<p className="text-xs font-medium text-fog-100">{t("timelineCancelWindow")}</p>
+									<p className="text-meta text-fog-500">
 										{formatDateTime(incident.cancelDeadline, locale)}
 									</p>
 								</li>
 							) : null}
-							{incident.cancelledAt ? (
+							{incident.cancelledAt && !cancellationInTimeline ? (
 								<li className="relative">
 									<span className="absolute -left-[21px] top-1 size-2 rounded-full bg-fog-500" />
-									<p className="text-xs font-medium text-fog-100">Cancelled by driver</p>
-									<p className="text-[11px] text-fog-500">
+									<p className="text-xs font-medium text-fog-100">{t("timelineCancelled")}</p>
+									<p className="text-meta text-fog-500">
 										{formatDateTime(incident.cancelledAt, locale)}
 									</p>
 								</li>
 							) : null}
-							{events.map((event) => (
-								<li key={event.id} className="relative">
-									<span className="absolute -left-[21px] top-1 size-2 rounded-full bg-rescue-400" />
-									<p className="text-xs font-medium text-fog-100">
-										{event.type.replaceAll("_", " ").toLowerCase()}
-									</p>
-									<p className="text-[11px] text-fog-500">
-										{formatDateTime(event.createdAt, locale)}
-									</p>
-								</li>
-							))}
+							{timeline.map((entry) => {
+								const label =
+									entry.kind === "audit"
+										? t(incidentAuditLabelKey(entry.action))
+										: entry.type.replaceAll("_", " ").toLowerCase();
+								const actor =
+									entry.kind === "audit" && entry.actorName
+										? t("timelineActor", { name: entry.actorName })
+										: null;
+								return (
+									<li key={entry.key} className="relative">
+										<span
+											className={`absolute -left-[21px] top-1 size-2 rounded-full ${
+												entry.kind === "audit" ? "bg-rescue-400" : "bg-fog-500"
+											}`}
+										/>
+										<p className="text-xs font-medium text-fog-100">{label}</p>
+										<p className="text-meta text-fog-500">
+											{formatDateTime(entry.at, locale)}
+											{actor ? <span className="text-fog-400"> · {actor}</span> : null}
+										</p>
+									</li>
+								);
+							})}
 						</ol>
 					</CardContent>
 				</Card>
@@ -262,7 +332,7 @@ export default async function IncidentDetailPage({
 					<CardContent className="flex flex-col gap-4">
 						{incident.resolution ? (
 							<div className="rounded border border-ink-700 bg-ink-950/40 p-3">
-								<p className="text-[11px] font-medium text-fog-500">{t("resolution")}</p>
+								<p className="text-meta font-medium text-fog-500">{t("resolution")}</p>
 								<p className="mt-1 text-xs text-fog-300">{incident.resolution}</p>
 							</div>
 						) : null}

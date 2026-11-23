@@ -35,6 +35,7 @@
 #include <math.h>
 
 #include "config.h"
+#include "config_apply.h"
 #include "filters.h"
 #include "gps.h"
 #include "hardware.h"
@@ -74,6 +75,9 @@ fw::MinInterval g_commandTimer(5 * 1000);
 String g_deviceId;
 String g_deviceToken;
 uint32_t g_configRev = 0;
+String g_pendingConfig;
+uint32_t g_pendingRev = 0;
+bool g_configPending = false;
 bool g_armed = true;
 bool g_mpuOk = false;
 
@@ -338,7 +342,7 @@ bool sendSms(const String& number, const String& body) {
 // Config persistence
 // ---------------------------------------------------------------------------
 
-bool applyConfigObject(JsonObject config, bool persist) {
+bool parseConfigObject(JsonObject config, fw::DeviceConfig& out, uint32_t& rev) {
 	if (config.isNull()) return false;
 	if (!config["version"].is<int>() || config["version"].as<int>() != fw::kConfigContractVersion) {
 		return false;
@@ -350,38 +354,87 @@ bool applyConfigObject(JsonObject config, bool persist) {
 	FW_CONFIG_FIELDS(FW_APPLY)
 #undef FW_APPLY
 
-	if (!fw::validateConfig(next)) {
-		Serial.println("[CFG] rejected: out of envelope");
-		return false;
-	}
+	if (!fw::validateConfig(next)) return false;
+	out = next;
+	rev = config["rev"] | 0;
+	return true;
+}
 
+void applyDeviceConfig(const fw::DeviceConfig& next, uint32_t rev, bool persist,
+					   const String& raw) {
 	g_config = next;
 	g_filter.setConfig(next);
 	g_heartbeatTimer =
 		fw::MinInterval(static_cast<uint32_t>(g_config.heartbeatIntervalS * 1000.0f));
 	g_heartbeatTimer.mark(millis());
-
+	g_configRev = rev;
 	if (persist) {
-		String raw;
-		serializeJson(config, raw);
 		prefs.putString("cfg_json", raw);
-		prefs.putUInt("cfg_rev", config["rev"] | 0);
-		g_configRev = config["rev"] | 0;
+		prefs.putUInt("cfg_rev", rev);
 	}
+}
+
+bool applyConfigObject(JsonObject config, bool persist) {
+	fw::DeviceConfig next;
+	uint32_t rev = 0;
+	if (!parseConfigObject(config, next, rev)) {
+		Serial.println("[CFG] rejected: version or envelope");
+		return false;
+	}
+	String raw;
+	serializeJson(config, raw);
+	applyDeviceConfig(next, rev, persist, raw);
 	return true;
+}
+
+/**
+ * Queue a config for the next Idle tick. The object is validated now, so an
+ * out-of-envelope payload is rejected immediately and the last-good config
+ * stays active. It is not applied until the alert state is Idle.
+ */
+bool queueConfigObject(JsonObject config) {
+	fw::DeviceConfig next;
+	uint32_t rev = 0;
+	if (!parseConfigObject(config, next, rev)) {
+		Serial.println("[CFG] rejected: version or envelope");
+		return false;
+	}
+	serializeJson(config, g_pendingConfig);
+	g_pendingRev = rev;
+	g_configPending = true;
+	return true;
+}
+
+void applyPendingConfig() {
+	if (!g_configPending) return;
+	if (!fw::canApplyConfig(g_safety.state())) return;
+
+	JsonDocument doc;
+	if (deserializeJson(doc, g_pendingConfig) != DeserializationError::Ok) {
+		g_configPending = false;
+		return;
+	}
+	if (!applyConfigObject(doc.as<JsonObject>(), true)) {
+		g_configPending = false;
+		return;
+	}
+	g_configPending = false;
+	Serial.printf("[CFG] applied queued rev=%lu\n", static_cast<unsigned long>(g_configRev));
 }
 
 void loadConfig() {
 	g_config = fw::defaultConfig();
+	g_configRev = 0;
 	const String raw = prefs.getString("cfg_json", "");
-	g_configRev = prefs.getUInt("cfg_rev", 0);
 	if (raw.isEmpty()) return;
 	JsonDocument doc;
 	if (deserializeJson(doc, raw) != DeserializationError::Ok) return;
 	JsonObject object = doc.as<JsonObject>();
-	// applyConfigObject persists; a boot load should not rewrite NVS.
+	// A boot load applies without rewriting NVS. Invalid stored data falls back
+	// to the factory defaults rather than pinning a broken object.
 	if (!applyConfigObject(object, false)) {
 		g_config = fw::defaultConfig();
+		g_configRev = 0;
 	}
 	g_filter.setConfig(g_config);
 }
@@ -1679,13 +1732,9 @@ void pollCommands() {
 
 	if (!data["config"].isNull()) {
 		JsonObject config = data["config"].as<JsonObject>();
-		String raw;
-		serializeJson(config, raw);
-		if (applyConfigObject(config, false)) {
-			prefs.putString("cfg_json", raw);
-			prefs.putUInt("cfg_rev", config["rev"] | 0);
-			g_configRev = config["rev"] | 0;
-			Serial.println("[CFG] applied from server");
+		if (queueConfigObject(config)) {
+			Serial.printf("[CFG] queued from server rev=%lu\n",
+						  static_cast<unsigned long>(g_pendingRev));
 		}
 	}
 
@@ -1749,6 +1798,35 @@ void handleSerialProvisioning() {
 							  g_deviceToken.isEmpty() ? "missing" : "set",
 							  static_cast<unsigned long>(g_configRev),
 							  static_cast<int>(g_safety.state()));
+			} else if (line == "CONFIG") {
+				JsonDocument doc;
+				JsonObject object = doc.to<JsonObject>();
+				object["version"] = fw::kConfigContractVersion;
+				object["rev"] = g_configRev;
+#define FW_DUMP(name, key, min, max, integer, def) object[key] = g_config.name;
+				FW_CONFIG_FIELDS(FW_DUMP)
+#undef FW_DUMP
+				String raw;
+				serializeJson(object, raw);
+				Serial.printf("[CFG] %s pending=%s\n", raw.c_str(), g_configPending ? "yes" : "no");
+			} else if (line.startsWith("SET_CONFIG ")) {
+				JsonDocument doc;
+				if (deserializeJson(doc, line.substring(11)) != DeserializationError::Ok) {
+					Serial.println("[CFG] invalid json");
+				} else if (queueConfigObject(doc.as<JsonObject>())) {
+					Serial.println("[CFG] queued; applies when idle");
+				}
+			} else if (line == "RESET_CONFIG") {
+				prefs.remove("cfg_json");
+				prefs.remove("cfg_rev");
+				g_configPending = false;
+				g_config = fw::defaultConfig();
+				g_configRev = 0;
+				g_filter.setConfig(g_config);
+				g_heartbeatTimer =
+					fw::MinInterval(static_cast<uint32_t>(g_config.heartbeatIntervalS * 1000.0f));
+				g_heartbeatTimer.mark(millis());
+				Serial.println("[CFG] reset to factory defaults");
 			} else if (line == "REBOOT") {
 				ESP.restart();
 			}
@@ -1818,6 +1896,7 @@ void setup() {
 void loop() {
 	handleSerialProvisioning();
 	readGps();
+	applyPendingConfig();
 
 	const uint32_t now = millis();
 	if (g_sampleCount == 0 || (now - g_lastImuMs) >= 20) {

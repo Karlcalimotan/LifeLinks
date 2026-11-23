@@ -12,6 +12,8 @@ export function ConfirmSubmit({
 	message,
 	confirmLabel,
 	confirmText,
+	cancelLabel,
+	disabled = false,
 	children,
 	variant = "primary",
 	size = "sm",
@@ -19,6 +21,8 @@ export function ConfirmSubmit({
 	message: string;
 	confirmLabel?: string;
 	confirmText?: string;
+	cancelLabel?: string;
+	disabled?: boolean;
 	children: ReactNode;
 	variant?: ButtonProps["variant"];
 	size?: ButtonProps["size"];
@@ -36,6 +40,7 @@ export function ConfirmSubmit({
 				type="button"
 				variant={variant}
 				size={size}
+				disabled={disabled}
 				onClick={() => dialogRef.current?.showModal()}
 			>
 				{children}
@@ -57,7 +62,7 @@ export function ConfirmSubmit({
 								Type <span className="font-mono text-fog-100">{confirmText}</span> to confirm.
 							</span>
 							<input
-								className="h-9 rounded-[3px] border border-ink-600 bg-ink-950/70 px-3 font-mono text-sm text-fog-100 focus:border-alarm-500 focus:outline-none"
+								className="h-9 rounded-[3px] border border-ink-600 bg-ink-950/70 px-3 font-mono text-sm text-fog-100 focus:border-alarm-500"
 								value={value}
 								onChange={(event) => setValue(event.target.value)}
 								onKeyDown={(event) => {
@@ -75,13 +80,18 @@ export function ConfirmSubmit({
 							size="sm"
 							onClick={() => dialogRef.current?.close()}
 						>
-							Cancel
+							{cancelLabel ?? "Cancel"}
 						</Button>
 						<Button
 							type="submit"
 							variant={variant === "danger" ? "danger" : "primary"}
 							size="sm"
 							disabled={!matches}
+							onClick={() => {
+								// Actions that return state instead of navigating must not leave
+								// the dialog covering the result.
+								if (confirmText == null) dialogRef.current?.close();
+							}}
 						>
 							{label}
 						</Button>
