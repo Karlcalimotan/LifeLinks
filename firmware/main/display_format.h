@@ -1,10 +1,10 @@
 /*
-  Pure text layout for the optional SSD1306 status display.
+  Pure display policy and text layout for the optional SSD1306 status display.
 
   Arduino-free, so the host-native Unity tests compile this header directly.
   It owns everything that is easy to get wrong on a 128x64 panel: the 21-column
-  grid, ASCII sanitising, the setup AP name, the IPv4 text and the state labels.
-  The driver (display.h) only moves these lines to the panel.
+  grid, ASCII sanitising, the setup AP name, the IPv4 text, the state labels and
+  the refresh gate. The driver (display.h) only moves these lines to the panel.
 
   Security rule encoded here: the device token is deliberately absent from this
   API. No screen builder accepts or formats a token, so a screen can never
@@ -30,16 +30,42 @@ static const size_t kIpv4TextMax = 16;	// "255.255.255.255" plus the NUL
 static const uint32_t kDisplayWifiOkHoldMs = 3000;
 static const uint32_t kDisplayProgressStepMs = 500;
 static const size_t kDisplayProgressDots = 4;
+static const uint32_t kDisplayMinDrawGapMs = 250;
 
 enum class DisplayWifiState : uint8_t {
 	Setup = 0,
 	Joining,
-	Connected,
+	Joined,
 };
 
 struct DisplayScreen {
 	char lines[kDisplayRows][kDisplayColumns + 1];
 	uint8_t lineCount;
+};
+
+/**
+ * The refresh rule: a changed screen is drawn immediately the first time, then
+ * no more often than kDisplayMinDrawGapMs. Unchanged content is never redrawn.
+ * Pure, so the rule is testable without a panel or an Arduino clock.
+ */
+class DrawGate {
+  public:
+	bool shouldDraw(uint32_t nowMs, bool changed) const {
+		if (!changed) return false;
+		if (!hasDrawn_) return true;
+		return (nowMs - lastDrawMs_) >= kDisplayMinDrawGapMs;
+	}
+
+	void markDrawn(uint32_t nowMs) {
+		lastDrawMs_ = nowMs;
+		hasDrawn_ = true;
+	}
+
+	bool hasDrawn() const { return hasDrawn_; }
+
+  private:
+	uint32_t lastDrawMs_ = 0;
+	bool hasDrawn_ = false;
 };
 
 /**
@@ -70,16 +96,16 @@ inline void setScreenLine(DisplayScreen& screen, const char* text) {
 }
 
 /**
- * "WiFi: connected" means joined to a WiFi network, never "online": the
- * tracker's telemetry, commands and SOS stay on the A7670E modem. The labels
- * deliberately avoid an online/offline claim.
+ * "WiFi: joined" means joined to a WiFi network, never "online": the tracker's
+ * telemetry, commands and SOS stay on the A7670E modem. The labels deliberately
+ * avoid an online/offline claim.
  */
 inline const char* wifiStateLabel(DisplayWifiState state) {
 	switch (state) {
 		case DisplayWifiState::Joining:
 			return "WiFi: joining";
-		case DisplayWifiState::Connected:
-			return "WiFi: connected";
+		case DisplayWifiState::Joined:
+			return "WiFi: joined";
 		default:
 			return "WiFi: setup";
 	}

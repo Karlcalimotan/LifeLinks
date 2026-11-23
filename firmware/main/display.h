@@ -27,8 +27,8 @@ namespace fw {
 static const uint8_t kDisplayAddress = 0x3C;
 static const int kDisplayWidth = 128;
 static const int kDisplayHeight = 64;
-static const uint32_t kDisplayMinDrawGapMs = 250;
 static const uint32_t kDisplayI2cClockHz = 400000;
+static const uint32_t kDisplayIdleClockHz = 100000;
 
 class StatusDisplay {
   public:
@@ -42,9 +42,9 @@ class StatusDisplay {
 		Wire.beginTransmission(kDisplayAddress);
 		if (Wire.endTransmission() != 0) return false;
 
-		// The SSD1306 and the MPU-6050 both support 400 kHz. This is what
-		// bounds a full 1024-byte flush to roughly 25 ms instead of 100 ms.
-		Wire.setClock(kDisplayI2cClockHz);
+		// The library sets the bus to kDisplayI2cClockHz for its own transfers
+		// and restores kDisplayIdleClockHz afterwards, so the MPU-6050 stays at
+		// 100 kHz. Both values come from the constructor below.
 		// reset=false: the modules have no ESP32 reset line wired.
 		// periphBegin=false: Wire is already running with the project pins;
 		// passing true would re-init the bus and reset the clock.
@@ -55,7 +55,6 @@ class StatusDisplay {
 		oled_.setTextColor(SSD1306_WHITE);
 		oled_.clearDisplay();
 		oled_.display();
-		hasContent_ = false;
 		return true;
 	}
 
@@ -68,8 +67,8 @@ class StatusDisplay {
 	 */
 	bool show(const DisplayScreen& screen, uint32_t nowMs) {
 		if (!present_) return false;
-		if (matches(screen)) return false;
-		if (hasContent_ && (nowMs - lastDrawMs_) < kDisplayMinDrawGapMs) return false;
+		const bool changed = !matches(screen);
+		if (!drawGate_.shouldDraw(nowMs, changed)) return false;
 
 		oled_.clearDisplay();
 		const uint8_t rows = screen.lineCount < kDisplayRows ? screen.lineCount : kDisplayRows;
@@ -83,14 +82,13 @@ class StatusDisplay {
 			const char* source = row < screen.lineCount ? screen.lines[row] : "";
 			copyDisplayText(source, drawn_[row], sizeof(drawn_[row]));
 		}
-		hasContent_ = true;
-		lastDrawMs_ = nowMs;
+		drawGate_.markDrawn(nowMs);
 		return true;
 	}
 
   private:
 	bool matches(const DisplayScreen& screen) const {
-		if (!hasContent_) return false;
+		if (!drawGate_.hasDrawn()) return false;
 		for (uint8_t row = 0; row < kDisplayRows; row += 1) {
 			const char* expected = row < screen.lineCount ? screen.lines[row] : "";
 			if (strcmp(drawn_[row], expected) != 0) return false;
@@ -99,10 +97,13 @@ class StatusDisplay {
 	}
 
 	Adafruit_SSD1306 oled_{static_cast<uint8_t>(kDisplayWidth),
-						   static_cast<uint8_t>(kDisplayHeight), &Wire, -1};
+						   static_cast<uint8_t>(kDisplayHeight),
+						   &Wire,
+						   -1,
+						   kDisplayI2cClockHz,
+						   kDisplayIdleClockHz};
 	bool present_ = false;
-	bool hasContent_ = false;
-	uint32_t lastDrawMs_ = 0;
+	DrawGate drawGate_;
 	char drawn_[kDisplayRows][kDisplayColumns + 1] = {};
 };
 

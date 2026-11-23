@@ -73,10 +73,46 @@ void test_progress_dots_cycle(void) {
 	TEST_ASSERT_EQUAL_UINT32(2, static_cast<uint32_t>(progressDots(1000002)));
 }
 
+void test_draw_gate_ignores_unchanged_content(void) {
+	DrawGate gate;
+	TEST_ASSERT_FALSE(gate.shouldDraw(0, false));
+	TEST_ASSERT_FALSE(gate.shouldDraw(1000, false));
+	gate.markDrawn(1000);
+	TEST_ASSERT_FALSE(gate.shouldDraw(2000, false));
+}
+
+void test_draw_gate_draws_the_first_change_immediately(void) {
+	DrawGate gate;
+	TEST_ASSERT_FALSE(gate.hasDrawn());
+	TEST_ASSERT_TRUE(gate.shouldDraw(0, true));
+	gate.markDrawn(0);
+	TEST_ASSERT_TRUE(gate.hasDrawn());
+	TEST_ASSERT_FALSE(gate.shouldDraw(0, true));
+	TEST_ASSERT_FALSE(gate.shouldDraw(kDisplayMinDrawGapMs - 1, true));
+	TEST_ASSERT_TRUE(gate.shouldDraw(kDisplayMinDrawGapMs, true));
+}
+
+void test_draw_gate_waits_for_the_gap_after_a_draw(void) {
+	DrawGate gate;
+	gate.markDrawn(1000);
+	TEST_ASSERT_FALSE(gate.shouldDraw(1200, true));
+	TEST_ASSERT_TRUE(gate.shouldDraw(1250, true));
+	gate.markDrawn(1250);
+	TEST_ASSERT_FALSE(gate.shouldDraw(1300, true));
+	TEST_ASSERT_TRUE(gate.shouldDraw(1500, true));
+}
+
+void test_draw_gate_handles_the_millis_wrap(void) {
+	DrawGate gate;
+	gate.markDrawn(0xFFFFFFF0u);
+	TEST_ASSERT_FALSE(gate.shouldDraw(0x00000010u, true));	// 32 ms elapsed
+	TEST_ASSERT_TRUE(gate.shouldDraw(0x000000F0u, true));  // 256 ms elapsed
+}
+
 void test_wifi_state_labels_are_not_online(void) {
 	const DisplayWifiState states[] = {DisplayWifiState::Setup, DisplayWifiState::Joining,
-									   DisplayWifiState::Connected};
-	const char* expected[] = {"WiFi: setup", "WiFi: joining", "WiFi: connected"};
+									   DisplayWifiState::Joined};
+	const char* expected[] = {"WiFi: setup", "WiFi: joining", "WiFi: joined"};
 	for (size_t index = 0; index < 3; index += 1) {
 		const char* label = wifiStateLabel(states[index]);
 		TEST_ASSERT_EQUAL_STRING(expected[index], label);
@@ -150,10 +186,10 @@ void test_wifi_ok_screen_shows_ssid_and_ip(void) {
 }
 
 void test_home_screen_shows_state_and_device_id(void) {
-	const DisplayScreen screen = homeScreen(DisplayWifiState::Connected, "AA:BB:CC:DD:EE:01", "");
+	const DisplayScreen screen = homeScreen(DisplayWifiState::Joined, "AA:BB:CC:DD:EE:01", "");
 	TEST_ASSERT_EQUAL_UINT8(5, screen.lineCount);
 	TEST_ASSERT_EQUAL_STRING("LifeLink tracker", screen.lines[0]);
-	TEST_ASSERT_EQUAL_STRING("WiFi: connected", screen.lines[1]);
+	TEST_ASSERT_EQUAL_STRING("WiFi: joined", screen.lines[1]);
 	TEST_ASSERT_EQUAL_STRING("Uplink: 4G modem", screen.lines[2]);
 	TEST_ASSERT_EQUAL_STRING("Device ID", screen.lines[3]);
 	TEST_ASSERT_EQUAL_STRING("AA:BB:CC:DD:EE:01", screen.lines[4]);
@@ -169,7 +205,7 @@ void test_home_screen_shows_state_and_device_id(void) {
 }
 
 void test_home_screen_adds_uuid_only_when_present(void) {
-	const DisplayScreen withUuid = homeScreen(DisplayWifiState::Connected, "AA:BB:CC:DD:EE:01",
+	const DisplayScreen withUuid = homeScreen(DisplayWifiState::Joined, "AA:BB:CC:DD:EE:01",
 											  "123e4567-e89b-12d3-a456-426614174000");
 	TEST_ASSERT_EQUAL_UINT8(7, withUuid.lineCount);
 	TEST_ASSERT_EQUAL_STRING("UUID", withUuid.lines[5]);
@@ -179,10 +215,9 @@ void test_home_screen_adds_uuid_only_when_present(void) {
 	assertScreenFits(withUuid);
 
 	const DisplayScreen withoutUuid =
-		homeScreen(DisplayWifiState::Connected, "AA:BB:CC:DD:EE:01", nullptr);
+		homeScreen(DisplayWifiState::Joined, "AA:BB:CC:DD:EE:01", nullptr);
 	TEST_ASSERT_EQUAL_UINT8(5, withoutUuid.lineCount);
-	const DisplayScreen emptyUuid =
-		homeScreen(DisplayWifiState::Connected, "AA:BB:CC:DD:EE:01", "");
+	const DisplayScreen emptyUuid = homeScreen(DisplayWifiState::Joined, "AA:BB:CC:DD:EE:01", "");
 	TEST_ASSERT_EQUAL_UINT8(5, emptyUuid.lineCount);
 }
 
@@ -200,7 +235,7 @@ void test_every_screen_fits_the_panel(void) {
 		provisioningScreenForMac("AA:BB:CC:DD:EE:FF"),
 		joiningScreen(longText, 1, 2, 3),
 		wifiOkScreen(longText, "255.255.255.255"),
-		homeScreen(DisplayWifiState::Connected, longText, longText),
+		homeScreen(DisplayWifiState::Joined, longText, longText),
 	};
 	for (const DisplayScreen& screen : screens) assertScreenFits(screen);
 }
@@ -211,6 +246,10 @@ int main(int, char**) {
 	RUN_TEST(test_ipv4_rejects_a_short_buffer);
 	RUN_TEST(test_copy_display_text_sanitises_and_truncates);
 	RUN_TEST(test_progress_dots_cycle);
+	RUN_TEST(test_draw_gate_ignores_unchanged_content);
+	RUN_TEST(test_draw_gate_draws_the_first_change_immediately);
+	RUN_TEST(test_draw_gate_waits_for_the_gap_after_a_draw);
+	RUN_TEST(test_draw_gate_handles_the_millis_wrap);
 	RUN_TEST(test_wifi_state_labels_are_not_online);
 	RUN_TEST(test_provisioning_screen_uses_the_mac_derived_ap_name);
 	RUN_TEST(test_joining_screen_shows_ssid_and_progress);

@@ -87,10 +87,10 @@ back.
 - **Reset:** no RES line is wired. The driver initialises with `reset=false`.
   If a particular module needs a reset pulse, wire RES to a spare GPIO and
   change `display.h`.
-- **Clock:** the driver raises the bus to 400 kHz when the panel answers; the
-  MPU-6050 supports the same rate. If a long bus or a slow module is unreliable,
-  lower `kDisplayI2cClockHz` and accept a slower frame (about 100 ms at
-  100 kHz).
+- **Clock:** the driver uses 400 kHz only for the SSD1306 library's own
+  transfers and restores 100 kHz afterwards, so the MPU-6050 stays at 100 kHz.
+  Lower `kDisplayI2cClockHz` if a long bus or a slow module is unreliable, and
+  accept a slower frame (about 100 ms at 100 kHz).
 - **Mounting:** put the panel where it can be seen during installation and
   bench work. It is not a driver-facing gauge and must not be mounted where it
   distracts the driver.
@@ -100,12 +100,12 @@ back.
 | `PROVISIONING` | The setup AP is open. Join `LifeLink-XXXX` and open `192.168.4.1`. |
 | `JOINING` | A stored-network check or a portal join is in progress; the SSID, progress dots and `Try n of 3` are shown. |
 | `WIFI OK` | A portal join was verified and saved; the SSID and IP stay for about 3 s. |
-| Home | `WiFi: setup`, `WiFi: joining` or `WiFi: connected`, the device ID, an optional UUID, and `Uplink: 4G modem`. |
+| Home | `WiFi: setup`, `WiFi: joining` or `WiFi: joined`, the device ID, an optional UUID, and `Uplink: 4G modem`. |
 
-`WiFi: connected` means the unit joined a WiFi network. It does **not** mean the
+`WiFi: joined` means the unit joined a WiFi network. It does **not** mean the
 tracker is online: telemetry, commands and SOS stay on the A7670E. The home
 screen keeps the last proven result; the radio is switched off after
-commissioning, so `WiFi: connected` is a commissioning result, not a live
+commissioning, so `WiFi: joined` is a commissioning result, not a live
 association. The display never shows the device token, and the UUID line appears
 only when a UUID already exists (the optional NVS key `device_uuid`; nothing
 writes it today). A UUID longer than 21 characters is truncated on the panel.
@@ -168,7 +168,7 @@ the result.
     operation without a reboot.
 18. **Display present**: boot a provisioned unit with the panel connected.
     Confirm the home screen shows the device ID that matches the boot log and
-    `STATUS`, `WiFi: connected` after a successful stored join, and
+    `STATUS`, `WiFi: joined` after a successful stored join, and
     `Uplink: 4G modem`.
 19. **Display absent**: unplug the panel and boot. Confirm the serial log says
     `[OLED] no SSD1306 at 0x3C - continuing without a display`, the unit still
@@ -179,7 +179,7 @@ the result.
     last four MAC hex digits, and `Open 192.168.4.1`.
 21. **Join screens**: join a network from the portal. Confirm `JOINING` shows
     the SSID and progress, `WIFI OK` shows the SSID and IP for about 3 s, then
-    the home screen shows `WiFi: connected`.
+    the home screen shows `WiFi: joined`.
 22. **Wrong password**: submit a deliberately wrong password. Confirm the
     display returns to `PROVISIONING` (no `WIFI OK`) and the stored credentials
     are unchanged.

@@ -23,7 +23,7 @@ main/
   hardware.h          hw:: aliases over pins.h
 test/
   test_config/        envelope and defaults
-  test_display/       screen text, IPv4, state labels, panel width
+  test_display/       screen text, IPv4, state labels, refresh gate, panel width
   test_filters/       pothole, crash, rollover, door slam, debounce
   test_provisioning/  AP name, form/NVS limits, boot reset gesture
   test_safety/        countdown, cancel, retry, latch/ack, faults, power, GPS, SMS
@@ -179,13 +179,13 @@ in `main/display.h` changed and a rebuild. Do not power the panel from 5 V.
 | `PROVISIONING` | the setup AP is open | `WiFi setup`, `Join network:`, the `LifeLink-XXXX` AP name, `Open 192.168.4.1` |
 | `JOINING` | a stored-network check or a portal join is in progress | the SSID, `Working` with progress dots, and `Try n of 3` for the stored check |
 | `WIFI OK` | about 3 s after a verified portal save | `WiFi OK - saved`, the SSID, the IP, `Uplink: 4G modem` |
-| Home | every other time | `WiFi: setup` / `WiFi: joining` / `WiFi: connected`, the device ID (`g_deviceId`), an optional UUID, `Uplink: 4G modem` |
+| Home | every other time | `WiFi: setup` / `WiFi: joining` / `WiFi: joined`, the device ID (`g_deviceId`), an optional UUID, `Uplink: 4G modem` |
 
-**"Connected" means joined to WiFi, not online.** The WiFi radio is
+**"Joined" means joined to WiFi, not online.** The WiFi radio is
 commissioning-only: telemetry, commands and SOS stay on the A7670E. The home and
 success screens say `Uplink: 4G modem` so the display cannot be read as a
 network-status indicator. The home screen keeps the last proven result; the
-radio is switched off after commissioning, so `WiFi: connected` is a
+radio is switched off after commissioning, so `WiFi: joined` is a
 commissioning result, not a live association.
 
 The device token is never displayed. `display_format.h` has no token input at
@@ -215,14 +215,16 @@ The build pins Adafruit SSD1306 2.5.17, Adafruit GFX 1.13.0 and Adafruit BusIO
   no I2C traffic can sit inside a countdown, an alert or an acknowledgement.
 - The display is serviced after the buzzer is written and before the blocking
   modem block. There are no `delay()` calls in the display path.
-- The I2C clock is raised to 400 kHz only when the panel answers. If a long bus
-  or a slow module proves unreliable, lower `kDisplayI2cClockHz` and expect a
-  longer flush (about 100 ms at 100 kHz).
+- The library switches the bus to 400 kHz for its own transfers and restores
+  100 kHz afterwards, so the MPU-6050 stays at 100 kHz. Both rates come from the
+  driver's constructor (`kDisplayI2cClockHz`, `kDisplayIdleClockHz`). If a long
+  bus or a slow module proves unreliable, lower `kDisplayI2cClockHz` and expect
+  a longer flush (about 100 ms at 100 kHz).
 
-The pure layout lives in `main/display_format.h` and is covered by
-`test/test_display`, so the screen text, IPv4 formatting, AP name and state
-labels are testable without a panel. Hardware checks are in
-[`../docs/hardware.md`](../docs/hardware.md); they are not a bench claim.
+The pure layout and refresh gate live in `main/display_format.h` and are
+covered by `test/test_display`, so the screen text, IPv4 formatting, AP name,
+state labels and redraw rule are testable without a panel. Hardware checks are
+in [`../docs/hardware.md`](../docs/hardware.md); they are not a bench claim.
 
 ### Bench checks (human)
 

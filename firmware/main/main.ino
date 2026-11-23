@@ -1093,13 +1093,13 @@ void succeedPortalJoin() {
 
 	// The success screen outlives the portal's 2 s close delay by a second, so
 	// the operator sees the SSID and IP for about 3 s even after the radio is
-	// switched off. The home screen then reports "WiFi: connected", which
-	// means joined to the network, not online.
+	// switched off. The home screen then reports "WiFi: joined", which means
+	// joined to the network, not online.
 	const IPAddress ip = WiFi.localIP();
 	fw::formatIpv4(ip[0], ip[1], ip[2], ip[3], g_wifiOkIp, sizeof(g_wifiOkIp));
 	g_wifiOkSsid = g_portalPendingSsid;
 	g_wifiOkUntilMs = millis() + fw::kDisplayWifiOkHoldMs;
-	g_homeWifiState = fw::DisplayWifiState::Connected;
+	g_homeWifiState = fw::DisplayWifiState::Joined;
 
 	Serial.printf("[WIFI] joined \"%s\" at %s - provisioning saved; closing portal\n",
 				  g_portalPendingSsid.c_str(), ip.toString().c_str());
@@ -1409,7 +1409,7 @@ void serviceStoredWifiCheck(uint32_t now) {
 		if (WiFi.status() == WL_CONNECTED && hasIp) {
 			Serial.printf("[WIFI] stored network reachable at %s; radio off\n",
 						  ip.toString().c_str());
-			g_homeWifiState = fw::DisplayWifiState::Connected;
+			g_homeWifiState = fw::DisplayWifiState::Joined;
 			WiFi.disconnect(false, false);
 			WiFi.setAutoReconnect(false);
 			WiFi.mode(WIFI_OFF);
@@ -1523,7 +1523,7 @@ void serviceDisplay(uint32_t now) {
 											 now / fw::kDisplayProgressStepMs, 0, 0),
 						   now);
 		} else {
-			g_display.show(fw::provisioningScreen(portalApName().c_str()), now);
+			g_display.show(fw::provisioningScreen(g_portalApName.c_str()), now);
 		}
 		return;
 	}
@@ -1976,7 +1976,7 @@ void setup() {
 	Serial.println();
 	Serial.println("[FIRMWARE] LifeLink " FW_VERSION);
 	Serial.println(
-		"[WIRING] MPU+OLED 21/22, SW-420 32, cancel 33, GPS 26/27, modem 16/17, buzzer 25");
+		"[WIRING] MPU+OLED 21/22, SW-420 27, cancel 33, GPS 16/17, modem 18/19, buzzer 25");
 
 	prefs.begin("lifelink", false);
 	g_deviceId = prefs.getString("device_id", chipMac());
