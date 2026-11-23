@@ -54,7 +54,7 @@
 #endif
 
 #ifndef FW_VERSION
-#define FW_VERSION "0.2.0"
+#define FW_VERSION "0.3.0"
 #endif
 
 #ifndef LIFELINK_API_BASE
