@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-23T13:13:54.152Z",
+  "generatedAt": "2026-11-23T13:19:31.744Z",
   "baseURL": "http://localhost:3000",
   "locale": "en",
   "axeVersion": "4.14.1",
@@ -174,7 +174,7 @@
       "measured": true,
       "counts": {
         "critical": 0,
-        "serious": 1,
+        "serious": 0,
         "moderate": 1,
         "minor": 0,
         "unknown": 0
@@ -192,21 +192,6 @@
               ],
               "html": "<span class=\"sr-only\">Crash detection and emergency response for every vehicle.</span>",
               "failureSummary": "Fix any of the following:\n  Some page content is not contained by landmarks"
-            }
-          ]
-        },
-        {
-          "id": "scrollable-region-focusable",
-          "impact": "serious",
-          "help": "Scrollable region must have keyboard access",
-          "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/scrollable-region-focusable?application=axeAPI",
-          "nodes": [
-            {
-              "target": [
-                "figure > .overflow-x-auto"
-              ],
-              "html": "<div class=\"overflow-x-auto\">",
-              "failureSummary": "Fix any of the following:\n  Element should have focusable content\n  Element should be focusable"
             }
           ]
         }
@@ -432,11 +417,11 @@
   ],
   "errors": [],
   "summary": {
-    "status": "fail",
+    "status": "pass",
     "measured": 9,
     "expected": 9,
     "critical": 0,
-    "serious": 1,
+    "serious": 0,
     "moderate": 10,
     "minor": 0
   }

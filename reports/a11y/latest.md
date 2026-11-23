@@ -1,20 +1,20 @@
 # Accessibility check (axe)
 
-Generated: 2026-11-23T13:13:54.152Z
+Generated: 2026-11-23T13:19:31.744Z
 Base URL: http://localhost:3000
 Locale: en
 axe: 4.14.1
 Viewports: desktop 1440x900
 Gate: serious and critical violations
 
-**Result: FAIL — serious or critical violations found**
+**Result: PASS — no serious or critical violations**
 
 Measured routes: 9 of 9.
 
 | Viewport | Route | Critical | Serious | Moderate | Minor | Result |
 | --- | --- | --- | --- | --- | --- | --- |
 | desktop | login | 0 | 0 | 2 | 0 | clean |
-| desktop | dashboard | 0 | 1 | 1 | 0 | FAIL |
+| desktop | dashboard | 0 | 0 | 1 | 0 | clean |
 | desktop | incidents | 0 | 0 | 1 | 0 | clean |
 | desktop | map | 0 | 0 | 1 | 0 | clean |
 | desktop | analytics | 0 | 0 | 1 | 0 | clean |
@@ -22,15 +22,6 @@ Measured routes: 9 of 9.
 | desktop | trackers | 0 | 0 | 1 | 0 | clean |
 | desktop | vehicles | 0 | 0 | 1 | 0 | clean |
 | desktop | notifications | 0 | 0 | 1 | 0 | clean |
-
-## Serious and critical violations
-
-### dashboard (desktop) — scrollable-region-focusable (serious) — 1 node(s)
-
-Scrollable region must have keyboard access
-
-https://dequeuniversity.com/rules/axe/4.14/scrollable-region-focusable?application=axeAPI
-- `figure > .overflow-x-auto` — Fix any of the following: Element should have focusable content Element should be focusable
 
 ## Moderate and minor findings
 
