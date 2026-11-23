@@ -1,7 +1,10 @@
+import { ConfigPushStatus } from "@/components/devices/config-push-status";
 import { ConfirmSubmit } from "@/components/devices/confirm-submit";
+import { DeviceConfigForm } from "@/components/devices/device-config-form";
 import { EditDeviceForm } from "@/components/devices/edit-device-form";
 import { ProvisioningPanel } from "@/components/devices/provisioning-panel";
 import { ApprovalBadge, DeviceStatusBadge } from "@/components/domain/badges";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState, PageHeader } from "@/components/ui/page-header";
@@ -22,9 +25,10 @@ import {
 } from "@/lib/actions/devices";
 import { canAdminister, requireRole } from "@/lib/auth/session";
 import { deviceConnectionState, gpsAgeSeconds } from "@/lib/device/status";
-import { buildFirmwareConfig } from "@/lib/firmware/config";
+import { CONFIG_FIELDS } from "@/lib/firmware/config";
+import { configPushState, configRevFromPayload } from "@/lib/firmware/device-config";
 import prisma from "@/lib/prisma";
-import { getOrgSettings, settingsToFirmwareValues } from "@/lib/settings/org";
+import { getDeviceConfig } from "@/lib/settings/device-config";
 import { formatDateTime, formatRelative } from "@/lib/utils";
 import { Radio, Satellite, Terminal } from "lucide-react";
 import { getTranslations } from "next-intl/server";
@@ -57,7 +61,7 @@ export default async function DeviceDetailPage({
 	const t = await getTranslations({ locale, namespace: "devices" });
 	const common = await getTranslations({ locale, namespace: "common" });
 
-	const [device, vehicles] = await Promise.all([
+	const [device, vehicles, lastConfigPush] = await Promise.all([
 		prisma.trackerDevice.findFirst({
 			where: { id, orgId: current.org.id },
 			include: {
@@ -71,11 +75,18 @@ export default async function DeviceDetailPage({
 			orderBy: { plateNo: "asc" },
 			select: { id: true, plateNo: true, make: true, model: true },
 		}),
+		prisma.deviceCommand.findFirst({
+			where: { deviceId: id, kind: "SET_CONFIG", device: { orgId: current.org.id } },
+			orderBy: { createdAt: "desc" },
+			select: { payload: true },
+		}),
 	]);
 	if (!device) notFound();
 
-	const settings = await getOrgSettings(current.org.id);
-	const config = buildFirmwareConfig(settingsToFirmwareValues(settings));
+	const deviceConfig = await getDeviceConfig(current.org.id, device.id);
+	const overrides = deviceConfig.overrides;
+	const pushedRev = configRevFromPayload(lastConfigPush?.payload);
+	const pushState = configPushState(device.configRev, deviceConfig.config.rev, pushedRev);
 	const state = deviceConnectionState(device.lastSeenAt);
 
 	return (
@@ -316,28 +327,56 @@ export default async function DeviceDetailPage({
 
 				<Card>
 					<CardHeader>
-						<CardTitle>Device configuration</CardTitle>
+						<CardTitle>{t("configTitle")}</CardTitle>
 					</CardHeader>
-					<CardContent>
-						<div className="grid grid-cols-2 gap-2 text-xs">
-							{Object.entries(config)
-								.filter(([key]) => key !== "version" && key !== "rev")
-								.map(([key, value]) => (
+					<CardContent className="flex flex-col gap-3">
+						<ConfigPushStatus
+							locale={locale}
+							state={pushState}
+							deviceRev={device.configRev}
+							configRev={deviceConfig.config.rev}
+						/>
+						<div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+							{CONFIG_FIELDS.map((field) => {
+								const overridden = overrides[field.key] != null;
+								return (
 									<div
-										key={key}
-										className="flex items-center justify-between rounded border border-ink-700 bg-ink-950/40 px-3 py-2"
+										key={field.key}
+										className="rounded border border-ink-700 bg-ink-950/40 px-3 py-2"
 									>
-										<span className="text-fog-500">{key}</span>
-										<span className="font-mono text-fog-100">{String(value)}</span>
+										<div className="flex items-center justify-between gap-2">
+											<span className="font-mono text-fog-500">{field.firmwareKey}</span>
+											<Badge tone={overridden ? "warning" : "muted"}>
+												{overridden ? t("configOverride") : t("configInherited")}
+											</Badge>
+										</div>
+										<p className="mt-1 font-mono text-fog-100">
+											{String(deviceConfig.values[field.key])}
+										</p>
 									</div>
-								))}
+								);
+							})}
 						</div>
-						<p className="mt-3 text-meta text-fog-500">
-							Config rev {config.rev} / version {config.version}
+						<p className="text-meta text-fog-500">
+							Config rev {deviceConfig.config.rev} / version {deviceConfig.config.version}
 						</p>
 					</CardContent>
 				</Card>
 			</div>
+
+			<Card className="mt-6">
+				<CardHeader>
+					<CardTitle>{t("configFormTitle")}</CardTitle>
+				</CardHeader>
+				<CardContent>
+					<DeviceConfigForm
+						deviceId={device.id}
+						locale={locale}
+						orgValues={deviceConfig.orgValues}
+						overrides={overrides}
+					/>
+				</CardContent>
+			</Card>
 
 			<Card className="mt-6">
 				<CardHeader>
