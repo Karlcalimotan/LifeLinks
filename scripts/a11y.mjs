@@ -370,7 +370,7 @@ function renderMarkdown(summary) {
 async function writeReports(summary) {
 	await mkdir(reportDir, { recursive: true });
 	report.summary = summary;
-	await writeFile(path.join(reportDir, "latest.json"), `${JSON.stringify(report, null, 2)}\n`);
+	await writeFile(path.join(reportDir, "latest.json"), `${JSON.stringify(report, null, "\t")}\n`);
 	await writeFile(path.join(reportDir, "latest.md"), renderMarkdown(summary));
 	return reportDir;
 }

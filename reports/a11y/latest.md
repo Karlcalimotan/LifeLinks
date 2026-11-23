@@ -1,6 +1,6 @@
 # Accessibility check (axe)
 
-Generated: 2026-11-23T13:19:31.744Z
+Generated: 2026-11-23T13:33:15.115Z
 Base URL: http://localhost:3000
 Locale: en
 axe: 4.14.1

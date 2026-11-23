@@ -38,19 +38,19 @@ desktop 1440x900.
 | --- | --- |
 | Routes measured | 9 of 9 |
 | Critical violations | 0 |
-| Serious violations | 1 |
+| Serious violations | 0 |
 | Moderate violations | 10 |
 | Minor violations | 0 |
 
-The result is **not a pass**. The dashboard incident-trend chart's horizontal
-scroller (`apps/web/components/analytics/bar-chart.tsx:29`) fails
-`scrollable-region-focusable` because it has no keyboard access. The other
-eight routes have no serious or critical violations. The ten moderate
-violations are missing landmarks (`region`, `landmark-one-main`); the login page
-accounts for most of the affected nodes. The gate exits `1` on a serious or
-critical violation, `2` when the app is unreachable or a route cannot be
-measured, and `0` only when every selected route is clean. An unreachable run is
-recorded as **NOT RUN**, never as a pass.
+The result is a **pass for serious and critical violations**: 9/9 routes were
+measured, with zero serious or critical findings. The ten moderate violations
+are missing landmarks (`region`, `landmark-one-main`); the login page accounts
+for most of the affected nodes. The dashboard incident-trend chart's horizontal
+scroller now has keyboard access (`bar-chart.tsx` uses a focusable `<section>`),
+so the previous `scrollable-region-focusable` finding is closed. The gate exits
+`1` on a serious or critical violation, `2` when the app is unreachable or a
+route cannot be measured, and `0` when no serious or critical violation is
+found. An unreachable run is recorded as **NOT RUN**, never as a pass.
 
 The check is not part of CI; wiring it in is a separate policy decision
 (`.github/` is out of scope for this change).
