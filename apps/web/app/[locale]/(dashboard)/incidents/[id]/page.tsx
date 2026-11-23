@@ -106,19 +106,28 @@ export default async function IncidentDetailPage({
 
 	const cancelCommands = await prisma.deviceCommand.findMany({
 		where: {
-			deviceId: incident.deviceId,
+			impactEventId: incident.id,
 			kind: "CANCEL_ALERT",
-			payload: { path: ["incident_id"], equals: incident.id },
 		},
 		orderBy: { createdAt: "desc" },
 		take: 20,
-		select: { id: true, kind: true, status: true, payload: true, createdAt: true },
+		select: {
+			id: true,
+			kind: true,
+			status: true,
+			payload: true,
+			impactEventId: true,
+			createdAt: true,
+			expiresAt: true,
+		},
 	});
+	const now = new Date();
 	const cancelAlert = readCancelAlertState({
 		incidentId: incident.id,
 		status: incident.status,
 		cancelRequestedAt: incident.cancelRequestedAt,
 		commands: cancelCommands,
+		now,
 	});
 
 	const timeline = mergeIncidentTimeline(
@@ -186,7 +195,9 @@ export default async function IncidentDetailPage({
 				<p className="mb-4 rounded border border-alarm-500/30 bg-alarm-500/10 px-3 py-2 text-xs text-alarm-300">
 					{error === "forbidden"
 						? "Your role cannot change incidents."
-						: "That status transition is not allowed."}
+						: error === "tracker_required"
+							? t("errorTrackerRequired")
+							: "That status transition is not allowed."}
 				</p>
 			) : null}
 

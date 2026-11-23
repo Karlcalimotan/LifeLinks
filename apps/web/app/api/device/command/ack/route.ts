@@ -9,7 +9,6 @@ import {
 	type CancelAckOutcome,
 	canCloseCancelAlert,
 	classifyCancelAck,
-	readCancelAlertIncidentId,
 } from "@/lib/incidents/cancel-alert";
 import type { ImpactStatusName } from "@/lib/incidents/state";
 import prisma from "@/lib/prisma";
@@ -31,10 +30,13 @@ type CancelAlertAckResult = CancelAckOutcome | "already_closed";
 /**
  * A device confirms a command it actually executed (or reports a failure).
  *
- * CANCEL_ALERT is the one command that changes an incident: only an explicit
+ * CANCEL_ALERT is the one command that changes an incident, and only an explicit
  * `cancelled` detail closes it as FALSE_ALARM. `too_late`, `unknown_incident`,
  * a missing detail or a failed command keep the status and leave a durable
  * reason, so the dashboard never implies the tracker stopped when it did not.
+ *
+ * The incident comes from `command.impactEventId`, not from the device payload:
+ * the payload carries the tracker's own client incident id (`llk-...`).
  */
 export const POST = withApi(
 	async (request) => {
@@ -62,7 +64,9 @@ export const POST = withApi(
 		});
 		if (!command) throw notFound("Command not found for this device.");
 
-		const detail = input.detail ?? null;
+		// The firmware sends the ACK state in `detail`; `result` is accepted for
+		// the contract wording and for any device that names the field that way.
+		const detail = input.detail ?? input.result ?? null;
 		const now = new Date();
 
 		if (command.kind === "CANCEL_ALERT") {
@@ -96,8 +100,10 @@ export const POST = withApi(
 					};
 				}
 
-				const incidentId = readCancelAlertIncidentId(command.payload);
+				const incidentId = command.impactEventId;
 				if (!incidentId) {
+					// Every CANCEL_ALERT this build creates carries the server incident.
+					// A command without it cannot be matched safely to an incident.
 					await tx.auditLog.create({
 						data: {
 							orgId: device.orgId,
@@ -107,7 +113,7 @@ export const POST = withApi(
 								commandId: command.id,
 								deviceId: device.id,
 								result: "unconfirmed",
-								reason: "missing_incident_id",
+								reason: "missing_impact_link",
 							},
 						},
 					});
@@ -120,10 +126,9 @@ export const POST = withApi(
 				}
 
 				// The incident must belong to the authenticated device and its org.
-				// A forged or misrouted payload cannot close another tenant's incident.
 				const incident = await tx.impactEvent.findFirst({
 					where: { id: incidentId, orgId: device.orgId, deviceId: device.id },
-					select: { id: true, status: true },
+					select: { id: true, status: true, resolution: true },
 				});
 				const outcome = classifyCancelAck({ status: input.status, detail });
 
@@ -150,6 +155,12 @@ export const POST = withApi(
 				}
 
 				if (outcome !== "cancelled") {
+					// The tracker answered; there is no longer a live request. Keep the
+					// status and the resolution exactly as they were.
+					await tx.impactEvent.updateMany({
+						where: { id: incident.id, orgId: device.orgId, deviceId: device.id },
+						data: { cancelRequestedAt: null },
+					});
 					await tx.auditLog.create({
 						data: {
 							orgId: device.orgId,
@@ -171,7 +182,15 @@ export const POST = withApi(
 					};
 				}
 
-				if (!canCloseCancelAlert(incident.status as ImpactStatusName)) {
+				// A driver-cancelled incident or one that already has a resolution is
+				// not rewritten by a late tracker confirmation.
+				const notClosable =
+					!canCloseCancelAlert(incident.status as ImpactStatusName) || incident.resolution !== null;
+				if (notClosable) {
+					await tx.impactEvent.updateMany({
+						where: { id: incident.id, orgId: device.orgId, deviceId: device.id },
+						data: { cancelRequestedAt: null },
+					});
 					await tx.auditLog.create({
 						data: {
 							orgId: device.orgId,
@@ -181,6 +200,7 @@ export const POST = withApi(
 								commandId: command.id,
 								deviceId: device.id,
 								result: "already_closed",
+								reason: incident.resolution !== null ? "resolution_recorded" : "status",
 								from: incident.status,
 							},
 						},
@@ -198,18 +218,24 @@ export const POST = withApi(
 						id: incident.id,
 						orgId: device.orgId,
 						deviceId: device.id,
+						resolution: null,
 						status: { in: [...CANCEL_ALERT_CLOSABLE_STATUSES] },
 					},
 					data: {
 						status: "FALSE_ALARM",
 						resolvedAt: now,
 						resolution: CANCEL_ALERT_RESOLUTION,
+						cancelRequestedAt: null,
 					},
 				});
 				if (closed.count === 0) {
 					const current = await tx.impactEvent.findFirst({
 						where: { id: incident.id, orgId: device.orgId, deviceId: device.id },
 						select: { status: true },
+					});
+					await tx.impactEvent.updateMany({
+						where: { id: incident.id, orgId: device.orgId, deviceId: device.id },
+						data: { cancelRequestedAt: null },
 					});
 					await tx.auditLog.create({
 						data: {

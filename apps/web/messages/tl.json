@@ -356,6 +356,7 @@
 		"cancelUnknownIncidentBody": "Hindi kilala ng tracker ang insidenteng ito, kaya hindi tumigil ang alerto.",
 		"cancelExpiredBody": "Hindi nakuha ng tracker ang kahilingang kanselahin. Maaaring tumatakbo pa ang alerto.",
 		"cancelFailedBody": "Iniulat ng tracker na nabigo ang pagkansela. Tingnan ang tracker.",
+		"errorTrackerRequired": "Kailangan ng kumpirmasyon ng tracker ang insidenteng ito. Gamitin ang Mark false alarm o Cancel incident para matigil ng tracker ang alerto.",
 		"peakAccel": "Peak acceleration",
 		"tilt": "Tilt",
 		"vibration": "Vibration count",

@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
 	incidentFindFirst: vi.fn(),
+	incidentUpdate: vi.fn(),
 	incidentUpdateMany: vi.fn(),
+	commandFindFirst: vi.fn(),
 	commandCreate: vi.fn(),
 	auditCreate: vi.fn(),
 	transaction: vi.fn(),
@@ -14,9 +16,13 @@ vi.mock("@/lib/prisma", () => ({
 	default: {
 		impactEvent: {
 			findFirst: mocks.incidentFindFirst,
+			update: mocks.incidentUpdate,
 			updateMany: mocks.incidentUpdateMany,
 		},
-		deviceCommand: { create: mocks.commandCreate },
+		deviceCommand: {
+			findFirst: mocks.commandFindFirst,
+			create: mocks.commandCreate,
+		},
 		auditLog: { create: mocks.auditCreate },
 		$transaction: mocks.transaction,
 	},
@@ -36,7 +42,9 @@ vi.mock("next/navigation", () => ({
 	},
 }));
 
-import { requestCancelAlertAction } from "./incidents";
+import { cancelIncidentAction, falseAlarmAction, requestCancelAlertAction } from "./incidents";
+
+const CLIENT_INCIDENT_ID = "llk-1a2b3c4d-00001234";
 
 function form(
 	values: {
@@ -59,20 +67,28 @@ function incident(overrides: Record<string, unknown> = {}) {
 		id: "inc-1",
 		orgId: "org-1",
 		deviceId: "dev-1",
+		clientIncidentId: CLIENT_INCIDENT_ID,
 		status: "CONFIRMED",
+		resolution: null,
+		resolvedAt: null,
+		cancelledAt: null,
 		vehicle: { ownerId: "user-1" },
 		...overrides,
 	};
 }
 
-async function redirectOf(data: FormData): Promise<string> {
+async function catchRedirect(run: () => Promise<unknown>): Promise<string> {
 	try {
-		await requestCancelAlertAction(data);
+		await run();
 		throw new Error("expected a redirect");
 	} catch (error) {
 		if (!(error instanceof Error) || !error.message.startsWith("redirect:")) throw error;
 		return error.message.slice("redirect:".length);
 	}
+}
+
+function redirectOf(data: FormData): Promise<string> {
+	return catchRedirect(() => requestCancelAlertAction(data));
 }
 
 beforeEach(() => {
@@ -83,16 +99,24 @@ beforeEach(() => {
 		role: "ADMIN",
 	});
 	mocks.incidentFindFirst.mockResolvedValue(incident());
+	mocks.incidentUpdate.mockResolvedValue({});
 	mocks.incidentUpdateMany.mockResolvedValue({ count: 1 });
+	mocks.commandFindFirst.mockResolvedValue(null);
 	mocks.commandCreate.mockResolvedValue({ id: "cmd-1" });
 	mocks.auditCreate.mockResolvedValue({});
-	mocks.transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
-		fn({
-			impactEvent: { updateMany: mocks.incidentUpdateMany },
-			deviceCommand: { create: mocks.commandCreate },
-			auditLog: { create: mocks.auditCreate },
-		}),
-	);
+	mocks.transaction.mockImplementation(async (arg: unknown) => {
+		if (typeof arg === "function") {
+			return (arg as (tx: unknown) => Promise<unknown>)({
+				impactEvent: { updateMany: mocks.incidentUpdateMany },
+				deviceCommand: {
+					findFirst: mocks.commandFindFirst,
+					create: mocks.commandCreate,
+				},
+				auditLog: { create: mocks.auditCreate },
+			});
+		}
+		return Promise.all(arg as Promise<unknown>[]);
+	});
 });
 
 describe("requestCancelAlertAction", () => {
@@ -111,12 +135,14 @@ describe("requestCancelAlertAction", () => {
 		expect(mocks.commandCreate).toHaveBeenCalledWith({
 			data: {
 				deviceId: "dev-1",
+				impactEventId: "inc-1",
 				kind: "CANCEL_ALERT",
 				payload: {
-					incident_id: "inc-1",
+					incident_id: CLIENT_INCIDENT_ID,
 					reason: "false_alarm",
 					all_clear: true,
 				},
+				createdAt: expect.any(Date),
 				expiresAt: expect.any(Date),
 			},
 		});
@@ -126,9 +152,23 @@ describe("requestCancelAlertAction", () => {
 				actorId: "user-1",
 				action: "incident.false_alarm_requested",
 				target: "inc-1",
-				metadata: { from: "CONFIRMED", intent: "false_alarm", deviceId: "dev-1" },
+				metadata: {
+					from: "CONFIRMED",
+					intent: "false_alarm",
+					deviceId: "dev-1",
+					clientIncidentId: CLIENT_INCIDENT_ID,
+				},
 			}),
 		});
+	});
+
+	it("sends the device client incident id, not the server id", async () => {
+		await redirectOf(form({ intent: "false_alarm" }));
+
+		const [call] = mocks.commandCreate.mock.calls;
+		expect(call?.[0].data.payload.incident_id).toBe(CLIENT_INCIDENT_ID);
+		expect(call?.[0].data.payload.incident_id).not.toBe("inc-1");
+		expect(call?.[0].data.impactEventId).toBe("inc-1");
 	});
 
 	it("does not mark the incident FALSE_ALARM optimistically", async () => {
@@ -145,14 +185,15 @@ describe("requestCancelAlertAction", () => {
 		}
 	});
 
-	it("sets an expiry on the command so a silent tracker leaves evidence", async () => {
+	it("sets an expiry and a matching request time on the command", async () => {
 		const before = Date.now();
 		await redirectOf(form());
 
-		for (const [call] of mocks.commandCreate.mock.calls) {
-			const expiresAt = call.data.expiresAt as Date;
-			expect(expiresAt.getTime()).toBeGreaterThanOrEqual(before + 10 * 60 * 1000 - 1_000);
-		}
+		const claim = mocks.incidentUpdateMany.mock.calls[0]?.[0];
+		const [create] = mocks.commandCreate.mock.calls;
+		const expiresAt = create?.[0].data.expiresAt as Date;
+		expect(create?.[0].data.createdAt).toEqual(claim?.data.cancelRequestedAt);
+		expect(expiresAt.getTime()).toBeGreaterThanOrEqual(before + 10 * 60 * 1000 - 1_000);
 	});
 
 	it("keeps the cancel intent separate in the audit trail", async () => {
@@ -161,14 +202,51 @@ describe("requestCancelAlertAction", () => {
 		expect(mocks.auditCreate).toHaveBeenCalledWith({
 			data: expect.objectContaining({
 				action: "incident.cancel_requested",
-				metadata: { from: "CONFIRMED", intent: "cancel", deviceId: "dev-1" },
+				metadata: {
+					from: "CONFIRMED",
+					intent: "cancel",
+					deviceId: "dev-1",
+					clientIncidentId: CLIENT_INCIDENT_ID,
+				},
 			}),
 		});
 		expect(mocks.commandCreate).toHaveBeenCalledWith({
 			data: expect.objectContaining({
-				payload: { incident_id: "inc-1", reason: "false_alarm", all_clear: true },
+				payload: { incident_id: CLIENT_INCIDENT_ID, reason: "false_alarm", all_clear: true },
 			}),
 		});
+	});
+
+	it("keeps a second submit from queueing a duplicate command", async () => {
+		mocks.commandFindFirst.mockResolvedValue({ id: "cmd-live" });
+
+		const path = await redirectOf(form({ intent: "false_alarm" }));
+
+		expect(path).toBe("/en/incidents/inc-1?cancel=requested");
+		expect(mocks.commandFindFirst).toHaveBeenCalledWith({
+			where: {
+				impactEventId: "inc-1",
+				kind: "CANCEL_ALERT",
+				status: "PENDING",
+				OR: [{ expiresAt: null }, { expiresAt: { gt: expect.any(Date) } }],
+			},
+			select: { id: true },
+		});
+		expect(mocks.commandCreate).not.toHaveBeenCalled();
+		expect(mocks.auditCreate).not.toHaveBeenCalled();
+	});
+
+	it("allows a new request when the previous command is past its expiry", async () => {
+		// The query excludes an expired PENDING command, so the action sees no
+		// live command and queues a fresh one.
+		mocks.commandFindFirst.mockResolvedValue(null);
+
+		await redirectOf(form());
+
+		expect(mocks.commandCreate).toHaveBeenCalledOnce();
+		const [create] = mocks.commandCreate.mock.calls;
+		const expiresAt = create?.[0].data.expiresAt as Date;
+		expect(expiresAt.getTime()).toBeGreaterThan(Date.now());
 	});
 
 	it("returns to the board when the operator came from there", async () => {
@@ -236,5 +314,44 @@ describe("requestCancelAlertAction", () => {
 		expect(path).toBe("/en/incidents/inc-1?error=transition");
 		expect(mocks.commandCreate).not.toHaveBeenCalled();
 		expect(mocks.auditCreate).not.toHaveBeenCalled();
+	});
+});
+
+describe("legacy local transitions", () => {
+	it.each([
+		["false alarm", falseAlarmAction, "CONFIRMED"],
+		["false alarm", falseAlarmAction, "ACKNOWLEDGED"],
+		["cancel", cancelIncidentAction, "CONFIRMED"],
+		["cancel", cancelIncidentAction, "ACKNOWLEDGED"],
+	])(
+		"refuses a local %s on a %s incident that needs the tracker",
+		async (_label, action, status) => {
+			mocks.incidentFindFirst.mockResolvedValue(incident({ status }));
+
+			const path = await catchRedirect(() => action(form()));
+
+			expect(path).toBe("/en/incidents/inc-1?error=tracker_required");
+			expect(mocks.incidentUpdate).not.toHaveBeenCalled();
+			expect(mocks.auditCreate).not.toHaveBeenCalled();
+		},
+	);
+
+	it("keeps the CANCELLED to FALSE_ALARM local path", async () => {
+		mocks.incidentFindFirst.mockResolvedValue(incident({ status: "CANCELLED" }));
+
+		const path = await catchRedirect(() => falseAlarmAction(form()));
+
+		expect(path).toBe("/en/incidents/inc-1?updated=1");
+		expect(mocks.incidentUpdate).toHaveBeenCalledWith({
+			where: { id: "inc-1" },
+			data: expect.objectContaining({ status: "FALSE_ALARM", resolution: "False alarm" }),
+		});
+		expect(mocks.auditCreate).toHaveBeenCalledWith({
+			data: expect.objectContaining({
+				action: "incident.false_alarm",
+				target: "inc-1",
+				metadata: { from: "CANCELLED", to: "FALSE_ALARM" },
+			}),
+		});
 	});
 });

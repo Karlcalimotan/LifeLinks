@@ -51,6 +51,19 @@ async function transition(formData: FormData, to: ImpactStatusName) {
 		);
 	}
 
+	// The legacy local transitions stay for a driver-cancelled incident, but a
+	// live incident must go through CANCEL_ALERT so the tracker actually stops.
+	if (
+		(to === "FALSE_ALARM" || to === "CANCELLED") &&
+		canRequestCancelAlert(incident.status as ImpactStatusName)
+	) {
+		redirect(
+			fromDashboard
+				? `/${locale}/dashboard?error=tracker_required`
+				: `/${locale}/incidents/${incident.id}?error=tracker_required`,
+		);
+	}
+
 	if (!canTransition(incident.status as ImpactStatusName, to)) {
 		redirect(
 			fromDashboard
@@ -153,9 +166,11 @@ export async function requestCancelAlertAction(formData: FormData) {
 	if (!canRequestCancelAlert(incident.status as ImpactStatusName)) redirect(transitionPath);
 
 	const now = new Date();
-	const queued = await prisma.$transaction(async (tx) => {
+	const result = await prisma.$transaction(async (tx) => {
 		// Claim the request in the same write that records it. A terminal status
 		// from a concurrent operator wins instead of receiving a stale command.
+		// The update also locks the incident row, so a double submit serialises
+		// here and the second one sees the command the first one created.
 		const claimed = await tx.impactEvent.updateMany({
 			where: {
 				id: incident.id,
@@ -164,13 +179,27 @@ export async function requestCancelAlertAction(formData: FormData) {
 			},
 			data: { cancelRequestedAt: now },
 		});
-		if (claimed.count !== 1) return false;
+		if (claimed.count !== 1) return "blocked" as const;
+
+		const liveCommand = await tx.deviceCommand.findFirst({
+			where: {
+				impactEventId: incident.id,
+				kind: CANCEL_ALERT_KIND,
+				status: "PENDING",
+				OR: [{ expiresAt: null }, { expiresAt: { gt: now } }],
+			},
+			select: { id: true },
+		});
+		if (liveCommand) return "duplicate" as const;
 
 		await tx.deviceCommand.create({
 			data: {
 				deviceId: incident.deviceId,
+				impactEventId: incident.id,
 				kind: CANCEL_ALERT_KIND,
-				payload: buildCancelAlertPayload(incident.id),
+				// The device compares this with its own g_incidentId (`llk-...`).
+				payload: buildCancelAlertPayload(incident.clientIncidentId),
+				createdAt: now,
 				expiresAt: new Date(now.getTime() + CANCEL_ALERT_COMMAND_TTL_MS),
 			},
 		});
@@ -185,12 +214,13 @@ export async function requestCancelAlertAction(formData: FormData) {
 					from: incident.status,
 					intent,
 					deviceId: incident.deviceId,
+					clientIncidentId: incident.clientIncidentId,
 				},
 			},
 		});
-		return true;
+		return "created" as const;
 	});
-	if (!queued) redirect(transitionPath);
+	if (result === "blocked") redirect(transitionPath);
 
 	revalidatePath(`/${locale}/dashboard`);
 	revalidatePath(`/${locale}/incidents`);

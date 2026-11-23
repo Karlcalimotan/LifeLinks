@@ -356,6 +356,7 @@
 		"cancelUnknownIncidentBody": "The tracker does not know this incident, so the alert was not stopped.",
 		"cancelExpiredBody": "The tracker never collected the cancel request. The alert may still be running.",
 		"cancelFailedBody": "The tracker reported that the cancel failed. Check the tracker.",
+		"errorTrackerRequired": "This incident needs the tracker to confirm. Use Mark false alarm or Cancel incident so the tracker can stop the alert.",
 		"peakAccel": "Peak acceleration",
 		"tilt": "Tilt",
 		"vibration": "Vibration count",

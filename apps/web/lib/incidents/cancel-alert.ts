@@ -3,8 +3,9 @@ import type { ImpactStatusName } from "@/lib/incidents/state";
 /**
  * Post-dispatch false alarm: the web asks the tracker to stand down and the
  * incident changes only when the tracker confirms. The contract is frozen in
- * `docs/delegation-plan.md`; the firmware handler ignores `reason` and reads
- * `incident_id` and `all_clear`.
+ * `docs/delegation-plan.md`. `payload.incident_id` is the tracker's own client
+ * incident id (`llk-...`), not the server ImpactEvent id; the command row keeps
+ * the server id in `impactEventId`.
  */
 export const CANCEL_ALERT_KIND = "CANCEL_ALERT" as const;
 export const CANCEL_ALERT_REASON = "false_alarm" as const;
@@ -34,14 +35,15 @@ export const CANCEL_ALERT_ELIGIBLE_STATUSES = [
 ] as const satisfies readonly ImpactStatusName[];
 
 /**
- * A confirmation may close any incident that is not terminal. CANCELLED is
- * included because an operator request and a driver cancel can race.
+ * A confirmation may close these statuses. CANCELLED is deliberately absent:
+ * a driver cancel already stopped the tracker, and a late ACK must not rewrite
+ * that incident. The operator can still mark a CANCELLED incident as a false
+ * alarm locally from the incident detail.
  */
 export const CANCEL_ALERT_CLOSABLE_STATUSES = [
 	"SUSPECTED",
 	"CONFIRMED",
 	"ACKNOWLEDGED",
-	"CANCELLED",
 ] as const satisfies readonly ImpactStatusName[];
 
 export type CancelAlertPayload = {
@@ -50,9 +52,12 @@ export type CancelAlertPayload = {
 	all_clear: true;
 };
 
-/** The exact payload frozen in the delegation plan. */
-export function buildCancelAlertPayload(incidentId: string): CancelAlertPayload {
-	return { incident_id: incidentId, reason: CANCEL_ALERT_REASON, all_clear: true };
+/**
+ * The exact payload frozen in the delegation plan. The id is the device client
+ * incident id, because the firmware compares it with its own `g_incidentId`.
+ */
+export function buildCancelAlertPayload(clientIncidentId: string): CancelAlertPayload {
+	return { incident_id: clientIncidentId, reason: CANCEL_ALERT_REASON, all_clear: true };
 }
 
 /** Whether an operator may ask the tracker to stand down for this status. */
@@ -69,11 +74,6 @@ function payloadRecord(value: unknown): Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value)
 		? (value as Record<string, unknown>)
 		: {};
-}
-
-export function readCancelAlertIncidentId(payload: unknown): string | null {
-	const incidentId = payloadRecord(payload).incident_id;
-	return typeof incidentId === "string" && incidentId.length > 0 ? incidentId : null;
 }
 
 export function readCancelAckDetail(payload: unknown): string | null {
@@ -112,10 +112,12 @@ export interface CancelAlertCommandView {
 	kind: string;
 	status: string;
 	payload: unknown;
+	impactEventId: string | null;
 	createdAt: Date;
+	expiresAt: Date | null;
 }
 
-/** The newest CANCEL_ALERT command that belongs to this incident. */
+/** The newest CANCEL_ALERT command that belongs to this server incident. */
 export function latestCancelAlertCommand(
 	incidentId: string,
 	commands: readonly CancelAlertCommandView[],
@@ -123,7 +125,7 @@ export function latestCancelAlertCommand(
 	let latest: CancelAlertCommandView | null = null;
 	for (const command of commands) {
 		if (command.kind !== CANCEL_ALERT_KIND) continue;
-		if (readCancelAlertIncidentId(command.payload) !== incidentId) continue;
+		if (command.impactEventId !== incidentId) continue;
 		if (!latest || command.createdAt.getTime() > latest.createdAt.getTime()) latest = command;
 	}
 	return latest;
@@ -142,17 +144,22 @@ export interface CancelAlertView {
  * What the incident detail should say about a stand-down request. The status is
  * the operator-visible truth; the command is the device-visible truth. The two
  * are only merged when the tracker actually confirmed.
+ *
+ * `now` lets a PENDING command that outlived its expiry become "not confirmed".
+ * Without it a tracker that never polls would leave the banner waiting forever.
  */
 export function readCancelAlertState({
 	incidentId,
 	status,
 	cancelRequestedAt,
 	commands,
+	now = new Date(),
 }: {
 	incidentId: string;
 	status: string;
 	cancelRequestedAt: Date | null;
 	commands: readonly CancelAlertCommandView[];
+	now?: Date;
 }): CancelAlertView {
 	const latest = latestCancelAlertCommand(incidentId, commands);
 	const base = {
@@ -186,6 +193,10 @@ export function readCancelAlertState({
 
 	switch (latest.status) {
 		case "PENDING":
+			if (latest.expiresAt && latest.expiresAt.getTime() <= now.getTime()) {
+				// The tracker never collected the command. Nothing was confirmed.
+				return { state: "not_confirmed", detail: "expired", ...base };
+			}
 			return { state: "waiting", detail: null, ...base };
 		case "EXPIRED":
 			return { state: "not_confirmed", detail: "expired", ...base };

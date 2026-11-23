@@ -10,34 +10,45 @@ import {
 	cancelAlertCopyKey,
 	classifyCancelAck,
 	latestCancelAlertCommand,
-	readCancelAlertIncidentId,
 	readCancelAlertState,
 } from "./cancel-alert";
 
 const at = (minutes: number) => new Date(Date.UTC(2026, 10, 23, 8, minutes));
+const now = at(20);
 
 function command(overrides: Partial<CancelAlertCommandView> = {}): CancelAlertCommandView {
 	return {
 		id: "cmd-1",
 		kind: "CANCEL_ALERT",
 		status: "PENDING",
-		payload: { incident_id: "inc-1", reason: "false_alarm", all_clear: true },
+		payload: {
+			incident_id: "llk-1a2b3c4d-00001234",
+			reason: "false_alarm",
+			all_clear: true,
+		},
+		impactEventId: "inc-1",
 		createdAt: at(1),
+		expiresAt: at(25),
 		...overrides,
 	};
 }
 
 describe("buildCancelAlertPayload", () => {
 	it("builds the exact frozen contract payload", () => {
-		expect(buildCancelAlertPayload("inc-1")).toEqual({
-			incident_id: "inc-1",
+		expect(buildCancelAlertPayload("llk-1a2b3c4d-00001234")).toEqual({
+			incident_id: "llk-1a2b3c4d-00001234",
 			reason: "false_alarm",
 			all_clear: true,
 		});
 	});
 
+	it("carries the device client incident id, not a cuid", () => {
+		const payload = buildCancelAlertPayload("llk-1a2b3c4d-00001234");
+		expect(payload.incident_id.startsWith("llk-")).toBe(true);
+	});
+
 	it("does not carry operator-supplied fields into the device payload", () => {
-		const payload = buildCancelAlertPayload("inc-2");
+		const payload = buildCancelAlertPayload("llk-ffffffff-00000001");
 		expect(Object.keys(payload).sort()).toEqual(["all_clear", "incident_id", "reason"]);
 	});
 });
@@ -55,21 +66,24 @@ describe("status eligibility", () => {
 		expect(canRequestCancelAlert("FALSE_ALARM")).toBe(false);
 	});
 
-	it("lets a confirmation close every non-terminal status, including a raced cancel", () => {
+	it("lets a confirmation close the live dispatch statuses", () => {
 		expect(canCloseCancelAlert("SUSPECTED")).toBe(true);
 		expect(canCloseCancelAlert("CONFIRMED")).toBe(true);
 		expect(canCloseCancelAlert("ACKNOWLEDGED")).toBe(true);
-		expect(canCloseCancelAlert("CANCELLED")).toBe(true);
 		expect(canCloseCancelAlert("RESOLVED")).toBe(false);
 		expect(canCloseCancelAlert("FALSE_ALARM")).toBe(false);
 	});
 
-	it("matches the incident state machine for every status", () => {
+	it("does not rewrite a driver-cancelled incident, even though the state machine allows it", () => {
+		expect(canTransition("CANCELLED", "FALSE_ALARM")).toBe(true);
+		expect(canCloseCancelAlert("CANCELLED")).toBe(false);
+	});
+
+	it("matches the incident state machine everywhere except CANCELLED", () => {
 		for (const status of [
 			"SUSPECTED",
 			"CONFIRMED",
 			"ACKNOWLEDGED",
-			"CANCELLED",
 			"RESOLVED",
 			"FALSE_ALARM",
 		] as const) {
@@ -103,22 +117,21 @@ describe("classifyCancelAck", () => {
 	});
 });
 
-describe("payload readers", () => {
-	it("reads the incident id and ack detail", () => {
-		expect(readCancelAlertIncidentId({ incident_id: "inc-1" })).toBe("inc-1");
-		expect(readCancelAlertIncidentId({ incident_id: "" })).toBeNull();
-		expect(readCancelAlertIncidentId({ incident_id: 4 })).toBeNull();
-		expect(readCancelAlertIncidentId(null)).toBeNull();
-	});
-
-	it("picks the newest command for the incident only", () => {
+describe("latestCancelAlertCommand", () => {
+	it("picks the newest command for the server incident only", () => {
 		const latest = latestCancelAlertCommand("inc-1", [
 			command({ id: "old", createdAt: at(1) }),
-			command({ id: "other-incident", payload: { incident_id: "inc-2" }, createdAt: at(9) }),
+			command({ id: "other-incident", impactEventId: "inc-2", createdAt: at(9) }),
 			command({ id: "new", status: "ACKED", createdAt: at(5) }),
 			command({ id: "other-kind", kind: "LOCATE", createdAt: at(10) }),
 		]);
 		expect(latest?.id).toBe("new");
+	});
+
+	it("ignores a command that has no server incident link", () => {
+		expect(
+			latestCancelAlertCommand("inc-1", [command({ impactEventId: null, createdAt: at(9) })]),
+		).toBeNull();
 	});
 });
 
@@ -130,6 +143,7 @@ describe("readCancelAlertState", () => {
 				status: "CONFIRMED",
 				cancelRequestedAt: null,
 				commands: [],
+				now,
 			}),
 		).toEqual({ state: "idle", detail: null, commandId: null, requestedAt: null });
 	});
@@ -140,6 +154,7 @@ describe("readCancelAlertState", () => {
 			status: "CONFIRMED",
 			cancelRequestedAt: at(1),
 			commands: [command()],
+			now,
 		});
 		expect(view.state).toBe("waiting");
 		expect(view.commandId).toBe("cmd-1");
@@ -152,8 +167,33 @@ describe("readCancelAlertState", () => {
 			status: "CONFIRMED",
 			cancelRequestedAt: at(1),
 			commands: [],
+			now,
 		});
 		expect(view.state).toBe("waiting");
+	});
+
+	it("does not wait forever: a pending command past its expiry is not confirmed", () => {
+		const view = readCancelAlertState({
+			incidentId: "inc-1",
+			status: "CONFIRMED",
+			cancelRequestedAt: at(1),
+			commands: [command({ status: "PENDING", expiresAt: at(5) })],
+			now,
+		});
+		expect(view.state).toBe("not_confirmed");
+		expect(view.detail).toBe("expired");
+	});
+
+	it("does not treat an expired command as a confirmation", () => {
+		const view = readCancelAlertState({
+			incidentId: "inc-1",
+			status: "CONFIRMED",
+			cancelRequestedAt: at(1),
+			commands: [command({ status: "ACKED", expiresAt: at(5) })],
+			now,
+		});
+		expect(view.state).toBe("not_confirmed");
+		expect(view.detail).toBe("unconfirmed");
 	});
 
 	it("reports the tracker's confirmation honestly", () => {
@@ -165,13 +205,14 @@ describe("readCancelAlertState", () => {
 				command({
 					status: "ACKED",
 					payload: {
-						incident_id: "inc-1",
+						incident_id: "llk-1a2b3c4d-00001234",
 						reason: "false_alarm",
 						all_clear: true,
 						ackDetail: "cancelled",
 					},
 				}),
 			],
+			now,
 		});
 		expect(view.state).toBe("confirmed");
 		expect(view.detail).toBe("cancelled");
@@ -187,9 +228,10 @@ describe("readCancelAlertState", () => {
 				commands: [
 					command({
 						status: "ACKED",
-						payload: { incident_id: "inc-1", ackDetail: detail },
+						payload: { incident_id: "llk-1a2b3c4d-00001234", ackDetail: detail },
 					}),
 				],
+				now,
 			});
 			expect(view.state).toBe("not_confirmed");
 			expect(view.detail).toBe(detail);
@@ -204,20 +246,22 @@ describe("readCancelAlertState", () => {
 			commands: [
 				command({
 					status: "FAILED",
-					payload: { incident_id: "inc-1", ackDetail: "modem_fault" },
+					payload: { incident_id: "llk-1a2b3c4d-00001234", ackDetail: "modem_fault" },
 				}),
 			],
+			now,
 		});
 		expect(view.state).toBe("failed");
 		expect(view.detail).toBe("modem_fault");
 	});
 
-	it("reports an expired command as not confirmed", () => {
+	it("reports a command the platform marked EXPIRED as not confirmed", () => {
 		const view = readCancelAlertState({
 			incidentId: "inc-1",
 			status: "CONFIRMED",
 			cancelRequestedAt: at(1),
 			commands: [command({ status: "EXPIRED" })],
+			now,
 		});
 		expect(view.state).toBe("not_confirmed");
 		expect(view.detail).toBe("expired");
@@ -228,7 +272,8 @@ describe("readCancelAlertState", () => {
 			incidentId: "inc-1",
 			status: "CONFIRMED",
 			cancelRequestedAt: at(1),
-			commands: [command({ status: "ACKED", payload: { incident_id: "inc-1" } })],
+			commands: [command({ status: "ACKED", payload: { incident_id: "llk-1a2b3c4d-00001234" } })],
+			now,
 		});
 		expect(view.state).toBe("not_confirmed");
 		expect(view.detail).toBe("unconfirmed");
@@ -240,6 +285,7 @@ describe("readCancelAlertState", () => {
 			status: "FALSE_ALARM",
 			cancelRequestedAt: null,
 			commands: [],
+			now,
 		});
 		expect(view.state).toBe("idle");
 	});
@@ -250,6 +296,7 @@ describe("readCancelAlertState", () => {
 			status: "RESOLVED",
 			cancelRequestedAt: at(1),
 			commands: [command()],
+			now,
 		});
 		expect(view.state).toBe("idle");
 		expect(view.commandId).toBeNull();
