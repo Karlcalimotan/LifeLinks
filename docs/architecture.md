@@ -95,6 +95,7 @@ Organization ── Membership ── User
               └── DeviceCommand
 
 OrgSettings, EmergencyContact, Geofence, AuditLog
+InvitationToken, MembershipPermission
 ```
 
 - `DeviceStateEvent` is the device audit log. `lastSeenAt` answers "is it
@@ -105,7 +106,13 @@ OrgSettings, EmergencyContact, Geofence, AuditLog
   A null column inherits the organisation value; the row is deleted when every
   field inherits again.
 - `AuditLog` records member changes (acknowledge, resolve, false alarm,
-  configuration, device token rotation).
+  configuration, device token rotation, invite, accept, revoke, re-invite).
+- `InvitationToken` stores the SHA-256 of a single-use invitation link. The
+  plaintext exists only in the link shown to the admin who minted it; there is
+  no email sender, so the admin copies the link. `MembershipPermission` holds
+  explicit per-member overrides; a missing row means "use the role default".
+  `Membership.revokedAt` is a soft revoke: the row keeps the person and the
+  audit trail, and every request treats it as absent.
 
 ### Roles and scope
 
@@ -121,6 +128,12 @@ The scope is enforced in the query (`Vehicle.ownerId`) and again in the incident
 action before a mutation. A stale session cookie with a removed role is rejected
 on read, so a role change takes effect on the next request.
 
+The role is the baseline, not the whole answer. A `MembershipPermission` row can
+grant or take one capability for one membership, and `lib/auth/permissions.ts`
+resolves explicit override ?? role default. Admin is never downgraded, so the
+last admin cannot lock themselves out. Revoking a membership (`revokedAt`) keeps
+the row for re-invite but resolves it as absent on every request.
+
 ## Auth and tenancy
 
 The console uses a self-contained session:
@@ -128,7 +141,9 @@ The console uses a self-contained session:
 1. `loginAction` validates the credentials, rate-limits per email + IP, verifies
    bcrypt, and signs a short JWT (HS256) into an HttpOnly cookie.
 2. `getCurrentUser()` verifies the cookie and re-reads the membership row. The
-   returned `orgId` is the only tenant scope any query may use.
+   returned `orgId` is the only tenant scope any query may use. A revoked
+   membership resolves to null, and the permission overlay is resolved in the
+   same read.
 3. `requireUser()` redirects to the localized login. `requireRole()` narrows the
    page to admins where required.
 

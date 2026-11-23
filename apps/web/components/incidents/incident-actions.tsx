@@ -8,7 +8,8 @@ import {
 	resolveIncidentAction,
 	resolveWithoutTrackerAction,
 } from "@/lib/actions/incidents";
-import { type MemberRoleName, canAcknowledgeAsBureau, canManageIncidents } from "@/lib/auth/roles";
+import type { PermissionSet } from "@/lib/auth/permissions";
+import { type MemberRoleName, canManageIncidents } from "@/lib/auth/roles";
 import { type BureauAckView, bureauAckCopyKey } from "@/lib/incidents/bureau-ack";
 import {
 	type CancelAlertView,
@@ -26,6 +27,7 @@ export async function IncidentActions({
 	locale,
 	status,
 	role,
+	permissions,
 	cancelAlert,
 	bureauAck,
 	acknowledgementRequired,
@@ -37,6 +39,7 @@ export async function IncidentActions({
 	locale: string;
 	status: string;
 	role: MemberRoleName;
+	permissions: PermissionSet;
 	cancelAlert: CancelAlertView;
 	bureauAck: BureauAckView;
 	acknowledgementRequired: boolean;
@@ -52,6 +55,8 @@ export async function IncidentActions({
 	const copy = cancelAlertCopyKey(cancelAlert);
 	const waiting = cancelAlert.state === "waiting";
 	const canRequest = canRequestCancelAlert(status as ImpactStatusName);
+	const canAcknowledgePermission = permissions["incident.acknowledge"];
+	const canResolve = permissions["incident.resolve"];
 
 	const ackCopy = bureauAckCopyKey(bureauAck);
 	const ackWaiting = bureauAck.state === "waiting";
@@ -62,14 +67,14 @@ export async function IncidentActions({
 	// incident can be acknowledged before dispatch.
 	const ackNotDispatched = deviceBacked && status === "SUSPECTED";
 	const canAcknowledge =
-		canAcknowledgeAsBureau(role) &&
+		canAcknowledgePermission &&
 		(status === "CONFIRMED" || (status === "SUSPECTED" && !deviceBacked));
 	// A pending command already reached the tracker; a second, contradictory
 	// command is refused by the action as well.
 	const showAcknowledge = canAcknowledge && !ackWaiting && !waiting;
 	const acknowledgeLabel = ackFailed ? t("ackRetry") : t("acknowledge");
 	const showResolveWithoutTracker = resolveWithoutTrackerAvailable && role === "ADMIN";
-	const userWaitingForBureau = !canAcknowledgeAsBureau(role) && acknowledgementRequired;
+	const userWaitingForBureau = !canAcknowledgePermission && acknowledgementRequired;
 
 	return (
 		<div className="flex flex-col gap-3">
@@ -165,7 +170,7 @@ export async function IncidentActions({
 					</form>
 				) : null}
 
-				{!waiting && !ackWaiting ? (
+				{canResolve && !waiting && !ackWaiting ? (
 					canRequest ? (
 						<form action={requestCancelAlertAction}>
 							<input type="hidden" name="locale" value={locale} />
@@ -196,7 +201,7 @@ export async function IncidentActions({
 					)
 				) : null}
 
-				{!waiting && !ackWaiting && canRequest ? (
+				{canResolve && !waiting && !ackWaiting && canRequest ? (
 					<form action={requestCancelAlertAction}>
 						<input type="hidden" name="locale" value={locale} />
 						<input type="hidden" name="incidentId" value={incidentId} />
@@ -223,7 +228,7 @@ export async function IncidentActions({
 						{userWaitingForBureau ? t("ackWaitingForBureauBody") : t("ackRequiredBody")}
 					</p>
 				</div>
-			) : (
+			) : canResolve ? (
 				<form action={resolveIncidentAction} className="flex flex-wrap items-center gap-2">
 					<input type="hidden" name="locale" value={locale} />
 					<input type="hidden" name="incidentId" value={incidentId} />
@@ -237,7 +242,7 @@ export async function IncidentActions({
 						{t("resolve")}
 					</Button>
 				</form>
-			)}
+			) : null}
 
 			{showResolveWithoutTracker ? (
 				<form

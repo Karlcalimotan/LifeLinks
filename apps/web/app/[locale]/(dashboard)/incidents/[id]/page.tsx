@@ -432,6 +432,7 @@ export default async function IncidentDetailPage({
 							locale={locale}
 							status={incident.status}
 							role={current.role}
+							permissions={current.permissions}
 							cancelAlert={cancelAlert}
 							bureauAck={bureauAck}
 							acknowledgementRequired={acknowledgementRequiredBeforeResolve({

@@ -21,6 +21,12 @@ describeRls("RLS organization isolation", () => {
 	let pushB = "";
 	let overrideA = "";
 	let overrideB = "";
+	let membershipA = "";
+	let membershipB = "";
+	let permissionA = "";
+	let permissionB = "";
+	let inviteA = "";
+	let inviteB = "";
 
 	function db() {
 		if (!prisma) throw new Error("RLS test database is not initialized");
@@ -130,12 +136,46 @@ describeRls("RLS organization isolation", () => {
 		});
 		userA = ua.id;
 		userB = ub.id;
-		await client.membership.create({
+		const ma = await client.membership.create({
 			data: { orgId: orgA, userId: userA, role: "ADMIN" },
 		});
-		await client.membership.create({
+		const mb = await client.membership.create({
 			data: { orgId: orgB, userId: userB, role: "ADMIN" },
 		});
+		membershipA = ma.id;
+		membershipB = mb.id;
+
+		const permissionRowA = await client.membershipPermission.create({
+			data: { membershipId: membershipA, key: "device.configure", allowed: true },
+		});
+		const permissionRowB = await client.membershipPermission.create({
+			data: { membershipId: membershipB, key: "device.configure", allowed: false },
+		});
+		permissionA = permissionRowA.id;
+		permissionB = permissionRowB.id;
+
+		const inviteRowA = await client.invitationToken.create({
+			data: {
+				orgId: orgA,
+				email: `rls-invite-a-${suffix}@example.test`,
+				role: "USER",
+				tokenHash: `rls-invite-hash-a-${suffix}`,
+				expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+				createdById: userA,
+			},
+		});
+		const inviteRowB = await client.invitationToken.create({
+			data: {
+				orgId: orgB,
+				email: `rls-invite-b-${suffix}@example.test`,
+				role: "USER",
+				tokenHash: `rls-invite-hash-b-${suffix}`,
+				expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+				createdById: userB,
+			},
+		});
+		inviteA = inviteRowA.id;
+		inviteB = inviteRowB.id;
 
 		const pa = await client.pushSubscription.create({
 			data: {
@@ -187,6 +227,14 @@ describeRls("RLS organization isolation", () => {
 			where: { id: { in: [overrideA, overrideB].filter(Boolean) } },
 		});
 		expect(leftoverOverrides).toBe(0);
+		const leftoverPermissions = await client.membershipPermission.count({
+			where: { id: { in: [permissionA, permissionB].filter(Boolean) } },
+		});
+		expect(leftoverPermissions).toBe(0);
+		const leftoverInvites = await client.invitationToken.count({
+			where: { id: { in: [inviteA, inviteB].filter(Boolean) } },
+		});
+		expect(leftoverInvites).toBe(0);
 		await client.$disconnect();
 	});
 
@@ -329,6 +377,111 @@ describeRls("RLS organization isolation", () => {
 		expect(still?.cancelWindowS).toBe(45);
 	});
 
+	it("sees only the current organization's membership permissions", async () => {
+		const a = await asTenant(
+			orgA,
+			(tx) => tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "MembershipPermission" ORDER BY "id"`,
+		);
+		expect(a.map((row) => row.id)).toEqual([permissionA]);
+
+		const b = await asTenant(
+			orgB,
+			(tx) => tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "MembershipPermission" ORDER BY "id"`,
+		);
+		expect(b.map((row) => row.id)).toEqual([permissionB]);
+	});
+
+	it("cannot update or delete another organization's membership permission", async () => {
+		const updated = await asTenant(
+			orgA,
+			(tx) =>
+				tx.$executeRaw`UPDATE "MembershipPermission" SET "allowed" = ${true} WHERE "id" = ${permissionB}`,
+		);
+		expect(updated).toBe(0);
+
+		const deleted = await asTenant(
+			orgA,
+			(tx) => tx.$executeRaw`DELETE FROM "MembershipPermission" WHERE "id" = ${permissionB}`,
+		);
+		expect(deleted).toBe(0);
+
+		const still = await db().membershipPermission.findUnique({ where: { id: permissionB } });
+		expect(still?.allowed).toBe(false);
+	});
+
+	it("sees only the current organization's invitation tokens", async () => {
+		const a = await asTenant(
+			orgA,
+			(tx) => tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "InvitationToken" ORDER BY "id"`,
+		);
+		expect(a.map((row) => row.id)).toEqual([inviteA]);
+
+		const b = await asTenant(
+			orgB,
+			(tx) => tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "InvitationToken" ORDER BY "id"`,
+		);
+		expect(b.map((row) => row.id)).toEqual([inviteB]);
+	});
+
+	it("cannot update or delete another organization's invitation token", async () => {
+		const updated = await asTenant(
+			orgA,
+			(tx) =>
+				tx.$executeRaw`UPDATE "InvitationToken" SET "email" = ${"hacked@example.test"} WHERE "id" = ${inviteB}`,
+		);
+		expect(updated).toBe(0);
+
+		const deleted = await asTenant(
+			orgA,
+			(tx) => tx.$executeRaw`DELETE FROM "InvitationToken" WHERE "id" = ${inviteB}`,
+		);
+		expect(deleted).toBe(0);
+
+		const still = await db().invitationToken.findUnique({ where: { id: inviteB } });
+		expect(still?.email).toContain("rls-invite-b-");
+	});
+
+	it("rejects an invitation token inserted for another organization", async () => {
+		await expect(
+			asTenant(
+				orgA,
+				(tx) => tx.$executeRaw`
+					INSERT INTO "InvitationToken"
+						("id", "orgId", "email", "role", "tokenHash", "expiresAt", "createdById", "createdAt")
+					VALUES (
+						${`rls-invite-x-${Date.now()}-${Math.random().toString(36).slice(2)}`},
+						${orgB},
+						${"x@example.test"},
+						${"USER"}::"MemberRole",
+						${`rls-invite-hash-x-${Date.now()}`},
+						${new Date(Date.now() + 86_400_000)},
+						${userA},
+						${new Date()}
+					)
+				`,
+			),
+		).rejects.toThrow();
+	});
+
+	it("rejects a permission override for another organization's membership", async () => {
+		await expect(
+			asTenant(
+				orgA,
+				(tx) => tx.$executeRaw`
+					INSERT INTO "MembershipPermission"
+						("id", "membershipId", "key", "allowed", "updatedAt")
+					VALUES (
+						${`rls-permission-x-${Date.now()}-${Math.random().toString(36).slice(2)}`},
+						${membershipB},
+						${"device.configure"},
+						${true},
+						${new Date()}
+					)
+				`,
+			),
+		).rejects.toThrow();
+	});
+
 	it("fails closed when no organization is set", async () => {
 		const vehicles = await asTenant(
 			null,
@@ -353,6 +506,18 @@ describeRls("RLS organization isolation", () => {
 			(tx) => tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "DeviceConfigOverride"`,
 		);
 		expect(overrides).toHaveLength(0);
+
+		const permissions = await asTenant(
+			null,
+			(tx) => tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "MembershipPermission"`,
+		);
+		expect(permissions).toHaveLength(0);
+
+		const invites = await asTenant(
+			null,
+			(tx) => tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "InvitationToken"`,
+		);
+		expect(invites).toHaveLength(0);
 	});
 
 	it("rejects an insert when no organization is set", async () => {

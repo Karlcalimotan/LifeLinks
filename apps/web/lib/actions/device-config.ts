@@ -1,6 +1,6 @@
 "use server";
 
-import { canAdminister, requireUser } from "@/lib/auth/session";
+import { requireUser } from "@/lib/auth/session";
 import { CONFIG_FIELDS, buildFirmwareConfig } from "@/lib/firmware/config";
 import {
 	type DeviceConfigFieldErrors,
@@ -66,7 +66,7 @@ export async function updateDeviceConfigAction(
 ): Promise<DeviceConfigState> {
 	const locale = String(formData.get("locale") ?? "en") === "tl" ? "tl" : "en";
 	const current = await requireUser();
-	if (!canAdminister(current.role)) return { ok: false, error: "forbidden" };
+	if (!current.permissions["device.configure"]) return { ok: false, error: "forbidden" };
 
 	const deviceId = String(formData.get("deviceId") ?? "").trim();
 	if (!deviceId) return { ok: false, error: "notfound" };

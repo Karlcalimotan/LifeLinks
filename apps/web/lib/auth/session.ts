@@ -6,6 +6,8 @@ import { SignJWT, jwtVerify } from "jose";
 import { getLocale } from "next-intl/server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { isMembershipActive } from "./membership";
+import { type PermissionSet, resolvePermissions } from "./permissions";
 import { type MemberRoleName, isMemberRole } from "./roles";
 import { resolveAuthSecret, shouldUseSecureSessionCookie } from "./secret";
 
@@ -95,13 +97,16 @@ export interface CurrentUser {
 	user: { id: string; email: string; name: string };
 	org: { id: string; name: string; slug: string };
 	role: MemberRoleName;
+	/** Explicit `MembershipPermission` overrides ?? role defaults. */
+	permissions: PermissionSet;
 }
 
 /**
  * Resolve the session against the database on every request. The JWT says who
  * the user claimed to be; the membership row says what they may still do. A
  * revoked membership therefore takes effect on the next request, not when the
- * cookie expires.
+ * cookie expires. The permission overlay is resolved here too, so every action
+ * reads the same set for the whole request.
  */
 export async function getCurrentUser(): Promise<CurrentUser | null> {
 	const session = await getSession();
@@ -109,9 +114,13 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 
 	const membership = await prisma.membership.findUnique({
 		where: { orgId_userId: { orgId: session.orgId, userId: session.sub } },
-		include: { user: true, org: true },
+		include: {
+			user: true,
+			org: true,
+			permissions: { select: { key: true, allowed: true } },
+		},
 	});
-	if (!membership) return null;
+	if (!membership || !isMembershipActive(membership)) return null;
 
 	return {
 		session,
@@ -126,6 +135,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
 			slug: membership.org.slug,
 		},
 		role: membership.role,
+		permissions: resolvePermissions(membership.role, membership.permissions),
 	};
 }
 
