@@ -71,6 +71,7 @@ enum CommandKind {
   TEST_ALERT
   SET_CONFIG
   ROTATE_TOKEN
+  CANCEL_ALERT
 }
 
 enum CommandStatus {
@@ -254,34 +255,36 @@ model TelemetrySample {
 }
 
 model ImpactEvent {
-  id               String       @id @default(cuid())
-  orgId            String
-  deviceId         String
-  vehicleId        String
-  tripId           String?
-  clientIncidentId String
-  detectedAt       DateTime
-  peakAccelG       Float
-  tiltDeg          Float
-  vibrationCount   Int          @default(0)
-  speedKph         Float?
-  lat              Float?
-  lng              Float?
-  gpsAgeS          Int?
-  status           ImpactStatus @default(CONFIRMED)
-  cancelDeadline   DateTime?
-  cancelledAt      DateTime?
-  resolvedAt       DateTime?
-  resolution       String?
-  evidence         Json?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  id                String       @id @default(cuid())
+  orgId             String
+  deviceId          String
+  vehicleId         String
+  tripId            String?
+  clientIncidentId  String
+  detectedAt        DateTime
+  peakAccelG        Float
+  tiltDeg           Float
+  vibrationCount    Int          @default(0)
+  speedKph          Float?
+  lat               Float?
+  lng               Float?
+  gpsAgeS           Int?
+  status            ImpactStatus @default(CONFIRMED)
+  cancelDeadline    DateTime?
+  cancelledAt       DateTime?
+  cancelRequestedAt DateTime?
+  resolvedAt        DateTime?
+  resolution        String?
+  evidence          Json?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
-  org     Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  device  TrackerDevice   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
-  vehicle Vehicle         @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  trip    Trip?           @relation(fields: [tripId], references: [id], onDelete: SetNull)
-  alerts  AlertDelivery[]
+  org      Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  device   TrackerDevice   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  vehicle  Vehicle         @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  trip     Trip?           @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  alerts   AlertDelivery[]
+  commands DeviceCommand[]
 
   @@unique([deviceId, clientIncidentId])
   @@index([orgId, detectedAt])
@@ -307,18 +310,21 @@ model AlertDelivery {
 }
 
 model DeviceCommand {
-  id        String        @id @default(cuid())
-  deviceId  String
-  kind      CommandKind
-  payload   Json          @default("{}")
-  status    CommandStatus @default(PENDING)
-  createdAt DateTime      @default(now())
-  expiresAt DateTime?
-  ackedAt   DateTime?
+  id            String        @id @default(cuid())
+  deviceId      String
+  impactEventId String?
+  kind          CommandKind
+  payload       Json          @default("{}")
+  status        CommandStatus @default(PENDING)
+  createdAt     DateTime      @default(now())
+  expiresAt     DateTime?
+  ackedAt       DateTime?
 
   device TrackerDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  impact ImpactEvent?  @relation(fields: [impactEventId], references: [id], onDelete: SetNull)
 
   @@index([deviceId, status, createdAt])
+  @@index([impactEventId, kind, createdAt])
 }
 
 model DeviceStateEvent {

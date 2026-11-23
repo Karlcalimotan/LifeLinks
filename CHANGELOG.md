@@ -10,6 +10,25 @@ All notable changes to this project are documented here. The format follows
 
 - Firmware: dedicated WiFi and factory reset buttons on GPIO 13/14, aligned pin
   map and provisioning tests (#107).
+- Tracker detail: an admin WiFi setup panel with the AP name derived from the
+  MAC, the current setup state, the GPIO 13/14 reset instructions and a
+  rotate-and-show token action (#43).
+- A repeatable axe accessibility gate (`pnpm a11y`) with JSON and Markdown
+  evidence; the dashboard chart scroller is keyboard accessible (#46).
+- Operator false alarm and cancel after dispatch now queue a `CANCEL_ALERT`
+  command carrying the device client incident id (`llk-...`). The incident
+  detail shows "Cancel requested, waiting for tracker", retries when the
+  command expires, and the stored command row keeps the server
+  `impactEventId` (#9).
+
+### Changed
+
+- `CANCEL_ALERT` acknowledgements decide the incident: only `cancelled` sets
+  `FALSE_ALARM`. `too_late`, `unknown_incident`, a missing detail, an expired
+  command or a failed command keep the status and record the reason. A
+  `CANCELLED` incident and an incident with a recorded resolution are not
+  overwritten, and legacy local false-alarm/cancel transitions are refused for
+  live incidents so the tracker is not bypassed (#9).
 
 ## [0.3.0] - 2026-11-23
 

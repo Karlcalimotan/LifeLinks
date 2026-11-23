@@ -3,6 +3,7 @@
 import { canAdminister, requireUser } from "@/lib/auth/session";
 import { generateDeviceToken, hashDeviceToken } from "@/lib/device/auth";
 import { parseBulkDeviceIds } from "@/lib/device/bulk";
+import { TOKEN_ROTATION_RATE_LIMIT } from "@/lib/device/limits";
 import {
 	commandSchema,
 	createDeviceSchema,
@@ -10,6 +11,7 @@ import {
 	updateDeviceSchema,
 } from "@/lib/device/validation";
 import prisma from "@/lib/prisma";
+import { rateLimit } from "@/lib/rate-limit";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { ZodError } from "zod";
@@ -29,6 +31,8 @@ export interface DeviceFormFieldErrors {
 export interface DeviceTokenState {
 	ok: boolean;
 	error?: string;
+	errorCode?: "rate_limited";
+	retryAfterSeconds?: number;
 	fieldErrors?: DeviceFormFieldErrors;
 	values?: DeviceFormValues;
 	token?: string;
@@ -164,6 +168,19 @@ export async function rotateDeviceTokenAction(
 	}
 
 	const deviceId = String(formData.get("deviceId") ?? "");
+	const limit = rateLimit(
+		`device-token:${current.user.id}:${deviceId}`,
+		TOKEN_ROTATION_RATE_LIMIT.limit,
+		TOKEN_ROTATION_RATE_LIMIT.windowMs,
+	);
+	if (!limit.allowed) {
+		return {
+			ok: false,
+			errorCode: "rate_limited",
+			retryAfterSeconds: limit.retryAfterSeconds,
+		};
+	}
+
 	const device = await prisma.trackerDevice.findFirst({
 		where: { id: deviceId, orgId: current.org.id },
 	});

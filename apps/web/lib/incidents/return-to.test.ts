@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { incidentSuccessPath } from "./return-to";
+import { incidentCancelRequestPath, incidentSuccessPath } from "./return-to";
 
 describe("incidentSuccessPath", () => {
 	it("sends the dashboard acknowledgement back to the dashboard", () => {
@@ -26,6 +26,20 @@ describe("incidentSuccessPath", () => {
 		expect(incidentSuccessPath("en", "inc-1", "/settings")).toBe("/en/incidents/inc-1?updated=1");
 		expect(incidentSuccessPath("en", "inc-1", "https://example.com")).toBe(
 			"/en/incidents/inc-1?updated=1",
+		);
+	});
+});
+
+describe("incidentCancelRequestPath", () => {
+	it("marks the request without claiming the incident changed", () => {
+		expect(incidentCancelRequestPath("en", "inc-1", "")).toBe(
+			"/en/incidents/inc-1?cancel=requested",
+		);
+		expect(incidentCancelRequestPath("tl", "inc-1", "/incidents")).toBe(
+			"/tl/incidents?cancel=requested",
+		);
+		expect(incidentCancelRequestPath("en", "inc-1", "/incidents?status=CONFIRMED")).toBe(
+			"/en/incidents?status=CONFIRMED&cancel=requested",
 		);
 	});
 });
