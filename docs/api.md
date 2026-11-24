@@ -31,7 +31,7 @@ conformance table and latency check.
 The tracker sends its provisioning token in the header:
 
 ```
-x-device-token: tf_<random>
+x-device-token: llk_<random>
 ```
 
 The database stores `sha256(token)` only. A token is shown once when the device
@@ -268,10 +268,10 @@ environment variables or secrets are configured.
 ```bash
 # Seed tokens are printed by pnpm seed
 curl -s http://localhost:3000/api/device/command?device_id=AA:BB:CC:DD:EE:01 \
-  -H "x-device-token: tf_demo_navara_token"
+  -H "x-device-token: llk_demo_navara_token"
 
 curl -s -X POST http://localhost:3000/api/device/ingest \
   -H "content-type: application/json" \
-  -H "x-device-token: tf_demo_navara_token" \
+  -H "x-device-token: llk_demo_navara_token" \
   -d '{"device_id":"AA:BB:CC:DD:EE:01","heartbeat":{"battery_v":12.4,"ignition":true}}'
 ```
