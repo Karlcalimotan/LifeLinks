@@ -113,7 +113,7 @@ With the tracker `Idle` and no active incident:
 
 1. Send `TEST_WDT`. The device prints the warning and asks for confirmation; it
    does not block.
-2. Send `TEST_WDT CONFIRM`. The loop stops feeding the watchdog.
+2. Send `TEST_WDT CONFIRM`. The loop stops resetting the watchdog.
 3. After about 120 s the serial log shows the task watchdog panic
    (`Task watchdog got triggered`) and the board reboots to the normal boot
    banner.

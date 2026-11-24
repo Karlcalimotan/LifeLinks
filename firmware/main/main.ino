@@ -1938,7 +1938,8 @@ bool readIgnition() {
 
 #ifdef LIFELINK_BENCH_WDT
 /**
- * Bench-only proof for the watchdog. The loop task blocks without feeding, so
+ * Bench-only proof for the watchdog. The loop task blocks without resetting
+ * the watchdog, so
  * the task watchdog must panic and reboot the board. It is compiled only in
  * env:esp32dev-bench and the caller refuses it unless the tracker is Idle.
  *

@@ -195,7 +195,7 @@ The synthetic hang is a human bench step and is not run automatically:
 1. Build and flash `env:esp32dev-bench`. The default build refuses the command.
 2. With the tracker `Idle` and no active incident, send `TEST_WDT` and confirm
    it only prints the warning.
-3. Send `TEST_WDT CONFIRM`. The loop stops feeding the watchdog.
+3. Send `TEST_WDT CONFIRM`. The loop stops resetting the watchdog.
 4. After about 120 s confirm the `Task watchdog got triggered` panic and the
    reboot to the boot banner.
 
