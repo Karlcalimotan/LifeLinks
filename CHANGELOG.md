@@ -132,6 +132,14 @@ All notable changes to this project are documented here. The format follows
   stays as a reserved column: it is not read, not exposed and not part of the
   firmware configuration envelope (#137).
 
+### Fixed
+
+- The service worker now evaluates on registration. `sw.js` and `sw-url.js`
+  both declared `safeNotificationUrl` in the classic worker global scope, so
+  the worker failed to start and both push and the PWA offline shell were
+  disabled. The URL guard is now an IIFE and the worker binds a local alias
+  (#147).
+
 ## [0.3.0] - 2026-11-23
 
 ### Added
