@@ -38,6 +38,16 @@ All notable changes to this project are documented here. The format follows
   `retention.cleanup` audit row per organisation with the cutoffs and counts.
   The privacy notice now describes the automatic deletion (#129).
 
+### Changed
+
+- Crash detection is always on. The tracker page no longer offers Arm or
+  Disarm, the admin command allowlist rejects both kinds, and the firmware
+  acknowledges `ARM`/`DISARM` as `unsupported` without changing safety state.
+  The unused `g_armed` flag is removed (#137).
+- Settings no longer shows a parked-impact toggle. `OrgSettings.parkedImpactAlerts`
+  stays as a reserved column: it is not read, not exposed and not part of the
+  firmware configuration envelope (#137).
+
 ## [0.4.0] - 2026-11-24
 
 ### Added

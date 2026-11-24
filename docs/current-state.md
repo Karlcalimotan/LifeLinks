@@ -9,6 +9,10 @@
   the app-level orgId filters are authoritative.
 - **Pages:** dashboard, devices (trackers), vehicles, incidents, settings, login
   and public legal pages. Tracker detail and incident detail exist.
+- **Always-on detection:** the tracker has no arm or disarm control. The console
+  offers Locate and Test alert, and the firmware acknowledges an ARM or DISARM
+  request as `unsupported` without changing safety state. The parked-impact
+  setting is not exposed or enforced.
 - **Device API:** `/api/device/ingest` (heartbeat + batched telemetry),
   `/api/device/incident`, `/api/device/incident/cancel`, `/api/device/command`,
   `/api/device/command/ack`, plus the signed firmware check. Device tokens are

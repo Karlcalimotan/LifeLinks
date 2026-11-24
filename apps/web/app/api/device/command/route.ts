@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * The tracker's command poll. It carries two things:
- * - queued commands (locate, arm/disarm, test alert, config)
+ * - queued commands (locate, test alert, cancel, acknowledgement, config)
  * - the versioned firmware config object
  *
  * Commands are delivered until acknowledged or expired; the device dedupes by
