@@ -1,3 +1,4 @@
+import { InstallCard } from "@/components/pwa/install-prompt";
 import { InviteMemberForm } from "@/components/settings/invite-member-form";
 import { MemberRowActions } from "@/components/settings/member-row-actions";
 import { Badge } from "@/components/ui/badge";
@@ -156,6 +157,9 @@ export default async function SettingsPage({
 				</nav>
 
 				<div className="min-w-0 flex-1">
+					<div className="mb-6">
+						<InstallCard />
+					</div>
 					{showForm && settings ? (
 						<SettingsForm
 							tab={tab}

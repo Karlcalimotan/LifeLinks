@@ -41,6 +41,21 @@ const nextConfig: NextConfig = {
 				source: "/sw-url.js",
 				headers: workerHeaders,
 			},
+			{
+				// The cache classification is imported by the worker too.
+				source: "/sw-cache-policy.js",
+				headers: workerHeaders,
+			},
+			{
+				// Precached by the worker. Revalidation keeps a new cache version
+				// from pinning an old offline page after a deploy.
+				source: "/offline.html",
+				headers: [{ key: "Cache-Control", value: "no-cache" }],
+			},
+			{
+				source: "/manifest.webmanifest",
+				headers: [{ key: "Cache-Control", value: "no-cache" }],
+			},
 		];
 	},
 };

@@ -19,6 +19,29 @@
 		"close": "Close",
 		"skipToContent": "Skip to main content"
 	},
+	"pwa": {
+		"install": {
+			"cardTitle": "Install the console",
+			"cardBody": "Install LifeLink on this phone for a full-screen console and a quick launch from the home screen.",
+			"bannerTitle": "Install LifeLink on this phone",
+			"bannerBody": "Open the console in one tap and keep the offline page available.",
+			"install": "Install",
+			"iosTitle": "Add to Home Screen",
+			"iosBody": "In Safari, tap Share, then Add to Home Screen.",
+			"iosBannerBody": "Tap Share, then Add to Home Screen to install LifeLink.",
+			"unavailableTitle": "Install from the browser menu",
+			"unavailableBody": "This browser does not show an install prompt. Open the browser menu and choose Install app or Add to Home Screen.",
+			"dismiss": "Not now",
+			"dismissBanner": "Dismiss install banner"
+		},
+		"update": {
+			"title": "A new version is ready",
+			"body": "Reload to use the latest console.",
+			"reload": "Reload",
+			"later": "Later",
+			"dismiss": "Dismiss update notice"
+		}
+	},
 	"search": {
 		"title": "Search the console",
 		"open": "Search",

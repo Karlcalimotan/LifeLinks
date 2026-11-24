@@ -75,7 +75,8 @@ Rules:
 - Never put text directly on a photograph or an arbitrary colour. Use a surface
   token.
 - No raw hex values outside `globals.css`, the web manifest, the global error
-  page (which must render without the app stylesheet) and the PWA theme colour.
+  page and `offline.html` (both must render without the app stylesheet) and the
+  PWA theme colour.
 - `fog-600` was removed: it measured 4.30:1 on `ink-950` and failed the text
   contract.
 

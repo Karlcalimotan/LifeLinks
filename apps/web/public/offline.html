@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex" />
+		<title>Offline · LifeLink</title>
+		<style>
+			:root {
+				color-scheme: dark;
+				--ink-950: #071013;
+				--ink-800: #0d1c21;
+				--ink-700: #122a30;
+				--fog-50: #f4fbfc;
+				--fog-100: #e8f1f2;
+				--fog-300: #b8c9cb;
+				--fog-500: #8fa3a6;
+				--signal-500: #ff5a1f;
+				--signal-400: #ff7a45;
+			}
+			* {
+				box-sizing: border-box;
+			}
+			body {
+				margin: 0;
+				min-height: 100vh;
+				display: grid;
+				place-items: center;
+				background-color: var(--ink-950);
+				color: var(--fog-100);
+				font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+				font-size: 14px;
+				line-height: 1.5;
+				padding: 24px;
+			}
+			main {
+				width: 100%;
+				max-width: 440px;
+				border: 1px solid var(--ink-700);
+				border-radius: 4px;
+				background-color: var(--ink-800);
+				box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.045);
+				padding: 24px;
+			}
+			.brand {
+				display: flex;
+				align-items: center;
+				gap: 10px;
+				margin-bottom: 20px;
+			}
+			.brand svg {
+				width: 36px;
+				height: 36px;
+				flex: none;
+			}
+			.brand strong {
+				font-size: 20px;
+				letter-spacing: -0.01em;
+			}
+			.kicker {
+				margin: 0 0 6px;
+				color: var(--signal-400);
+				font-size: 12px;
+				font-weight: 600;
+				letter-spacing: 0.08em;
+				text-transform: uppercase;
+			}
+			h1 {
+				margin: 0 0 12px;
+				font-size: 24px;
+				line-height: 1.15;
+			}
+			p {
+				margin: 0 0 16px;
+				color: var(--fog-300);
+			}
+			p.tagalog {
+				padding-top: 16px;
+				border-top: 1px solid var(--ink-700);
+				color: var(--fog-500);
+			}
+			.retry {
+				display: block;
+				width: 100%;
+				min-height: 44px;
+				border: 0;
+				border-radius: 4px;
+				background-color: var(--signal-500);
+				color: var(--ink-950);
+				font: inherit;
+				font-weight: 600;
+				line-height: 44px;
+				text-align: center;
+				text-decoration: none;
+				cursor: pointer;
+			}
+			.retry:hover {
+				background-color: var(--signal-400);
+			}
+			.retry:focus-visible {
+				outline: 2px solid var(--signal-400);
+				outline-offset: 2px;
+			}
+			.privacy {
+				margin: 16px 0 0;
+				color: var(--fog-500);
+				font-size: 12px;
+			}
+		</style>
+	</head>
+	<body>
+		<main>
+			<div class="brand">
+				<svg viewBox="0 0 64 64" fill="none" aria-hidden="true">
+					<path
+						d="M4 0h46l14 14v46a4 4 0 0 1-4 4H4a4 4 0 0 1-4-4V4a4 4 0 0 1 4-4Z"
+						fill="#FF5A1F"
+					/>
+					<path
+						d="M14 20v24h10l5-19 6 25 5-12h10"
+						stroke="#071013"
+						stroke-width="5.5"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					/>
+					<rect x="46" y="34" width="8" height="8" rx="1" fill="#F4FBFC" />
+				</svg>
+				<strong>LifeLink</strong>
+			</div>
+
+			<p class="kicker">Offline</p>
+			<h1>You are offline</h1>
+			<p>
+				LifeLink needs a connection to show incidents and vehicle data. Reconnect, then try
+				again. Nothing on this screen is live data.
+			</p>
+
+			<p class="tagalog" lang="tl">
+				<strong>Wala kang koneksyon.</strong> Kailangan ng koneksyon ang LifeLink para
+				ipakita ang mga insidente at datos ng sasakyan. Kumonekta muli, pagkatapos subukan
+				ulit. Walang live na datos sa screen na ito.
+			</p>
+
+			<a class="retry" href="/">Retry · Subukan ulit</a>
+
+			<p class="privacy">
+				This page is the only console page stored on the device. Incident, vehicle and
+				member data are never cached.
+			</p>
+		</main>
+	</body>
+</html>
