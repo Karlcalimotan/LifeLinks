@@ -6,6 +6,20 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Vehicle owners can register a vehicle and its emergency contacts from the
+  console. `EmergencyContact.vehicleId` attaches a contact to one vehicle (null
+  stays the admin-only organisation fallback), an owner may write only their
+  own vehicle and its contacts while an admin may write the whole organisation,
+  and every create, edit and archive writes an audit row with before/after
+  values. A vehicle with incidents or a tracker is archived as `RETIRED`, never
+  hard-deleted.
+- Alert routing prefers the vehicle's active contacts: the incident route merges
+  them ahead of the organisation phones and emails, dedupes and caps each
+  channel at ten, and the command poll sends up to two vehicle contacts as the
+  tracker's `alert_phones`, falling back to the organisation list (#127).
+
 ## [0.4.0] - 2026-11-24
 
 ### Added

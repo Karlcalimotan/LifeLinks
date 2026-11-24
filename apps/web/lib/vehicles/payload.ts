@@ -27,8 +27,11 @@ export const VEHICLE_DETAIL_SELECT = {
 	plateNo: true,
 	make: true,
 	model: true,
+	year: true,
+	vin: true,
 	driverName: true,
 	driverPhone: true,
+	ownerId: true,
 	status: true,
 	devices: {
 		select: {

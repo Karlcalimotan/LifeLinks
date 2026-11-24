@@ -122,6 +122,24 @@ InvitationToken, MembershipPermission
   explicit per-member overrides; a missing row means "use the role default".
   `Membership.revokedAt` is a soft revoke: the row keeps the person and the
   audit trail, and every request treats it as absent.
+- `EmergencyContact.vehicleId` attaches a contact to one vehicle; a null
+  `vehicleId` is the organisation-level fallback and only an admin may create
+  it. Deleting a vehicle cascades its contacts, so the console archives a
+  vehicle as `RETIRED` instead of deleting a row that has incidents or a
+  tracker. `@@unique([orgId, phone])` is kept on purpose: one phone is one
+  person in an organisation, so a shared contact stays on one vehicle and the
+  duplicate is reported instead of silently copied.
+- Alert routing reads both sources. `alertTargetsForVehicle` puts the active
+  vehicle contacts first, then the `OrgSettings` phones and emails, removes
+  duplicates and caps each channel at ten. The command poll uses
+  `alertPhonesForDevice`: up to two active vehicle contacts, with the
+  organisation phones as the fallback the tracker already expects. The incident
+  route queues `AlertDelivery` rows from the same merged targets, so the web
+  trail and the device SMS fallback agree.
+- Vehicle and contact writes follow the same scope as the pages: an owner may
+  register and edit only their own vehicle and the contacts on it, an admin the
+  whole organisation, and a responder neither. Every create, edit and archive
+  writes an `AuditLog` row with the actor and before/after values.
 
 ### Roles and scope
 
