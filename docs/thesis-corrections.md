@@ -1,24 +1,23 @@
 # Thesis corrections for the implemented system
 
 Memo for the LifeLink researchers. It compares the thesis text (v3.1, supplied
-as `v31.txt`) with the repository at `origin/develop@733b0d7` and with the
-changes queued for v0.5.0. It does not edit the `.docx`.
+as `v31.txt`) with the repository at `origin/develop@259ffe2` and with the
+v0.5.0 batch. It does not edit the `.docx`.
 
 Prepared on 25 November 2026 on branch `docs/thesis-corrections` for issue
 #132. The repository package version is `0.4.0`; the `Unreleased` section of
-`CHANGELOG.md` is the v0.5.0 set. At this commit some v0.5.0 work is merged into
-`develop` and some is still on a task branch. The status labels below say which
-is which.
+`CHANGELOG.md` is the v0.5.0 set. At this commit #130 is merged into `develop`;
+the user guide is in the same v0.5.0 batch. The status labels below say which is
+which.
 
 ## How to read the status labels
 
 - **Already true** - the current code and docs support the claim. The thesis
   wording is stale, or only needs a small clarification.
-- **Changed in v0.5.0, merged** - the change is in `develop` at `733b0d7`, under
+- **Changed in v0.5.0, merged** - the change is in `develop` at `259ffe2`, under
   the `Unreleased` section. It is not tagged as a release yet.
-- **Changed in v0.5.0, pending merge** - the change is implemented on the named
-  branch but is not on `develop` at `733b0d7`. Confirm it is in the submission
-  build before using the replacement text.
+- **In the v0.5.0 batch** - the change is committed on a task branch that is
+  merging with this batch.
 - **Pending bench** - code or configuration exists, but no hardware result has
   been recorded. Do not write it as verified.
 - **Verification needed** - the repository does not contain enough evidence.
@@ -30,11 +29,11 @@ is which.
 | --- | --- | --- | --- |
 | 1. Pin map | 3.6.3, Figure 19 | Pending bench (#54) | Do not edit either map yet |
 | 2. Retry wording | 3.3.1, 3.6.2 | Already true (v0.4.0) | Replace the two sentences |
-| 3. ERD and data model | 3.6.4 | Five models already true; `sent_at` fields pending v0.5.0 (#130) | Add the models; correct `AlertDelivery` now |
+| 3. ERD and data model | 3.6.4 | Five models already true; `sent_at` fields v0.5.0 (#130) merged | Add the models and fields; correct `AlertDelivery` now |
 | 4. Roles | 3.5.1, Chapter 1 scope | Already true (v0.4.0) | Add one paragraph on the platform administrator |
 | 5. Tool table | Table 1, Figure 5 | Verification needed | Confirm the tools before changing the row |
-| 6. PWA and user guide | 3.6.5, 3.7.2, 3.10 | v0.5.0 (#133) merged; guide pending merge | Add the PWA text; apply the guide sentence when merged |
-| 7. Transmission time | 3.8.2, 3.9.1 | v0.5.0, pending merge (#130) | Use the new `sent_at` wording only if #130 is in the build |
+| 6. PWA and user guide | 3.6.5, 3.7.2, 3.10 | v0.5.0 (#133) merged; guide in batch | Add the PWA text and the guide sentence |
+| 7. Transmission time | 3.8.2, 3.9.1 | v0.5.0 (#130) merged | Use the new `sent_at` wording |
 | 8. Retention | 3.6.5, Figure 28, privacy notice | v0.5.0 (#129) merged | Add the daily cleanup and the `CRON_SECRET` prerequisite |
 | 9. Watchdog | 3.5.2, 3.7.1 | v0.5.0 (#128) merged; bench pending | Correct the claim; keep the bench result out |
 | 10. Vehicles and contacts | 3.5.1, ISO item H1 | v0.5.0 (#127) merged | Add edit/archive and alert routing |
@@ -162,8 +161,9 @@ new trial.
 ## 3. ERD and data model (3.6.4)
 
 **Status: The five missing models are already in the schema. The
-`sentAt`/`confirmedReceivedAt` fields are v0.5.0, pending merge (#130). The
-`AlertDelivery` description is wrong now and should be corrected in any case.**
+`sentAt`/`confirmedReceivedAt` fields are v0.5.0 (#130), merged into `develop`
+at `259ffe2`. The `AlertDelivery` description is wrong now and should be
+corrected in any case.**
 
 **Current text (3.6.4):**
 
@@ -197,7 +197,7 @@ new trial.
 > insert the Entity Relationship Diagram generated from the Prisma schema here.
 
 **The five models the thesis omits.** All five are in
-`apps/web/prisma/schema.prisma` at `733b0d7`:
+`apps/web/prisma/schema.prisma` at `259ffe2`:
 
 - `PushSubscription`: `userId`, `orgId`, `endpoint` (unique), `p256dh`,
   `auth`, `userAgent`, `locale`. One row per browser push endpoint.
@@ -213,8 +213,8 @@ new trial.
   heartbeat interval and SOS retry. A null field inherits the organization
   default.
 
-**The two incident fields (v0.5.0, #130).** Add these only when the
-`sent_at` change is in the submission build:
+**The two incident fields (v0.5.0, #130, merged).** Both are in the current
+schema:
 
 - `ImpactEvent.sentAt`: the moment the countdown expired, from the GPS UTC
   clock. Captured once and never replaced by a retry.
@@ -229,7 +229,7 @@ notification." It is one row per configured phone or email target with a
 status. The server does not send SMS or email: the tracker sends the SMS, and
 no email sender is configured. The rows are the alert trail, not proof of
 delivery. `AlertChannel` also has an `HTTP` value that the incident route does
-not create. This correction does not depend on #130.
+not create. This correction is separate from the `sent_at` change.
 
 ---
 
@@ -325,8 +325,8 @@ not the repository alone.
 
 ## 6. PWA and user guide (3.6.5, 3.7.2, 3.10)
 
-**Status: The installable PWA is v0.5.0 (#133), merged. The user guide is on
-the `docs/user-guide` branch (commit `b9912e2`), pending merge.**
+**Status: The installable PWA is v0.5.0 (#133), merged into `develop`. The user
+guide is in the v0.5.0 batch at `2427885`.**
 
 **Current text (3.6.5, opening paragraph):**
 
@@ -363,36 +363,27 @@ the `docs/user-guide` branch (commit `b9912e2`), pending merge.**
 
 **Corrected text (3.10, last sentence):**
 
-> A driver and responder guide is provided in `docs/user-guide.md`; it covers
+> A driver and responder guide is provided as a separate document; it covers
 > the countdown and cancel button, the responder workflow and tracker latch,
 > administrator tasks, phone installation, privacy, and troubleshooting.
 
 **Why.** `docs/pwa.md`, `apps/web/app/manifest.ts`,
 `apps/web/components/pwa/`, `apps/web/public/sw.js` and
 `apps/web/public/offline.html` implement the manifest, install prompts, offline
-shell and cache policy. `docs/user-guide.md` exists on the `docs/user-guide`
-branch with sections for drivers, responders, administrators, phone
-installation, privacy and troubleshooting. It is not on `develop` at
-`733b0d7`.
+shell and cache policy. The guide, `docs/user-guide.md`, is in the v0.5.0 batch
+at `2427885` with sections for drivers, responders, administrators, vehicles and
+contacts, retention, phone installation, privacy and troubleshooting.
 
 **Screenshot note.** If Figures 21 and 28 were captured before v0.5.0, recapture
 them. The dashboard now shows an install banner, and Settings shows an install
 card. The offline page is a separate public page; if it is included, label it
 as the offline shell, not as a console screen.
 
-**Guide consistency warning.** The guide on `docs/user-guide` at `b9912e2`
-still says retention is not automatic, Arm and Disarm do not change detection,
-contacts are read-only and not used for routing, and the installable shell is a
-separate change. Those lines are stale. Correct them before the guide is merged
-or cited in 3.10. This memo does not edit another branch.
-
 ---
 
 ## 7. Transmission time (3.8.2, 3.9.1)
 
-**Status: Changed in v0.5.0, pending merge (#130). At `733b0d7` the fields and
-the console delay are not on `develop`. Confirm #130 is in the submission build
-before using this text.**
+**Status: Changed in v0.5.0 (#130), merged into `develop` at `259ffe2`.**
 
 **Current text (3.8.2):**
 
@@ -422,22 +413,24 @@ before using this text.**
 > done at each of the three test sites, and the transmission time is computed
 > per channel.
 
-**Why.** On the `feat/device-sent-at` branch, the firmware captures
-`g_sentAt` when the state changes to `Alerting` and back-dates it to the
-countdown deadline with `dispatchSentAt()`. `sendIncident()` includes it as
-`sent_at` on every report when the GPS clock is set. The incident route stores
-`sentAt` and `confirmedReceivedAt`; the detail page renders the delay through
+**Why.** In the merged v0.5.0 change (#130), the firmware captures `g_sentAt`
+when the state changes to `Alerting` and back-dates it to the countdown deadline
+with `dispatchSentAt()`. `sendIncident()` includes it as `sent_at` on every
+report when the GPS clock is set. The incident route stores `sentAt` and
+`confirmedReceivedAt`; the detail page renders the delay through
 `readTransmissionDelay()`. The route keeps the first value on retries. The
 helper suppresses a negative gap or a gap over one hour.
+
+**RTC note.** The build has no battery-backed RTC; the time source is GPS UTC.
+The RTC module choice and bench remain pending (#106). Do not claim an RTC
+timestamp.
 
 **Formula 3 (3.9.1).** The formula does not change. `tsent` is still the end of
 the countdown. The correction is that the value is now recorded and stored, and
 that the console delay includes the SMS attempts before the HTTPS post.
 
-**If #130 is not in the submission build,** keep the thesis's manual method and
-remove the console-delay sentence. Do not describe a field the build does not
-have. The SMS channel time is still measured from the recipient phone in either
-case.
+**Build note.** A thesis paired with a build before v0.5.0 must omit the
+`sent_at` sentence and the console delay; those fields do not exist there.
 
 ---
 
@@ -781,16 +774,15 @@ out of the thesis, or mark them pending bench:
 - the watchdog synthetic-hang reset on a real unit;
 - the absence of a false watchdog reset through a normal alert, cancel and
   acknowledgement cycle;
+- the battery-backed RTC timestamp and module choice (#106); the current build
+  uses GPS UTC and has no RTC;
 - GPS cold-start time and accuracy in the installed unit;
 - SMS delivery on the actual carrier and SIM;
 - power behavior with the actual buck, cells and modem;
 - the false-positive rate on real roads.
 
-These are pending a merge or a researcher confirmation, not a bench result:
+One item is a researcher confirmation, not a bench result:
 
-- the `sent_at` field and console delay, until #130 is merged into the
-  submission build;
-- the user guide, until `docs/user-guide` is merged;
 - a change of AI tool, until the researchers confirm it from their own records.
 
 The code and docs can support a design claim. They cannot support a bench
@@ -801,15 +793,14 @@ result.
 ## 16. Researcher checklist
 
 1. Apply items 2, 4, 10 and 11 to the text and screenshots.
-2. Apply item 6 when `docs/user-guide` is merged. Apply item 8 when v0.5.0 is
-   the submission build. Apply item 7 only after confirming that #130 is
-   included.
+2. Apply items 6, 7 and 8 against the v0.5.0 batch. #130 is merged and the user
+   guide is in the batch.
 3. Keep 3.6.3 and Figure 19 unchanged until the #54 bench record exists. Attach
    the current candidate map to #54 before the technician starts.
 4. Confirm item 5 with your own session records before changing Table 1 or
    Figure 5.
-5. Rebuild the ERD from `apps/web/prisma/schema.prisma`. If #130 is not merged,
-   omit `sentAt` and `confirmedReceivedAt`; do not draw them from memory.
+5. Rebuild the ERD from `apps/web/prisma/schema.prisma`; it includes `sentAt`
+   and `confirmedReceivedAt` in v0.5.0. Do not draw them from memory.
 6. Recapture any screenshot that shows an install surface, a vehicle or contact
    editor, Arm or Disarm, or a parked-impact toggle.
 7. Replace any privacy notice that says automatic deletion is not enabled.
