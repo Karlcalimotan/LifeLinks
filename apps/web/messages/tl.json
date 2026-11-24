@@ -19,6 +19,32 @@
 		"close": "Close",
 		"skipToContent": "Lumaktaw sa pangunahing nilalaman"
 	},
+	"pwa": {
+		"install": {
+			"cardTitle": "I-install ang console",
+			"cardBody": "I-install ang LifeLink sa teleponong ito para sa full-screen na console at mabilis na pagbukas mula sa home screen.",
+			"bannerTitle": "I-install ang LifeLink sa teleponong ito",
+			"bannerBody": "Buksan ang console sa isang tap at manatiling available ang offline page.",
+			"install": "I-install",
+			"iosTitle": "Idagdag sa Home Screen",
+			"iosBody": "Sa Safari, i-tap ang Share, pagkatapos ang Add to Home Screen.",
+			"iosBannerBody": "I-tap ang Share, pagkatapos ang Add to Home Screen para i-install ang LifeLink.",
+			"iosOtherTitle": "Buksan ang site na ito sa Safari",
+			"iosOtherBody": "Ang Safari lang ang makakapagdagdag ng LifeLink sa Home Screen sa iPhone at iPad. Buksan ang site na ito sa Safari, pagkatapos i-tap ang Share at Add to Home Screen.",
+			"iosOtherBannerBody": "Buksan ang site na ito sa Safari, pagkatapos i-tap ang Share at Add to Home Screen.",
+			"unavailableTitle": "Mag-install mula sa browser menu",
+			"unavailableBody": "Hindi nagpapakita ng install prompt ang browser na ito. Buksan ang browser menu at piliin ang Install app o Add to Home Screen.",
+			"dismiss": "Mamaya na",
+			"dismissBanner": "Isara ang install banner"
+		},
+		"update": {
+			"title": "May bagong bersyon na handa",
+			"body": "I-reload para gamitin ang pinakabagong console.",
+			"reload": "I-reload",
+			"later": "Mamaya",
+			"dismiss": "Isara ang update notice"
+		}
+	},
 	"search": {
 		"title": "Maghanap sa console",
 		"open": "Maghanap",

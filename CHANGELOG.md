@@ -19,6 +19,17 @@ All notable changes to this project are documented here. The format follows
   them ahead of the organisation phones and emails, dedupes and caps each
   channel at ten, and the command poll sends up to two vehicle contacts as the
   tracker's `alert_phones`, falling back to the organisation list (#127).
+- Installable PWA: `/manifest.webmanifest` with a locale-neutral `/` start URL
+  and scope, 192/512/maskable/Apple PNG icons rendered from the brand mark, a
+  global service worker registration that also covers the login page, install
+  prompts for Android and desktop plus iOS Add to Home Screen instructions, and
+  a waiting-worker update banner that posts `SKIP_WAITING` only on request
+  (#133).
+- A bilingual offline shell at `/offline.html`. The worker caches only public
+  build assets, the offline page, the manifest, the public icons and the brand
+  marks; API responses, RSC payloads, HTML documents, authenticated pages and
+  cross-origin requests stay network-only. Push and notification-click
+  behaviour is unchanged (#133).
 
 ## [0.4.0] - 2026-11-24
 
