@@ -40,7 +40,9 @@ export const metadata: Metadata = {
 	appleWebApp: {
 		capable: true,
 		title: APP_NAME,
-		statusBarStyle: "black-translucent",
+		// Opaque status bar: content stays below it, so the header and the
+		// update banner do not need safe-area padding.
+		statusBarStyle: "black",
 	},
 	icons: {
 		icon: [

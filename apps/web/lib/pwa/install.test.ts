@@ -6,6 +6,7 @@ import {
 	dismissInstall,
 	isInstallDismissed,
 	isIosDevice,
+	isIosSafari,
 	isStandalone,
 	resolveInstallSurface,
 } from "./install";
@@ -42,6 +43,47 @@ describe("install prompt helpers", () => {
 			isIosDevice({
 				userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
 				platform: "MacIntel",
+				maxTouchPoints: 0,
+			}),
+		).toBe(false);
+	});
+
+	it("only treats Safari as the iOS browser that can install", () => {
+		const iphone = { platform: "iPhone", maxTouchPoints: 5 };
+		const ipad = { platform: "MacIntel", maxTouchPoints: 5 };
+
+		expect(
+			isIosSafari({
+				userAgent:
+					"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+				...iphone,
+			}),
+		).toBe(true);
+		expect(
+			isIosSafari({
+				userAgent:
+					"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+				...ipad,
+			}),
+		).toBe(true);
+		expect(
+			isIosSafari({
+				userAgent:
+					"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/120.0.6099.119 Mobile/15E148 Safari/604.1",
+				...iphone,
+			}),
+		).toBe(false);
+		expect(
+			isIosSafari({
+				userAgent:
+					"Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/120.0 Mobile/15E148 Safari/605.1.15",
+				...iphone,
+			}),
+		).toBe(false);
+		expect(
+			isIosSafari({
+				userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0 Safari/537.36",
+				platform: "Win32",
 				maxTouchPoints: 0,
 			}),
 		).toBe(false);

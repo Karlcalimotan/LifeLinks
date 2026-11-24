@@ -1,13 +1,20 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 
 type Classification = "navigation" | "static" | "private" | "cross-origin";
 
+interface FakeResponse {
+	ok: boolean;
+	type: string;
+	headers: { get(name: string): string | null };
+}
+
 interface PolicyGlobal {
 	LifeLinkCachePolicy?: {
 		OFFLINE_URL: string;
+		PRECACHE_URLS: string[];
 		classifyRequest: (request: {
 			url: string;
 			method?: string;
@@ -15,6 +22,7 @@ interface PolicyGlobal {
 			origin?: string;
 			headers?: { get(name: string): string | null };
 		}) => Classification;
+		isCacheable: (response: FakeResponse | null | undefined) => boolean;
 		isStaticAsset: (pathname: string) => boolean;
 	};
 }
@@ -58,6 +66,22 @@ function request(
 	};
 }
 
+function fakeResponse({
+	ok = true,
+	type = "basic",
+	contentType = "application/javascript",
+	cacheControl = "",
+}: {
+	ok?: boolean;
+	type?: string;
+	contentType?: string;
+	cacheControl?: string;
+} = {}): FakeResponse {
+	const values: Record<string, string> = { "content-type": contentType };
+	if (cacheControl) values["cache-control"] = cacheControl;
+	return { ok, type, headers: headers(values) };
+}
+
 describe("service worker cache policy", () => {
 	it("treats same-origin navigations as network-first", () => {
 		expect(policy.classifyRequest(request("/en/dashboard", { mode: "navigate" }))).toBe(
@@ -74,7 +98,41 @@ describe("service worker cache policy", () => {
 		expect(policy.classifyRequest(request("/manifest.webmanifest"))).toBe("static");
 		expect(policy.classifyRequest(request("/offline.html"))).toBe("static");
 		expect(policy.classifyRequest(request("/logo-mark.svg"))).toBe("static");
-		expect(policy.isStaticAsset("/fonts/barlow.woff2")).toBe(true);
+		expect(policy.isStaticAsset("/_next/static/media/barlow.woff2")).toBe(true);
+		expect(policy.isStaticAsset("/fonts/barlow.woff2")).toBe(false);
+		expect(policy.isStaticAsset("/favicon.ico")).toBe(false);
+	});
+
+	it("stores only public, basic, non-document responses", () => {
+		expect(policy.isCacheable(fakeResponse())).toBe(true);
+		expect(policy.isCacheable(fakeResponse({ contentType: "image/png" }))).toBe(true);
+		expect(policy.isCacheable(fakeResponse({ contentType: "" }))).toBe(false);
+		expect(policy.isCacheable(fakeResponse({ contentType: "text/html; charset=utf-8" }))).toBe(
+			false,
+		);
+		expect(policy.isCacheable(fakeResponse({ contentType: "application/json" }))).toBe(false);
+		expect(policy.isCacheable(fakeResponse({ contentType: "text/x-component" }))).toBe(false);
+		expect(policy.isCacheable(fakeResponse({ cacheControl: "public, no-store" }))).toBe(false);
+		expect(policy.isCacheable(fakeResponse({ cacheControl: "private, max-age=60" }))).toBe(false);
+		expect(policy.isCacheable(fakeResponse({ ok: false }))).toBe(false);
+		expect(policy.isCacheable(fakeResponse({ type: "cors" }))).toBe(false);
+		expect(policy.isCacheable(fakeResponse({ type: "opaque" }))).toBe(false);
+		expect(policy.isCacheable(null)).toBe(false);
+	});
+
+	it("maps every precache URL to a public file or the manifest route", () => {
+		const publicDir = path.join(process.cwd(), "public");
+		const generatedRoutes = new Set(["/manifest.webmanifest"]);
+
+		expect(policy.PRECACHE_URLS).toContain(policy.OFFLINE_URL);
+		expect(policy.PRECACHE_URLS).toContain("/manifest.webmanifest");
+
+		for (const url of policy.PRECACHE_URLS) {
+			if (generatedRoutes.has(url)) continue;
+			expect(existsSync(path.join(publicDir, url.replace(/^\//, ""))), `${url} should exist`).toBe(
+				true,
+			);
+		}
 	});
 
 	it("never caches API responses or Next.js RSC payloads", () => {

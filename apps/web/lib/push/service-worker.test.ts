@@ -5,6 +5,12 @@ import { describe, expect, it } from "vitest";
 const source = readFileSync(path.join(process.cwd(), "public/sw.js"), "utf8");
 const policy = readFileSync(path.join(process.cwd(), "public/sw-cache-policy.js"), "utf8");
 
+function pushHandlerSource(): string {
+	const start = source.indexOf('self.addEventListener("push"');
+	const end = source.indexOf('self.addEventListener("notificationclick"');
+	return source.slice(start, end);
+}
+
 describe("service worker", () => {
 	it("handles push and notification clicks", () => {
 		expect(source).toContain('addEventListener("push"');
@@ -20,18 +26,18 @@ describe("service worker", () => {
 	});
 
 	it("reads only the agreed payload fields", () => {
+		const pushHandler = pushHandlerSource();
+		expect(pushHandler.length).toBeGreaterThan(0);
+
 		for (const field of ["incidentId", "plate", "body", "url"]) {
-			expect(source).toContain(`payload.${field}`);
+			expect(pushHandler).toContain(`payload.${field}`);
 		}
-		for (const forbidden of [
-			"payload.token",
-			"payload.p256dh",
-			"payload.auth",
-			"payload.latitude",
-			"payload.longitude",
-			"payload.phone",
-		]) {
-			expect(source).not.toContain(forbidden);
+
+		// Scan the whole push handler, not just dotted accesses, so a
+		// whole-payload leak is caught as well.
+		const lower = pushHandler.toLowerCase();
+		for (const forbidden of ["token", "p256dh", "auth", "latitude", "longitude", "phone"]) {
+			expect(lower).not.toContain(forbidden);
 		}
 	});
 
@@ -63,23 +69,43 @@ describe("service worker", () => {
 	});
 
 	it("refuses to store documents and private responses", () => {
-		expect(source).toContain("text/html");
-		expect(source).toContain("application/json");
-		expect(source).toContain("text/x-component");
-		expect(source).toContain("no-store");
+		expect(policy).toContain("function isCacheable");
+		expect(policy).toContain("text/html");
+		expect(policy).toContain("application/json");
+		expect(policy).toContain("text/x-component");
+		expect(policy).toContain("no-store");
+		expect(policy).toContain("private");
 		expect(policy).toContain("/api/");
 		expect(policy).toContain("_rsc");
+		expect(source).toContain("isCacheable");
 		expect(source).not.toContain("indexedDB");
 	});
 
-	it("waits for the update message before activating", () => {
+	it("precaches each URL and makes only the offline page mandatory", () => {
+		expect(source).toContain("Promise.allSettled");
+		expect(source).toContain("cache.add(");
+		expect(source).not.toContain("cache.addAll");
+		expect(source).toContain("url === OFFLINE_URL");
+		expect(source).toContain("console.error");
+	});
+
+	it("uses the cached offline page instead of a second copy", () => {
+		expect(source).toContain("cache.match(OFFLINE_URL)");
+		expect(source).not.toContain("<!doctype");
+		expect(source).not.toContain("<html");
+		expect(source).not.toContain("OFFLINE_FALLBACK");
+	});
+
+	it("waits for a same-origin update message before activating", () => {
 		const install = source.slice(
 			source.indexOf('addEventListener("install"'),
 			source.indexOf('addEventListener("activate"'),
 		);
 		expect(install).not.toContain("skipWaiting");
-		expect(source).toContain('event.data.type === "SKIP_WAITING"');
+		expect(source).toContain('event.data.type !== "SKIP_WAITING"');
 		expect(source).toContain("self.skipWaiting()");
+		expect(source).toContain("event.source");
+		expect(source).toContain("isSameOriginClient");
 	});
 
 	it("delegates URL safety to the tested guard", () => {

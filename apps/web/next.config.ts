@@ -56,6 +56,12 @@ const nextConfig: NextConfig = {
 				source: "/manifest.webmanifest",
 				headers: [{ key: "Cache-Control", value: "no-cache" }],
 			},
+			{
+				// Icons are precached, but a replaced icon must still be
+				// revalidated instead of being pinned by the HTTP cache.
+				source: "/icons/:path*",
+				headers: [{ key: "Cache-Control", value: "no-cache" }],
+			},
 		];
 	},
 };

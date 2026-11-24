@@ -15,6 +15,17 @@ export interface BeforeInstallPromptLike {
 
 export type InstallSurface = "installed" | "prompt" | "ios" | "unavailable";
 
+export interface IosDeviceInput {
+	userAgent: string;
+	platform: string;
+	maxTouchPoints: number;
+}
+
+// Chrome, Firefox, Edge, Opera, DuckDuckGo, the Google app and common in-app
+// browsers on iOS can show the site but cannot add it to the Home Screen.
+const NON_SAFARI_IOS_BROWSER =
+	/crios|fxios|edgios|opios|duckduckgo|gsa|fbav|fban|instagram|line\//i;
+
 export function isStandalone({
 	displayModeStandalone,
 	navigatorStandalone,
@@ -26,17 +37,18 @@ export function isStandalone({
 }
 
 /** iPadOS reports a Mac user agent, so the touch count is part of the check. */
-export function isIosDevice({
-	userAgent,
-	platform,
-	maxTouchPoints,
-}: {
-	userAgent: string;
-	platform: string;
-	maxTouchPoints: number;
-}): boolean {
+export function isIosDevice({ userAgent, platform, maxTouchPoints }: IosDeviceInput): boolean {
 	if (/iphone|ipad|ipod/i.test(userAgent)) return true;
 	return platform === "MacIntel" && maxTouchPoints > 1;
+}
+
+/**
+ * Safari is the only iOS browser that can install a web app. The other iOS
+ * browsers need "open in Safari" instructions instead of "tap Share here".
+ */
+export function isIosSafari(input: IosDeviceInput): boolean {
+	if (!isIosDevice(input)) return false;
+	return !NON_SAFARI_IOS_BROWSER.test(input.userAgent);
 }
 
 export function canPromptInstall(

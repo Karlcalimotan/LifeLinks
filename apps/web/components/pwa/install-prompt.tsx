@@ -9,10 +9,11 @@ import {
 	dismissInstall,
 	isInstallDismissed,
 	isIosDevice,
+	isIosSafari,
 	isStandalone,
 	resolveInstallSurface,
 } from "@/lib/pwa/install";
-import { Download, Share2, X } from "lucide-react";
+import { Download, ExternalLink, Share2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import {
 	type ReactNode,
@@ -60,6 +61,7 @@ bindCapture();
 interface InstallPromptValue {
 	ready: boolean;
 	surface: InstallSurface;
+	iosSafari: boolean;
 	dismissed: boolean;
 	promptInstall(): Promise<void>;
 	dismissBanner(): void;
@@ -78,6 +80,7 @@ function browserStorage(): Storage | undefined {
 export function InstallPromptProvider({ children }: { children: ReactNode }) {
 	const [promptEvent, setPromptEvent] = useState<InstallPromptEvent | null>(null);
 	const [ios, setIos] = useState(false);
+	const [iosSafari, setIosSafari] = useState(false);
 	const [standalone, setStandalone] = useState(false);
 	const [installed, setInstalled] = useState(false);
 	const [dismissed, setDismissed] = useState(false);
@@ -108,13 +111,13 @@ export function InstallPromptProvider({ children }: { children: ReactNode }) {
 		};
 
 		syncStandalone();
-		setIos(
-			isIosDevice({
-				userAgent: navigator.userAgent,
-				platform: navigator.platform,
-				maxTouchPoints: navigator.maxTouchPoints,
-			}),
-		);
+		const device = {
+			userAgent: navigator.userAgent,
+			platform: navigator.platform,
+			maxTouchPoints: navigator.maxTouchPoints,
+		};
+		setIos(isIosDevice(device));
+		setIosSafari(isIosSafari(device));
 		setDismissed(isInstallDismissed(browserStorage()));
 		setReady(true);
 
@@ -147,8 +150,8 @@ export function InstallPromptProvider({ children }: { children: ReactNode }) {
 	});
 
 	const value = useMemo<InstallPromptValue>(
-		() => ({ ready, surface, dismissed, promptInstall, dismissBanner }),
-		[ready, surface, dismissed, promptInstall, dismissBanner],
+		() => ({ ready, surface, iosSafari, dismissed, promptInstall, dismissBanner }),
+		[ready, surface, iosSafari, dismissed, promptInstall, dismissBanner],
 	);
 
 	return <InstallPromptContext.Provider value={value}>{children}</InstallPromptContext.Provider>;
@@ -163,26 +166,25 @@ function useInstallPrompt(): InstallPromptValue {
 /** Dismissible install banner for the dashboard. */
 export function InstallBanner() {
 	const t = useTranslations("pwa.install");
-	const { ready, surface, dismissed, promptInstall, dismissBanner } = useInstallPrompt();
+	const { ready, surface, iosSafari, dismissed, promptInstall, dismissBanner } = useInstallPrompt();
 
 	if (!ready || dismissed || surface === "installed" || surface === "unavailable") return null;
 
 	const ios = surface === "ios";
-	const Icon = ios ? Share2 : Download;
+	const iosOther = ios && !iosSafari;
+	const Icon = iosOther ? ExternalLink : ios ? Share2 : Download;
+	const title = iosOther ? t("iosOtherTitle") : ios ? t("iosTitle") : t("bannerTitle");
+	const body = iosOther ? t("iosOtherBannerBody") : ios ? t("iosBannerBody") : t("bannerBody");
 
 	return (
 		<section
 			className="mb-4 flex items-start gap-3 rounded-panel border border-signal-500/35 bg-ink-800 px-4 py-3"
-			aria-label={t("bannerTitle")}
+			aria-label={title}
 		>
 			<Icon className="mt-0.5 size-5 shrink-0 text-signal-400" aria-hidden="true" />
 			<div className="min-w-0 flex-1">
-				<p className="text-body font-medium text-fog-100">
-					{ios ? t("iosTitle") : t("bannerTitle")}
-				</p>
-				<p className="mt-0.5 text-meta leading-relaxed text-fog-400">
-					{ios ? t("iosBannerBody") : t("bannerBody")}
-				</p>
+				<p className="text-body font-medium text-fog-100">{title}</p>
+				<p className="mt-0.5 text-meta leading-relaxed text-fog-400">{body}</p>
 				<div className="mt-2 flex flex-wrap items-center gap-2">
 					{ios ? null : (
 						<Button type="button" size="sm" onClick={() => void promptInstall()}>
@@ -209,22 +211,33 @@ export function InstallBanner() {
 /** Settings card. Hidden once the app runs as an installed standalone window. */
 export function InstallCard() {
 	const t = useTranslations("pwa.install");
-	const { ready, surface, promptInstall } = useInstallPrompt();
+	const { ready, surface, iosSafari, promptInstall } = useInstallPrompt();
 
 	if (!ready || surface === "installed") return null;
 
 	const ios = surface === "ios";
+	const iosOther = ios && !iosSafari;
 	const unavailable = surface === "unavailable";
+	const title = iosOther
+		? t("iosOtherTitle")
+		: ios
+			? t("iosTitle")
+			: unavailable
+				? t("unavailableTitle")
+				: t("cardTitle");
+	const body = iosOther
+		? t("iosOtherBody")
+		: ios
+			? t("iosBody")
+			: unavailable
+				? t("unavailableBody")
+				: t("cardBody");
 
 	return (
 		<Card>
 			<CardHeader>
-				<CardTitle>
-					{ios ? t("iosTitle") : unavailable ? t("unavailableTitle") : t("cardTitle")}
-				</CardTitle>
-				<CardDescription>
-					{ios ? t("iosBody") : unavailable ? t("unavailableBody") : t("cardBody")}
-				</CardDescription>
+				<CardTitle>{title}</CardTitle>
+				<CardDescription>{body}</CardDescription>
 			</CardHeader>
 			{ios || unavailable ? null : (
 				<CardContent>

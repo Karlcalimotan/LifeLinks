@@ -17,7 +17,7 @@ describe("app manifest", () => {
 		expect(app.scope).toBe("/");
 		expect(app.display).toBe("standalone");
 		expect(app.display_override).toContain("standalone");
-		expect(app.orientation).toBe("portrait-primary");
+		expect(app.orientation).toBe("any");
 		expect(app.background_color).toBe("#071013");
 		expect(app.theme_color).toBe("#071013");
 	});
