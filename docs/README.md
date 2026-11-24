@@ -16,6 +16,7 @@
 | [agents.md](agents.md) | Multi-agent roles, worktrees, issue-first and merge policy |
 | [runbook.md](runbook.md) | Build, flash, provisioning, health checks, troubleshooting |
 | [current-state.md](current-state.md) | Setup baseline and gaps before the work phases |
+| [thesis-corrections.md](thesis-corrections.md) | Thesis v3.1 corrections against the v0.5.0 batch, with section-level replacement text |
 | [adr/](adr/) | Architecture decisions and the template |
 | [../stack/README.md](../stack/README.md) | Scaffold and generators |
 
