@@ -2,22 +2,21 @@
 
 Memo for the LifeLink researchers. It compares the thesis text (v3.1, supplied
 as `v31.txt`) with the repository at `origin/develop@259ffe2` and with the
-v0.5.0 batch. It does not edit the `.docx`.
+v0.4.0 batch. It does not edit the `.docx`.
 
 Prepared on 25 November 2026 on branch `docs/thesis-corrections` for issue
-#132. The repository package version is `0.4.0`; the `Unreleased` section of
-`CHANGELOG.md` is the v0.5.0 set. At this commit #130 is merged into `develop`;
-the user guide is in the same v0.5.0 batch. The status labels below say which is
-which.
+#132. The repository package version is `0.4.0`; the v0.4.0 release section of
+`CHANGELOG.md` is the batch. At this commit #130 and the user guide are merged
+into `develop`. The status labels below say which is which.
 
 ## How to read the status labels
 
 - **Already true** - the current code and docs support the claim. The thesis
   wording is stale, or only needs a small clarification.
-- **Changed in v0.5.0, merged** - the change is in `develop` at `259ffe2`, under
-  the `Unreleased` section. It is not tagged as a release yet.
-- **In the v0.5.0 batch** - the change is committed on a task branch that is
-  merging with this batch.
+- **Changed in v0.4.0, merged** - the change is merged into `develop` and is
+  part of the v0.4.0 release. It is not tagged as a release yet.
+- **Merged in the v0.4.0 batch** - the change is merged into `develop` with this
+  batch.
 - **Pending bench** - code or configuration exists, but no hardware result has
   been recorded. Do not write it as verified.
 - **Verification needed** - the repository does not contain enough evidence.
@@ -29,15 +28,15 @@ which.
 | --- | --- | --- | --- |
 | 1. Pin map | 3.6.3, Figure 19 | Pending bench (#54) | Do not edit either map yet |
 | 2. Retry wording | 3.3.1, 3.6.2 | Already true (v0.4.0) | Replace the two sentences |
-| 3. ERD and data model | 3.6.4 | Five models already true; `sent_at` fields v0.5.0 (#130) merged | Add the models and fields; correct `AlertDelivery` now |
+| 3. ERD and data model | 3.6.4 | Five models already true; `sent_at` fields v0.4.0 (#130) merged | Add the models and fields; correct `AlertDelivery` now |
 | 4. Roles | 3.5.1, Chapter 1 scope | Already true (v0.4.0) | Add one paragraph on the platform administrator |
 | 5. Tool table | Table 1, Figure 5 | Verification needed | Confirm the tools before changing the row |
-| 6. PWA and user guide | 3.6.5, 3.7.2, 3.10 | v0.5.0 (#133) merged; guide in batch | Add the PWA text and the guide sentence |
-| 7. Transmission time | 3.8.2, 3.9.1 | v0.5.0 (#130) merged | Use the new `sent_at` wording |
-| 8. Retention | 3.6.5, Figure 28, privacy notice | v0.5.0 (#129) merged | Add the daily cleanup and the `CRON_SECRET` prerequisite |
-| 9. Watchdog | 3.5.2, 3.7.1 | v0.5.0 (#128) merged; bench pending | Correct the claim; keep the bench result out |
-| 10. Vehicles and contacts | 3.5.1, ISO item H1 | v0.5.0 (#127) merged | Add edit/archive and alert routing |
-| 11. Arm/Disarm and parked impact | 3.6.5 screenshots | v0.5.0 (#137) merged | Replace or annotate affected screenshots |
+| 6. PWA and user guide | 3.6.5, 3.7.2, 3.10 | v0.4.0 (#133) merged; guide merged | Add the PWA text and the guide sentence |
+| 7. Transmission time | 3.8.2, 3.9.1 | v0.4.0 (#130) merged | Use the new `sent_at` wording |
+| 8. Retention | 3.6.5, Figure 28, privacy notice | v0.4.0 (#129) merged | Add the daily cleanup and the `CRON_SECRET` prerequisite |
+| 9. Watchdog | 3.5.2, 3.7.1 | v0.4.0 (#128) merged; bench pending | Correct the claim; keep the bench result out |
+| 10. Vehicles and contacts | 3.5.1, ISO item H1 | v0.4.0 (#127) merged | Add edit/archive and alert routing |
+| 11. Arm/Disarm and parked impact | 3.6.5 screenshots | v0.4.0 (#137) merged | Replace or annotate affected screenshots |
 | 12. Other stale claims | privacy notice, 3.6.4, 3.7.1, 3.7.2 | Mixed | Apply each correction below |
 | 13. Four development cycles | Definition, 3.4.3, Table 2, 3.10 | No change | Leave as is unless the researchers add a cycle |
 
@@ -161,7 +160,7 @@ new trial.
 ## 3. ERD and data model (3.6.4)
 
 **Status: The five missing models are already in the schema. The
-`sentAt`/`confirmedReceivedAt` fields are v0.5.0 (#130), merged into `develop`
+`sentAt`/`confirmedReceivedAt` fields are v0.4.0 (#130), merged into `develop`
 at `259ffe2`. The `AlertDelivery` description is wrong now and should be
 corrected in any case.**
 
@@ -213,7 +212,7 @@ corrected in any case.**
   heartbeat interval and SOS retry. A null field inherits the organization
   default.
 
-**The two incident fields (v0.5.0, #130, merged).** Both are in the current
+**The two incident fields (v0.4.0, #130, merged).** Both are in the current
 schema:
 
 - `ImpactEvent.sentAt`: the moment the countdown expired, from the GPS UTC
@@ -297,7 +296,7 @@ workflow:
 - `docs/agents.md` says the definitions live in `.opencode/agents/` and that
   "OpenCode discovers them from the project."
 - The issue-first, worktree and subagent workflow in `AGENTS.md` and
-  `docs/agents.md` is the workflow used for the v0.4.0 and v0.5.0 changes.
+  `docs/agents.md` is the workflow used for the v0.4.0 and v0.4.0 changes.
 
 The repository does not record a model per commit, and it contains no record of
 Claude or Claude Code. This memo was prepared in OpenCode on DeepSeek V4.1
@@ -325,8 +324,8 @@ not the repository alone.
 
 ## 6. PWA and user guide (3.6.5, 3.7.2, 3.10)
 
-**Status: The installable PWA is v0.5.0 (#133), merged into `develop`. The user
-guide is in the v0.5.0 batch at `2427885`.**
+**Status: The installable PWA is v0.4.0 (#133), merged into `develop`. The user
+guide is merged into `develop`.**
 
 **Current text (3.6.5, opening paragraph):**
 
@@ -370,11 +369,11 @@ guide is in the v0.5.0 batch at `2427885`.**
 **Why.** `docs/pwa.md`, `apps/web/app/manifest.ts`,
 `apps/web/components/pwa/`, `apps/web/public/sw.js` and
 `apps/web/public/offline.html` implement the manifest, install prompts, offline
-shell and cache policy. The guide, `docs/user-guide.md`, is in the v0.5.0 batch
-at `2427885` with sections for drivers, responders, administrators, vehicles and
+shell and cache policy. The guide, `docs/user-guide.md`, is merged into `develop`
+with sections for drivers, responders, administrators, vehicles and
 contacts, retention, phone installation, privacy and troubleshooting.
 
-**Screenshot note.** If Figures 21 and 28 were captured before v0.5.0, recapture
+**Screenshot note.** If Figures 21 and 28 were captured before v0.4.0, recapture
 them. The dashboard now shows an install banner, and Settings shows an install
 card. The offline page is a separate public page; if it is included, label it
 as the offline shell, not as a console screen.
@@ -383,7 +382,7 @@ as the offline shell, not as a console screen.
 
 ## 7. Transmission time (3.8.2, 3.9.1)
 
-**Status: Changed in v0.5.0 (#130), merged into `develop` at `259ffe2`.**
+**Status: Changed in v0.4.0 (#130), merged into `develop` at `259ffe2`.**
 
 **Current text (3.8.2):**
 
@@ -413,7 +412,7 @@ as the offline shell, not as a console screen.
 > done at each of the three test sites, and the transmission time is computed
 > per channel.
 
-**Why.** In the merged v0.5.0 change (#130), the firmware captures `g_sentAt`
+**Why.** In the merged v0.4.0 change (#130), the firmware captures `g_sentAt`
 when the state changes to `Alerting` and back-dates it to the countdown deadline
 with `dispatchSentAt()`. `sendIncident()` includes it as `sent_at` on every
 report when the GPS clock is set. The incident route stores `sentAt` and
@@ -429,14 +428,14 @@ timestamp.
 the countdown. The correction is that the value is now recorded and stored, and
 that the console delay includes the SMS attempts before the HTTPS post.
 
-**Build note.** A thesis paired with a build before v0.5.0 must omit the
+**Build note.** A thesis paired with a build before v0.4.0 must omit the
 `sent_at` sentence and the console delay; those fields do not exist there.
 
 ---
 
 ## 8. Retention (3.6.5, Figure 28, privacy notice)
 
-**Status: Changed in v0.5.0 (#129), merged.**
+**Status: Changed in v0.4.0 (#129), merged.**
 
 **Current text (Figure 28):**
 
@@ -495,7 +494,7 @@ so a deployment without it enforces nothing.
 
 ## 9. Watchdog (3.5.2, 3.7.1)
 
-**Status: Changed in v0.5.0 (#128), merged. The synthetic-hang reset and the
+**Status: Changed in v0.4.0 (#128), merged. The synthetic-hang reset and the
 no-false-reset check are pending bench.**
 
 **Current text (3.5.2):**
@@ -548,7 +547,7 @@ correction, not a bench result.
 
 ## 10. Vehicles and contacts (3.5.1, ISO item H1)
 
-**Status: Changed in v0.5.0 (#127), merged. The thesis claim is now true.**
+**Status: Changed in v0.4.0 (#127), merged. The thesis claim is now true.**
 
 **Current text (3.5.1):**
 
@@ -591,14 +590,14 @@ use case.
 **Implementation note, not thesis text.** The console's notifications page
 still has a stale `contactsSubtitle` string in `apps/web/messages/en.json` and
 `tl.json` that says contacts are read-only and not used for routing. That
-contradicts v0.5.0 and should be fixed in a separate code or copy change. The
+contradicts v0.4.0 and should be fixed in a separate code or copy change. The
 thesis does not contain that sentence.
 
 ---
 
 ## 11. Arm/Disarm and parked impact (3.6.5, Figures 27 and 28)
 
-**Status: Changed in v0.5.0 (#137), merged.**
+**Status: Changed in v0.4.0 (#137), merged.**
 
 **Current text.** There is none. The v3.1 thesis text does not mention Arm,
 Disarm, or a parked-impact setting. The risk is in the screenshots.
@@ -628,7 +627,7 @@ envelope. `docs/safety.md` says there is no parked mode.
 
 ### 12a. Privacy notice
 
-**Status: Changed in v0.5.0 (#129), merged.**
+**Status: Changed in v0.4.0 (#129), merged.**
 
 Use the current text in item 8. The notice now says the retention periods are
 enforced by a scheduled daily cleanup and that telemetry and incident records
@@ -673,7 +672,7 @@ record; the tracker may send more than one SMS while the alarm is latched."
 
 ### 12f. Screenshots
 
-**Status: v0.5.0 changes; recapture if the current screenshots predate them.**
+**Status: v0.4.0 changes; recapture if the current screenshots predate them.**
 
 Check Figures 20 to 28 for these changes:
 
@@ -732,10 +731,10 @@ This is a wording correction, not a security finding.
 
 **Why.** Four cycles is a research-process claim, not a commit count. The
 repository has many commits and several release batches (`package.json` is
-`0.4.0`, the `Unreleased` section is the v0.5.0 set), but a release batch is not
+`0.4.0`, the `Unreleased` section is the v0.4.0 set), but a release batch is not
 an iteration. No evidence in the repository contradicts four cycles.
 
-If the researchers count the v0.5.0 work as a fifth cycle, update the
+If the researchers count the v0.4.0 work as a fifth cycle, update the
 Definition of Terms, 3.4.3, Table 2 and 3.10 together. Otherwise leave the
 claim as it is. Do not change "four" to match the number of releases.
 
@@ -793,14 +792,14 @@ result.
 ## 16. Researcher checklist
 
 1. Apply items 2, 4, 10 and 11 to the text and screenshots.
-2. Apply items 6, 7 and 8 against the v0.5.0 batch. #130 is merged and the user
-   guide is in the batch.
+2. Apply items 6, 7 and 8 against the v0.4.0 batch. #130 is merged and the user
+   guide is merged.
 3. Keep 3.6.3 and Figure 19 unchanged until the #54 bench record exists. Attach
    the current candidate map to #54 before the technician starts.
 4. Confirm item 5 with your own session records before changing Table 1 or
    Figure 5.
 5. Rebuild the ERD from `apps/web/prisma/schema.prisma`; it includes `sentAt`
-   and `confirmedReceivedAt` in v0.5.0. Do not draw them from memory.
+   and `confirmedReceivedAt` in v0.4.0. Do not draw them from memory.
 6. Recapture any screenshot that shows an install surface, a vehicle or contact
    editor, Arm or Disarm, or a parked-impact toggle.
 7. Replace any privacy notice that says automatic deletion is not enabled.
