@@ -9,16 +9,18 @@
  *
  * Keep this file dependency free and classic-script compatible.
  */
-function safeNotificationUrl(value, origin) {
-	if (typeof value !== "string") return "/";
-	if (!value.startsWith("/") || value.startsWith("//")) return "/";
-	try {
-		const parsed = new URL(value, origin);
-		if (parsed.origin !== origin) return "/";
-		return `${parsed.pathname}${parsed.search}${parsed.hash}`;
-	} catch {
-		return "/";
+(() => {
+	function safeNotificationUrl(value, origin) {
+		if (typeof value !== "string") return "/";
+		if (!value.startsWith("/") || value.startsWith("//")) return "/";
+		try {
+			const parsed = new URL(value, origin);
+			if (parsed.origin !== origin) return "/";
+			return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+		} catch {
+			return "/";
+		}
 	}
-}
 
-self.LifeLinkPushUrl = { safeNotificationUrl };
+	self.LifeLinkPushUrl = { safeNotificationUrl };
+})();
