@@ -244,6 +244,17 @@ Requires `Authorization: Bearer $CRON_SECRET`. Writes at most one
 `DEVICE_OFFLINE` event per device per hour when `lastSeenAt` is older than the
 offline window. It never changes an incident.
 
+### `GET /api/cron/retention`
+
+Requires `Authorization: Bearer $CRON_SECRET`; `503` when the secret is not
+configured and `401` when the header is wrong. Deletes telemetry and incidents
+older than each organisation's configured retention periods in bounded batches
+and writes one `retention.cleanup` audit row per organisation. `?dryRun=1`
+returns the counts without deleting. The response contains cutoffs and counts
+only, never row contents or the secret. See
+[`deployment.md`](deployment.md#scheduled-retention-cleanup) for the schedule
+and operation.
+
 ### `GET /api/health`
 
 Returns `200` when PostgreSQL answers `SELECT 1`, `503` otherwise. No auth. The

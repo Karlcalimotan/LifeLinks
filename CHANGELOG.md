@@ -30,6 +30,13 @@ All notable changes to this project are documented here. The format follows
   marks; API responses, RSC payloads, HTML documents, authenticated pages and
   cross-origin requests stay network-only. Push and notification-click
   behaviour is unchanged (#133).
+- Telemetry and incident retention are now enforced by a daily
+  `GET /api/cron/retention` job. It requires `Authorization: Bearer
+  $CRON_SECRET`, fails closed with `503` when the secret is not configured,
+  deletes rows older than each organisation's configured periods in bounded
+  batches, supports `?dryRun=1` for counts without deletion, and writes one
+  `retention.cleanup` audit row per organisation with the cutoffs and counts.
+  The privacy notice now describes the automatic deletion (#129).
 
 ## [0.4.0] - 2026-11-24
 
