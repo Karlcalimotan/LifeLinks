@@ -48,6 +48,25 @@ pio device monitor -b 115200
 The default environment is `esp32dev`. The partition table is `min_spiffs.csv`,
 which leaves room for a future signed OTA slot.
 
+## Incident timing
+
+The incident payload carries two device times, both GPS UTC epoch seconds from
+the tracker's fix:
+
+- `detected_at` is the impact detection. It is `0` when the clock was not set,
+  and the console falls back to its receipt time for the row.
+- `sent_at` is the countdown expiry, the moment the emergency alert starts. It
+  is derived from the countdown deadline, not from the loop pass that notices
+  the expiry, so a blocking modem phase cannot add its delay. The value is
+  captured once per incident; every retry reports the original. Without a GPS
+  fix the payload omits it instead of sending a fabricated time.
+
+The console measures transmission time from this alert start to the receipt of
+the first `CONFIRMED` report (`ImpactEvent.confirmedReceivedAt`), and the SMS
+attempts run before the incident HTTP post, so they are included in the
+interval. The thesis measurement therefore needs a GPS fix at dispatch. Without
+one there is no `sent_at` and the console shows no delay.
+
 ## Native tests
 
 ```bash

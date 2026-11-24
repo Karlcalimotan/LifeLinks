@@ -149,7 +149,8 @@ bool g_allClearPending = false;
 
 String g_incidentId;
 uint32_t g_detectedAt = 0;
-// The moment the countdown expired and the emergency alert started. Captured
+// The moment the countdown expired and the emergency alert started, derived
+// from the countdown deadline rather than from the observation time. Captured
 // once per incident, from the same GPS clock as g_detectedAt, and never
 // replaced by a retry: the console measures transmission time from this value.
 uint32_t g_sentAt = 0;
@@ -2218,10 +2219,12 @@ void loop() {
 		if (state == fw::AlertState::Alerting && g_lastState != fw::AlertState::Alerting) {
 			g_alertStartedAt = now;
 			// The dispatch time is the countdown expiry, not the retry that
-			// happens to leave the modem. This transition fires once, so every
-			// retry of the incident reports the original value. 0 means the GPS
-			// clock was not set; the payload then omits sent_at.
-			g_sentAt = gpsEpochSeconds();
+			// happens to leave the modem, and not the sample that noticed the
+			// expiry after a blocking modem phase. dispatchSentAt back-dates the
+			// observation to the deadline. This transition fires once, so every
+			// retry reports the original value. 0 means the GPS clock was not
+			// set; the payload then omits sent_at.
+			g_sentAt = fw::dispatchSentAt(gpsEpochSeconds(), now, g_safety.countdownEndMs());
 			g_buzzer.setPattern(fw::BuzzerPattern::Alerting, now);
 		}
 

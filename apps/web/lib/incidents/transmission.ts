@@ -1,4 +1,8 @@
-/** The longest send-to-receive gap treated as a plausible console delay. */
+/**
+ * The longest send-to-receive gap treated as a plausible console delay. A gap
+ * beyond this is a clock error, not a link that slow, so it is not reported as
+ * a measurement.
+ */
 export const MAX_TRANSMISSION_DELAY_S = 3600;
 
 export interface TransmissionDelay {
@@ -11,20 +15,24 @@ export interface TransmissionDelay {
 /**
  * Transmission delay for a dispatched incident: the gap between the moment the
  * tracker started the emergency alert and the moment the console stored the
- * report.
+ * dispatched CONFIRMED report.
  *
- * Returns null when the tracker recorded no send time, or when the gap is not a
- * plausible network delay. A negative gap means the device clock is ahead of
- * the console clock, and anything over an hour is a clock error rather than a
- * link that slow. Showing either would misstate the measurement, so the page
- * makes no claim instead.
+ * `receivedAt` must be the receipt of that CONFIRMED report, not the row
+ * creation time: a SUSPECTED report creates the row before the countdown ends,
+ * and anchoring the delay there would produce a negative value in the normal
+ * flow.
+ *
+ * Returns null when either time is missing, or when the gap is not a plausible
+ * network delay. A negative gap means the device clock is ahead of the console
+ * clock. Showing either would misstate the measurement, so the page makes no
+ * claim instead.
  */
 export function readTransmissionDelay(input: {
 	sentAt: Date | null | undefined;
-	createdAt: Date;
+	receivedAt: Date | null | undefined;
 }): TransmissionDelay | null {
-	if (!input.sentAt) return null;
-	const deltaMs = input.createdAt.getTime() - input.sentAt.getTime();
+	if (!input.sentAt || !input.receivedAt) return null;
+	const deltaMs = input.receivedAt.getTime() - input.sentAt.getTime();
 	if (!Number.isFinite(deltaMs)) return null;
 	const seconds = deltaMs / 1000;
 	if (seconds < 0 || seconds > MAX_TRANSMISSION_DELAY_S) return null;

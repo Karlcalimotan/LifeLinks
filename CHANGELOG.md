@@ -9,11 +9,13 @@ All notable changes to this project are documented here. The format follows
 ### Added
 
 - The tracker records `sent_at` once, when the countdown expires and the
-  emergency alert starts, and repeats the same value on every retry.
+  emergency alert starts, back-dated from the countdown deadline to GPS UTC.
   `ImpactEvent.sentAt` stores it only when the device clock passes the same
-  plausibility check as `detected_at`, a retry never replaces a stored value,
-  and the incident detail shows "Tracker sent at HH:MM:SS" with the console
-  delay when the gap is between 0 and 3600 seconds (#130).
+  plausibility check as `detected_at`, and a retry never replaces it.
+  `ImpactEvent.confirmedReceivedAt` anchors the console receipt of the first
+  `CONFIRMED` report, so the incident detail shows "Tracker sent at HH:MM:SS"
+  with the alert-start to receipt delay (0 to 3600 seconds) rather than the
+  earlier `createdAt` of the suspected row (#130).
 - Vehicle owners can register a vehicle and its emergency contacts from the
   console. `EmergencyContact.vehicleId` attaches a contact to one vehicle (null
   stays the admin-only organisation fallback), an owner may write only their

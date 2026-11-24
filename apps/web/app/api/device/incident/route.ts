@@ -43,6 +43,7 @@ interface ExistingIncident {
 	lng: number | null;
 	gpsAgeS: number | null;
 	sentAt: Date | null;
+	confirmedReceivedAt: Date | null;
 	evidence: Prisma.JsonValue | null;
 }
 
@@ -76,6 +77,7 @@ async function confirmExistingIncident({
 	input,
 	hasFix,
 	sentAt,
+	receivedAt,
 	targets,
 }: {
 	tx: Prisma.TransactionClient;
@@ -84,6 +86,7 @@ async function confirmExistingIncident({
 	input: IncidentInput;
 	hasFix: boolean;
 	sentAt: Date | null;
+	receivedAt: Date;
 	targets: AlertTargets;
 }): Promise<{ transitioned: boolean; queued: number }> {
 	const updated = await tx.impactEvent.updateMany({
@@ -97,6 +100,9 @@ async function confirmExistingIncident({
 			// The first send time is the countdown expiry. A retry that carries
 			// no time, or a different one, never replaces the stored value.
 			sentAt: incident.sentAt ?? sentAt,
+			// The delay is measured from the receipt of the dispatched report,
+			// so the first CONFIRMED receipt is the anchor. Later retries keep it.
+			confirmedReceivedAt: incident.confirmedReceivedAt ?? receivedAt,
 			evidence: (input.evidence ?? incident.evidence ?? {}) as Prisma.InputJsonValue,
 		},
 	});
@@ -147,6 +153,10 @@ async function confirmExistingIncident({
  */
 export const POST = withApi(
 	async (request) => {
+		// Receipt anchor for this report. The dispatched CONFIRMED report is the
+		// one the transmission delay is measured from, not the earlier SUSPECTED
+		// row creation.
+		const receivedAt = new Date();
 		const device = await requireDevice(request);
 		if (!isDeviceApproved(device)) throw forbidden("Device is not approved.");
 
@@ -223,6 +233,7 @@ export const POST = withApi(
 						input,
 						hasFix,
 						sentAt,
+						receivedAt,
 						targets,
 					});
 					queued = result.queued;
@@ -282,6 +293,7 @@ export const POST = withApi(
 						clientIncidentId: input.incident_id,
 						detectedAt,
 						sentAt,
+						confirmedReceivedAt: status === "CONFIRMED" ? receivedAt : null,
 						peakAccelG: input.peak_accel_g,
 						tiltDeg: input.tilt_deg,
 						vibrationCount: input.vibration_count,

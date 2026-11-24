@@ -154,7 +154,7 @@ in the past is ignored and the receipt time is used.
   "lat": 10.3157,
   "lng": 123.8854,
   "gps_age_s": 3,
-  "status": "SUSPECTED",
+  "status": "CONFIRMED",
   "cancelled": false,
   "evidence": {
     "samples": [{ "t": 1763472000, "accel_g": 3.8, "tilt_deg": 72 }]
@@ -164,11 +164,19 @@ in the past is ignored and the receipt time is used.
 
 - `status` is `SUSPECTED`, `CONFIRMED` or `CANCELLED`.
 - `sent_at` is the Unix second when the countdown expired and the alert
-  started. The tracker captures it once and repeats the same value on every
-  retry; a `SUSPECTED` report before the countdown, or a tracker whose clock was
-  never set, omits it. The console stores `sentAt` only when the value passes
-  the same clock-plausibility check as `detected_at`, and a retry never replaces
-  a stored value.
+  started. It is GPS UTC from the tracker's fix, not network time; the firmware
+  back-dates the observation to the countdown deadline so a late loop pass does
+  not inflate the measurement. The tracker captures it once and repeats the same
+  value on every retry; a `SUSPECTED` report before the countdown, or a tracker
+  without a GPS fix, omits it. The console stores `sentAt` only when the value
+  passes the same clock-plausibility check as `detected_at`, and a retry never
+  replaces a stored value.
+- The console anchors the delay with `confirmedReceivedAt`, the receipt of the
+  first `CONFIRMED` report. The measured interval is alert start to console
+  receipt and includes the SMS attempts that run before the incident HTTP post.
+  `createdAt` is only the row creation time and is not used for the measurement.
+  A transmission-time test needs a GPS fix at dispatch; without one the console
+  stores no send time and shows no claim.
 - The first call creates the incident and queues the configured alert targets.
 - A `SUSPECTED` incident can be upgraded to `CONFIRMED` by a later retry with the
   same `incident_id`; alerts are queued only once.

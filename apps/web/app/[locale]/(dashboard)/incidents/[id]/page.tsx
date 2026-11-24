@@ -185,7 +185,7 @@ export default async function IncidentDetailPage({
 	const hasFix = incident.lat != null && incident.lng != null;
 	const transmission = readTransmissionDelay({
 		sentAt: incident.sentAt,
-		createdAt: incident.createdAt,
+		receivedAt: incident.confirmedReceivedAt,
 	});
 
 	return (
