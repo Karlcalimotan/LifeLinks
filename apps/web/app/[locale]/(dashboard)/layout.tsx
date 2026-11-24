@@ -47,6 +47,9 @@ export default async function DashboardLayout({
 				dark: theme("dark"),
 				system: theme("system"),
 			}}
+			accountLabel={t("account")}
+			languageLabel={common("language")}
+			closeLabel={common("close")}
 		>
 			{children}
 		</AppShell>

@@ -9,6 +9,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { VehicleCardList } from "@/components/vehicles/vehicle-card-list";
 import { Link } from "@/i18n/routing";
 import { vehicleScope } from "@/lib/auth/roles";
 import { requireUser } from "@/lib/auth/session";
@@ -55,65 +56,74 @@ export default async function VehiclesPage({ params }: { params: Promise<{ local
 					{vehicles.length === 0 ? (
 						<EmptyState title={t("empty")} />
 					) : (
-						<Table>
-							<TableHeader>
-								<TableRow>
-									<TableHead>{t("plate")}</TableHead>
-									<TableHead>{t("makeModel")}</TableHead>
-									<TableHead>{t("driver")}</TableHead>
-									<TableHead>{t("tracker")}</TableHead>
-									<TableHead>{t("lastSeen")}</TableHead>
-									<TableHead>{t("status")}</TableHead>
-									<TableHead>Incidents</TableHead>
-								</TableRow>
-							</TableHeader>
-							<TableBody>
-								{vehicles.map((vehicle) => {
-									const device = vehicle.devices[0];
-									return (
-										<TableRow key={vehicle.id}>
-											<TableCell>
-												<Link
-													href={`/vehicles/${vehicle.id}`}
-													className="font-medium text-signal-400 hover:text-signal-300"
-												>
-													{vehicle.plateNo}
-												</Link>
-											</TableCell>
-											<TableCell className="text-fog-100">
-												{vehicle.make} {vehicle.model}
-												{vehicle.year ? ` (${vehicle.year})` : ""}
-											</TableCell>
-											<TableCell>
-												{vehicle.driverName ?? "—"}
-												{vehicle.driverPhone ? (
-													<span className="block text-meta text-fog-500">
-														{vehicle.driverPhone}
-													</span>
-												) : null}
-											</TableCell>
-											<TableCell>
-												{device ? (
-													<span className="flex flex-col gap-1">
-														<span className="text-xs text-fog-300">{device.label}</span>
-														<DeviceStatusBadge state={deviceConnectionState(device.lastSeenAt)} />
-													</span>
-												) : (
-													<span className="text-xs text-fog-500">No tracker</span>
-												)}
-											</TableCell>
-											<TableCell className="text-xs text-fog-500">
-												{formatRelative(device?.lastSeenAt)}
-											</TableCell>
-											<TableCell>
-												<VehicleStatusBadge status={vehicle.status} />
-											</TableCell>
-											<TableCell className="text-fog-300">{vehicle._count.impacts}</TableCell>
+						<>
+							<div className="hidden lg:block">
+								<Table>
+									<TableHeader>
+										<TableRow>
+											<TableHead>{t("plate")}</TableHead>
+											<TableHead>{t("makeModel")}</TableHead>
+											<TableHead>{t("driver")}</TableHead>
+											<TableHead>{t("tracker")}</TableHead>
+											<TableHead>{t("lastSeen")}</TableHead>
+											<TableHead>{t("status")}</TableHead>
+											<TableHead>Incidents</TableHead>
 										</TableRow>
-									);
-								})}
-							</TableBody>
-						</Table>
+									</TableHeader>
+									<TableBody>
+										{vehicles.map((vehicle) => {
+											const device = vehicle.devices[0];
+											return (
+												<TableRow key={vehicle.id}>
+													<TableCell>
+														<Link
+															href={`/vehicles/${vehicle.id}`}
+															className="font-medium text-signal-400 hover:text-signal-300"
+														>
+															{vehicle.plateNo}
+														</Link>
+													</TableCell>
+													<TableCell className="text-fog-100">
+														{vehicle.make} {vehicle.model}
+														{vehicle.year ? ` (${vehicle.year})` : ""}
+													</TableCell>
+													<TableCell>
+														{vehicle.driverName ?? "—"}
+														{vehicle.driverPhone ? (
+															<span className="block text-meta text-fog-500">
+																{vehicle.driverPhone}
+															</span>
+														) : null}
+													</TableCell>
+													<TableCell>
+														{device ? (
+															<span className="flex flex-col gap-1">
+																<span className="text-xs text-fog-300">{device.label}</span>
+																<DeviceStatusBadge
+																	state={deviceConnectionState(device.lastSeenAt)}
+																/>
+															</span>
+														) : (
+															<span className="text-xs text-fog-500">No tracker</span>
+														)}
+													</TableCell>
+													<TableCell className="text-xs text-fog-500">
+														{formatRelative(device?.lastSeenAt)}
+													</TableCell>
+													<TableCell>
+														<VehicleStatusBadge status={vehicle.status} />
+													</TableCell>
+													<TableCell className="text-fog-300">{vehicle._count.impacts}</TableCell>
+												</TableRow>
+											);
+										})}
+									</TableBody>
+								</Table>
+							</div>
+							<div className="lg:hidden">
+								<VehicleCardList locale={locale} vehicles={vehicles} />
+							</div>
+						</>
 					)}
 				</CardContent>
 			</Card>

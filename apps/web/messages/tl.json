@@ -17,6 +17,7 @@
 		"copy": "Kopyahin",
 		"copied": "Nakopya",
 		"close": "Close",
+		"language": "Wika",
 		"skipToContent": "Lumaktaw sa pangunahing nilalaman"
 	},
 	"search": {
@@ -60,6 +61,9 @@
 		"settings": "Mga Setting",
 		"signOut": "Mag-sign out",
 		"menu": "Menu",
+		"more": "Higit pa",
+		"account": "Account",
+		"primary": "Pangunahing nabigasyon",
 		"notifications": "Mga Abiso"
 	},
 	"roles": {
@@ -113,6 +117,7 @@
 		"viewAll": "Tingnan lahat",
 		"attention": "Kailangan ng atensyon",
 		"allClear": "Maayos ang lahat",
+		"kpiDefinitions": "Ano ang ibig sabihin ng mga numerong ito",
 		"kpiOpenIncidents": "Bukas na insidente",
 		"kpiOpenHint": "Suspected, confirmed o acknowledged",
 		"kpiAwaitingAck": "Naghihintay ng acknowledgement",

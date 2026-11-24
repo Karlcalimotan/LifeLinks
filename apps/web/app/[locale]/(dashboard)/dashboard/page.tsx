@@ -318,10 +318,12 @@ export default async function DashboardPage({
 			<Card className="overflow-hidden">
 				<div className="grid grid-cols-2 gap-px bg-ink-700 sm:grid-cols-3 xl:grid-cols-6">
 					{kpis.map((kpi) => (
-						<div key={kpi.key} className="bg-ink-800 p-4">
-							<p className="text-meta font-medium text-fog-500">{kpi.label}</p>
+						<div key={kpi.key} className="min-w-0 bg-ink-800 p-3 sm:p-4">
+							<p className="line-clamp-2 text-meta font-medium leading-tight text-fog-500">
+								{kpi.label}
+							</p>
 							<p
-								className={`mt-1.5 font-display text-title leading-none tracking-tight tabular-nums ${
+								className={`mt-1.5 whitespace-nowrap font-display text-title leading-none tracking-tight tabular-nums ${
 									kpi.tone === "danger"
 										? "text-alarm-300"
 										: kpi.tone === "caution"
@@ -331,14 +333,28 @@ export default async function DashboardPage({
 							>
 								{kpi.value}
 							</p>
-							<p className="mt-1 text-meta leading-relaxed text-fog-500">{kpi.hint}</p>
+							<p className="mt-1 hidden text-meta leading-relaxed text-fog-500 sm:block">
+								{kpi.hint}
+							</p>
 						</div>
 					))}
 				</div>
+				<details className="border-t border-ink-700 px-3 py-1 sm:hidden">
+					<summary className="flex min-h-10 cursor-pointer items-center text-meta font-medium text-fog-300">
+						{t("kpiDefinitions")}
+					</summary>
+					<ul className="space-y-1 pb-2 text-meta leading-snug text-fog-500">
+						{kpis.map((kpi) => (
+							<li key={kpi.key}>
+								<span className="text-fog-300">{kpi.label}:</span> {kpi.hint}
+							</li>
+						))}
+					</ul>
+				</details>
 			</Card>
 
 			<div className="mt-4 grid items-start gap-4 xl:grid-cols-[1.2fr_1fr]">
-				<Card className="flex flex-col">
+				<Card className="flex min-w-0 flex-col">
 					<CardHeader className="flex-row items-start justify-between gap-3">
 						<div className="min-w-0">
 							<CardTitle>{t("livePositions")}</CardTitle>
@@ -357,7 +373,7 @@ export default async function DashboardPage({
 					</CardContent>
 				</Card>
 
-				<Card className="flex flex-col">
+				<Card className="flex min-w-0 flex-col">
 					<CardHeader className="flex-row items-start justify-between gap-3">
 						<div className="min-w-0">
 							<CardTitle>{t("needsAttention")}</CardTitle>
@@ -374,7 +390,7 @@ export default async function DashboardPage({
 							<ul className="divide-y divide-ink-700">
 								{data.queue.map((incident) => (
 									<li key={incident.id} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
-										<div className="flex items-start justify-between gap-3">
+										<div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
 											<div className="min-w-0">
 												<Link
 													href={`/incidents/${incident.id}`}
@@ -382,12 +398,12 @@ export default async function DashboardPage({
 												>
 													{incident.vehicle.plateNo}
 												</Link>
-												<p className="truncate text-meta text-fog-500">
+												<p className="text-meta text-fog-500 sm:truncate">
 													{incident.vehicle.driverName ?? t("driverUnknown")} ·{" "}
 													{formatDateTime(incident.detectedAt, locale)}
 												</p>
 											</div>
-											<div className="flex shrink-0 items-center gap-1.5">
+											<div className="flex flex-wrap items-center gap-1.5 sm:shrink-0">
 												<SeverityBadge
 													peakAccelG={incident.peakAccelG}
 													tiltDeg={incident.tiltDeg}
@@ -441,7 +457,7 @@ export default async function DashboardPage({
 			</div>
 
 			<div className="mt-4 grid gap-4 lg:grid-cols-3">
-				<Card className="flex flex-col">
+				<Card className="flex min-w-0 flex-col">
 					<CardHeader className="flex-row items-center justify-between gap-3">
 						<div className="min-w-0">
 							<CardTitle>{t("fleetStatus")}</CardTitle>
@@ -472,9 +488,9 @@ export default async function DashboardPage({
 									<Link
 										key={vehicle.id}
 										href={`/vehicles/${vehicle.id}`}
-										className={`flex items-center justify-between gap-3 rounded-control border border-l-2 border-ink-700 bg-ink-900/40 px-3 py-2.5 transition-colors hover:border-ink-600 hover:bg-ink-700/40 ${rail}`}
+										className={`flex min-w-0 items-center justify-between gap-3 rounded-control border border-l-2 border-ink-700 bg-ink-900/40 px-3 py-2.5 transition-colors hover:border-ink-600 hover:bg-ink-700/40 ${rail}`}
 									>
-										<div className="min-w-0">
+										<div className="min-w-0 flex-1">
 											<p className="truncate text-body font-medium text-fog-100">
 												{vehicle.plateNo}
 											</p>
@@ -498,7 +514,7 @@ export default async function DashboardPage({
 					</CardContent>
 				</Card>
 
-				<Card className="flex flex-col">
+				<Card className="flex min-w-0 flex-col">
 					<CardHeader>
 						<CardTitle>{t("recentActivity")}</CardTitle>
 						<CardDescription>{t("activityHint")}</CardDescription>
@@ -560,7 +576,7 @@ export default async function DashboardPage({
 					</CardContent>
 				</Card>
 
-				<Card className="flex flex-col">
+				<Card className="flex min-w-0 flex-col">
 					<CardHeader>
 						<CardTitle>{t("incidentTrend")}</CardTitle>
 						<CardDescription>{t("incidentTrendHint")}</CardDescription>

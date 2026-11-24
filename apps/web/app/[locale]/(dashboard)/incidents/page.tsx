@@ -72,9 +72,9 @@ const RANGE_LABELS: Record<Exclude<IncidentRangeFilter, "all">, string> = {
 };
 
 const pagerLink =
-	"inline-flex h-8 items-center rounded-panel border border-ink-600 px-3 text-meta text-fog-300 hover:bg-ink-700/60";
+	"inline-flex h-10 items-center rounded-panel border border-ink-600 px-3 text-meta text-fog-300 hover:bg-ink-700/60 sm:h-8";
 const pagerDisabled =
-	"inline-flex h-8 items-center rounded-panel border border-ink-700 px-3 text-meta text-fog-500 opacity-60";
+	"inline-flex h-10 items-center rounded-panel border border-ink-700 px-3 text-meta text-fog-500 opacity-60 sm:h-8";
 
 export default async function IncidentsPage({
 	params,
@@ -226,7 +226,7 @@ export default async function IncidentsPage({
 									<span className="text-meta text-fog-500">{t("sortDetected")}</span>
 									<Link
 										href={sortHref}
-										className="inline-flex h-8 items-center gap-1 rounded-control border border-ink-700 px-2 text-meta text-fog-300 hover:border-ink-600 hover:text-fog-100"
+										className="inline-flex h-10 items-center gap-1 rounded-control border border-ink-700 px-2 text-meta text-fog-300 hover:border-ink-600 hover:text-fog-100 sm:h-8"
 									>
 										{effectiveQuery.dir === "asc" ? t("sortOldest") : t("sortNewest")}
 										{effectiveQuery.dir === "asc" ? (

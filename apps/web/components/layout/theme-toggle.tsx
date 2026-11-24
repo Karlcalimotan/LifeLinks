@@ -39,9 +39,11 @@ function applyPreference(preference: ThemePreference, persist: boolean) {
 export function ThemeToggle({
 	initialPreference,
 	labels,
+	size = "sm",
 }: {
 	initialPreference: ThemePreference;
 	labels: ThemeLabels;
+	size?: "sm" | "md";
 }) {
 	const [preference, setPreference] = useState(initialPreference);
 
@@ -77,13 +79,14 @@ export function ThemeToggle({
 						aria-label={labels[labelKey]}
 						title={labels[labelKey]}
 						className={cn(
-							"grid size-7 place-items-center rounded-[2px] transition-colors",
+							"grid place-items-center rounded-[2px] transition-colors",
+							size === "md" ? "size-11" : "size-7",
 							active
 								? "bg-ink-700 text-fog-50"
 								: "text-fog-500 hover:bg-ink-800 hover:text-fog-100",
 						)}
 					>
-						<Icon className="size-3.5" aria-hidden="true" />
+						<Icon className={size === "md" ? "size-4" : "size-3.5"} aria-hidden="true" />
 					</button>
 				);
 			})}

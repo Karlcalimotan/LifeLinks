@@ -75,7 +75,7 @@ export function IncidentBell({
 				aria-expanded={open}
 				aria-controls="incident-bell-panel"
 				aria-label={t("notificationsAria", { count: data.count })}
-				className="inline-flex h-8 items-center gap-1.5 rounded-control border border-ink-600 bg-ink-800 px-2 text-fog-300 transition-colors hover:bg-ink-700 hover:text-fog-100"
+				className="inline-flex h-11 w-11 items-center justify-center gap-1.5 rounded-control border border-ink-600 bg-ink-800 px-2 text-fog-300 transition-colors hover:bg-ink-700 hover:text-fog-100 sm:h-8 sm:w-auto"
 			>
 				<Bell className="size-4" aria-hidden="true" />
 				{data.count > 0 ? (
@@ -88,7 +88,7 @@ export function IncidentBell({
 					ref={panelRef}
 					id="incident-bell-panel"
 					aria-label={t("notifications")}
-					className="absolute right-0 top-full z-50 mt-2 w-72 max-w-[calc(100vw-2rem)] overflow-hidden rounded-overlay border border-ink-600 bg-ink-900 shadow-overlay"
+					className="fixed inset-x-4 top-[calc(env(safe-area-inset-top)_+_4.5rem)] z-50 max-h-[70dvh] overflow-y-auto rounded-overlay border border-ink-600 bg-ink-900 shadow-overlay sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-2 sm:max-h-none sm:w-72"
 				>
 					<div className="flex items-start justify-between gap-2 border-b border-ink-700 px-4 py-3">
 						<div className="min-w-0">

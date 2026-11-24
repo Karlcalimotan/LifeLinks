@@ -157,6 +157,37 @@ body {
 	box-shadow: inset 3px 0 0 var(--color-signal-500);
 }
 
+/* OpenStreetMap surface: keep Leaflet chrome inside the Night Highway tokens. */
+.leaflet-container {
+	background: var(--color-ink-900);
+	color: var(--color-fog-100);
+	font-family: var(--font-barlow), sans-serif;
+}
+
+:root[data-theme="dark"] .leaflet-tile-pane {
+	filter: invert(1) hue-rotate(180deg) brightness(0.82) contrast(0.9);
+}
+
+.leaflet-bar a,
+.leaflet-bar a:hover {
+	background: var(--color-ink-800);
+	color: var(--color-fog-100);
+	border-color: var(--color-ink-600);
+}
+
+.leaflet-bar a:hover {
+	background: var(--color-ink-700);
+}
+
+.leaflet-control-attribution {
+	background: var(--color-ink-900) !important;
+	color: var(--color-fog-500) !important;
+}
+
+.leaflet-control-attribution a {
+	color: var(--color-fog-300) !important;
+}
+
 .beacon-pulse {
 	animation: beacon-pulse 2.6s ease-in-out infinite;
 }

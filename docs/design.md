@@ -69,6 +69,16 @@ from `prefers-color-scheme` before paint for `system`. The toggle sits on the
 login board and in the console header. Body text and secondary labels stay at
 WCAG AA (5.0:1 or better) on both paper and panels.
 
+## Mobile shell
+
+Below `lg` the sidebar becomes a five-slot bottom bar: Dashboard, Live map,
+Vehicles and Incidents, plus **More** for Analytics, Notifications, Trackers
+and Settings. The More sheet and the account sheet (appearance, language, sign
+out) are native `<dialog>` bottom sheets. Header controls are 44px on touch,
+the header is one row, and `env(safe-area-inset-*)` keeps content clear of the
+home indicator. Tables become card lists below `lg`; a scrollable chip row or
+chart gets a solid chevron cue, not a colour fade.
+
 ## Typography
 
 - **Display:** Barlow Condensed 600/700. Page titles, the incident count and

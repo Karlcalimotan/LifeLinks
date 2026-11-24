@@ -10,10 +10,14 @@ import {
 	ChartColumn,
 	LayoutDashboard,
 	Map as MapIcon,
+	MoreHorizontal,
 	Radio,
 	Settings,
 	TriangleAlert,
+	X,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { useEffect, useRef, useState } from "react";
 
 const items = [
 	{ href: "/dashboard", key: "dashboard", icon: LayoutDashboard, admin: false },
@@ -44,6 +48,7 @@ export function Sidebar({
 	role: MemberRoleName;
 }) {
 	const pathname = usePathname();
+	const nav = useTranslations("nav");
 	const visible = visibleItems(role);
 
 	return (
@@ -53,7 +58,7 @@ export function Sidebar({
 				<Logo />
 			</Link>
 
-			<nav className="flex flex-1 flex-col gap-0.5 px-3 pt-2">
+			<nav aria-label={nav("primary")} className="flex flex-1 flex-col gap-0.5 px-3 pt-2">
 				{visible.map((item) => {
 					const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 					const Icon = item.icon;
@@ -91,6 +96,12 @@ export function Sidebar({
 	);
 }
 
+const MAX_TABS = 5;
+
+function isCurrent(pathname: string, href: string) {
+	return pathname === href || pathname.startsWith(`${href}/`);
+}
+
 export function MobileNav({
 	labels,
 	role,
@@ -99,28 +110,139 @@ export function MobileNav({
 	role: MemberRoleName;
 }) {
 	const pathname = usePathname();
+	const nav = useTranslations("nav");
+	const common = useTranslations("common");
+	const [moreOpen, setMoreOpen] = useState(false);
+	const dialogRef = useRef<HTMLDialogElement>(null);
+	const closeRef = useRef<HTMLButtonElement>(null);
 	const visible = visibleItems(role);
 
+	// Keep the bar at five slots so every route stays reachable without a
+	// sideways scroll; the tail lives in the More sheet.
+	const overflow = visible.length > MAX_TABS ? visible.slice(MAX_TABS - 1) : [];
+	const primary = overflow.length > 0 ? visible.slice(0, MAX_TABS - 1) : visible;
+	const overflowActive = overflow.some((item) => isCurrent(pathname, item.href));
+
+	useEffect(() => {
+		const dialog = dialogRef.current;
+		if (!dialog) return;
+
+		if (moreOpen && !dialog.open) {
+			dialog.showModal();
+			document.body.style.overflow = "hidden";
+			requestAnimationFrame(() => closeRef.current?.focus());
+		} else if (!moreOpen && dialog.open) {
+			dialog.close();
+		}
+
+		return () => {
+			document.body.style.overflow = "";
+		};
+	}, [moreOpen]);
+
 	return (
-		<nav className="fixed inset-x-0 bottom-0 z-30 flex overflow-x-auto border-t border-ink-700 bg-ink-950 px-2 py-1 lg:hidden">
-			{visible.map((item) => {
-				const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-				const Icon = item.icon;
-				return (
-					<Link
-						key={item.href}
-						href={item.href}
-						aria-current={active ? "page" : undefined}
+		<>
+			<nav
+				aria-label={nav("primary")}
+				className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-ink-700 bg-ink-950 px-2 py-1 pb-[env(safe-area-inset-bottom)] lg:hidden"
+			>
+				{primary.map((item) => {
+					const active = isCurrent(pathname, item.href);
+					const Icon = item.icon;
+					return (
+						<Link
+							key={item.href}
+							href={item.href}
+							aria-current={active ? "page" : undefined}
+							className={cn(
+								"relative flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-meta leading-tight transition-colors",
+								active ? "bg-signal-500/10 text-signal-300" : "text-fog-500 hover:text-fog-100",
+							)}
+						>
+							{active ? (
+								<span aria-hidden="true" className="absolute inset-x-2 top-0 h-0.5 bg-signal-500" />
+							) : null}
+							<Icon className="size-5" aria-hidden="true" />
+							<span className="line-clamp-2 w-full text-center">
+								{labels[item.key] ?? item.key}
+							</span>
+						</Link>
+					);
+				})}
+
+				{overflow.length > 0 ? (
+					<button
+						type="button"
+						onClick={() => setMoreOpen(true)}
+						aria-haspopup="dialog"
+						aria-expanded={moreOpen}
+						aria-current={overflowActive ? "page" : undefined}
 						className={cn(
-							"flex min-w-[72px] flex-none flex-col items-center gap-1 rounded-control px-1 py-2 text-meta",
-							active ? "text-signal-300" : "text-fog-500",
+							"relative flex min-h-14 min-w-0 flex-col items-center justify-center gap-0.5 px-1 py-1.5 text-meta leading-tight transition-colors",
+							overflowActive
+								? "bg-signal-500/10 text-signal-300"
+								: "text-fog-500 hover:text-fog-100",
 						)}
 					>
-						<Icon className="size-4" />
-						<span className="w-full truncate text-center">{labels[item.key] ?? item.key}</span>
-					</Link>
-				);
-			})}
-		</nav>
+						{overflowActive ? (
+							<span aria-hidden="true" className="absolute inset-x-2 top-0 h-0.5 bg-signal-500" />
+						) : null}
+						<MoreHorizontal className="size-5" aria-hidden="true" />
+						<span className="line-clamp-2 w-full text-center">{nav("more")}</span>
+					</button>
+				) : null}
+			</nav>
+
+			<dialog
+				ref={dialogRef}
+				onClose={() => setMoreOpen(false)}
+				onCancel={(event) => {
+					event.preventDefault();
+					setMoreOpen(false);
+				}}
+				onMouseDown={(event) => {
+					if (event.target === event.currentTarget) setMoreOpen(false);
+				}}
+				className="fixed inset-x-0 bottom-0 top-auto z-40 m-0 max-h-[80dvh] w-full max-w-none overflow-y-auto rounded-t-overlay border border-ink-700 border-b-0 bg-ink-900 p-0 text-fog-100 shadow-overlay backdrop:bg-ink-950/70 lg:hidden"
+			>
+				<div className="h-1 hazard-stripe" aria-hidden="true" />
+				<div className="flex items-center justify-between gap-3 border-b border-ink-700 px-4 py-3">
+					<p className="font-display text-section font-semibold">{nav("menu")}</p>
+					<button
+						ref={closeRef}
+						type="button"
+						onClick={() => setMoreOpen(false)}
+						aria-label={common("close")}
+						className="grid size-11 place-items-center rounded-control text-fog-500 transition-colors hover:bg-ink-800 hover:text-fog-100"
+					>
+						<X className="size-5" aria-hidden="true" />
+					</button>
+				</div>
+				<ul className="flex flex-col gap-0.5 p-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+					{overflow.map((item) => {
+						const active = isCurrent(pathname, item.href);
+						const Icon = item.icon;
+						return (
+							<li key={item.href}>
+								<Link
+									href={item.href}
+									onClick={() => setMoreOpen(false)}
+									aria-current={active ? "page" : undefined}
+									className={cn(
+										"flex min-h-11 items-center gap-3 rounded-control px-3 py-2.5 text-body transition-colors",
+										active
+											? "bg-signal-500/10 text-signal-300"
+											: "text-fog-300 hover:bg-ink-800 hover:text-fog-100",
+									)}
+								>
+									<Icon className="size-4" aria-hidden="true" />
+									{labels[item.key] ?? item.key}
+								</Link>
+							</li>
+						);
+					})}
+				</ul>
+			</dialog>
+		</>
 	);
 }

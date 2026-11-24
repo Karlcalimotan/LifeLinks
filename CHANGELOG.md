@@ -12,6 +12,18 @@ All notable changes to this project are documented here. The format follows
   preference, and a toggle on the login board and in the console header. The
   dark palette is unchanged; light mode maps the ink/fog scales to paper and
   text so existing components switch without per-screen overrides.
+- Mobile console shell: a one-row header with an account sheet, a five-slot
+  bottom navigation with a More sheet, 44px header controls, safe-area insets
+  and 16px form controls (no iOS focus zoom). Vehicles and the notifications
+  delivery log get card lists below `lg`; filter toolbars collapse, the
+  settings save action sticks above the bottom bar, and analytics/pagers get
+  larger touch targets.
+- The live map now uses Leaflet with OpenStreetMap tiles, plotted from each
+  tracker's last GPS fix. The dashboard keeps the offline schematic for a
+  quick fleet overview. Adds the `leaflet` dependency and its typings.
+- Bench-unit handoff for `34:84:A9:7B:8A:C8`, including the local provisioning
+  path, the token contract and the reachability requirement for the A7670E
+  modem ([`docs/bench-device.md`](docs/bench-device.md)).
 - Firmware: dedicated WiFi and factory reset buttons on GPIO 13/14, aligned pin
   map and provisioning tests (#107).
 - Tracker detail: an admin WiFi setup panel with the AP name derived from the

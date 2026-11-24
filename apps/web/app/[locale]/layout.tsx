@@ -9,6 +9,7 @@ import { getMessages, getTranslations } from "next-intl/server";
 import { Barlow, Barlow_Condensed, JetBrains_Mono } from "next/font/google";
 import { notFound } from "next/navigation";
 import Script from "next/script";
+import "leaflet/dist/leaflet.css";
 import "../globals.css";
 
 const barlow = Barlow({
@@ -49,6 +50,7 @@ export const viewport: Viewport = {
 	],
 	width: "device-width",
 	initialScale: 1,
+	viewportFit: "cover",
 };
 
 export function generateStaticParams() {

@@ -5,6 +5,7 @@ import {
 	type IncidentsQuery,
 	buildIncidentsHref,
 } from "@/lib/incidents/query";
+import { ChevronRight } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 const STATUS_LABELS: Record<IncidentStatusFilter, string> = {
@@ -38,27 +39,38 @@ export async function IncidentStatusChips({
 	];
 
 	return (
-		<nav aria-label={t("statusFilter")} className="mb-4 flex flex-wrap gap-2">
-			{chips.map((chip) => {
-				const active = query.status === chip.value;
-				return (
-					<Link
-						key={chip.value ?? "all"}
-						href={buildIncidentsHref(query, { status: chip.value, page: 1 })}
-						aria-current={active ? "true" : undefined}
-						className={`inline-flex h-9 items-center gap-1.5 rounded-control border px-3 text-meta transition-colors ${
-							active
-								? "border-signal-500/40 bg-signal-500/10 text-signal-300"
-								: "border-ink-700 text-fog-400 hover:border-ink-600 hover:text-fog-100"
-						}`}
-					>
-						{chip.label}
-						<span className={`tabular-nums ${active ? "text-signal-300" : "text-fog-500"}`}>
-							{chip.count}
-						</span>
-					</Link>
-				);
-			})}
-		</nav>
+		<div className="relative mb-4">
+			<nav
+				aria-label={t("statusFilter")}
+				className="-mx-4 flex flex-nowrap gap-2 overflow-x-auto px-4 py-1 sm:mx-0 sm:flex-wrap sm:px-0 sm:py-0"
+			>
+				{chips.map((chip) => {
+					const active = query.status === chip.value;
+					return (
+						<Link
+							key={chip.value ?? "all"}
+							href={buildIncidentsHref(query, { status: chip.value, page: 1 })}
+							aria-current={active ? "true" : undefined}
+							className={`inline-flex h-10 shrink-0 items-center gap-1.5 rounded-control border px-3 text-meta transition-colors sm:h-9 ${
+								active
+									? "border-signal-500/40 bg-signal-500/10 text-signal-300"
+									: "border-ink-700 text-fog-400 hover:border-ink-600 hover:text-fog-100"
+							}`}
+						>
+							{chip.label}
+							<span className={`tabular-nums ${active ? "text-signal-300" : "text-fog-500"}`}>
+								{chip.count}
+							</span>
+						</Link>
+					);
+				})}
+			</nav>
+			<span
+				aria-hidden="true"
+				className="pointer-events-none absolute -right-1 top-1/2 -translate-y-1/2 rounded-l-control bg-ink-800 p-1 text-fog-500 sm:hidden"
+			>
+				<ChevronRight className="size-4" />
+			</span>
+		</div>
 	);
 }

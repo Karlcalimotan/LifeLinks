@@ -1,4 +1,5 @@
 import { Logo } from "@/components/brand/logo";
+import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { ThemeToggle } from "@/components/layout/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Label } from "@/components/ui/field";
@@ -40,7 +41,7 @@ export default async function LoginPage({
 	];
 
 	return (
-		<div className="grid min-h-screen lg:grid-cols-[1.15fr_0.85fr]">
+		<div className="grid min-h-dvh lg:grid-cols-[1.15fr_0.85fr]">
 			<section className="relative hidden overflow-hidden border-r border-ink-700 bg-ink-950 p-10 lg:flex lg:flex-col xl:p-12">
 				<div
 					className="pointer-events-none absolute inset-0 console-grid opacity-60"
@@ -79,8 +80,9 @@ export default async function LoginPage({
 				<p className="relative pt-6 text-[11px] text-fog-500">{t("prototypeNote")}</p>
 			</section>
 
-			<section className="relative flex items-center justify-center bg-ink-900 p-6 sm:p-10">
-				<div className="absolute right-4 top-4 sm:right-6 sm:top-6">
+			<section className="relative flex flex-col items-center justify-center bg-ink-900 p-4 pt-[max(1rem,env(safe-area-inset-top))] sm:p-10">
+				<div className="mb-4 flex w-full items-center justify-end gap-2 lg:absolute lg:right-6 lg:top-6 lg:mb-0 lg:w-auto">
+					<LocaleSwitcher label={common("language")} />
 					<ThemeToggle
 						initialPreference={themePreference}
 						labels={{
@@ -92,13 +94,14 @@ export default async function LoginPage({
 					/>
 				</div>
 				<div className="w-full max-w-sm">
+					<h1 className="sr-only">{`${APP_NAME} — ${t("signIn")}`}</h1>
 					<div className="mb-8 lg:hidden">
 						<Logo />
 					</div>
 
 					<div className="cut-corner border border-ink-700 bg-ink-800">
 						<div className="h-1 hazard-stripe" aria-hidden="true" />
-						<div className="p-6">
+						<div className="p-5 sm:p-6">
 							<h2 className="font-display text-3xl font-semibold leading-none tracking-tight text-fog-50">
 								{t("signIn")}
 							</h2>
@@ -141,11 +144,14 @@ export default async function LoginPage({
 					</div>
 
 					{showDemoAccounts ? (
-						<div className="mt-4 border border-ink-700 bg-ink-900/60 p-3">
-							<p className="text-[11px] font-medium text-fog-300">{t("demoAccess")}</p>
+						<div className="mt-3 border border-ink-700 bg-ink-900/60 p-3">
+							<p className="text-meta font-medium text-fog-300">{t("demoAccess")}</p>
 							<ul className="mt-1.5 flex flex-col gap-1">
 								{DEMO_ACCOUNTS.map((account) => (
-									<li key={account.email} className="text-[11px] leading-relaxed text-fog-500">
+									<li
+										key={account.email}
+										className="break-words text-meta leading-relaxed text-fog-500"
+									>
 										{account.role}: {account.email} / {account.password}
 									</li>
 								))}
@@ -153,7 +159,7 @@ export default async function LoginPage({
 						</div>
 					) : null}
 
-					<p className="mt-8 text-center text-[11px] text-fog-500">
+					<p className="mt-6 text-center text-meta text-fog-500">
 						{APP_NAME}. {APP_TAGLINE}
 					</p>
 				</div>

@@ -1,4 +1,5 @@
 import { LogoMark } from "@/components/brand/logo";
+import { AccountMenu } from "@/components/layout/account-menu";
 import { LocaleSwitcher } from "@/components/layout/locale-switcher";
 import { LogoutButton } from "@/components/layout/logout-button";
 import { MobileNav, Sidebar } from "@/components/layout/sidebar";
@@ -32,6 +33,9 @@ export async function AppShell({
 	skipLabel,
 	themePreference,
 	themeLabels,
+	accountLabel,
+	languageLabel,
+	closeLabel,
 	children,
 }: {
 	locale: string;
@@ -44,6 +48,9 @@ export async function AppShell({
 	skipLabel: string;
 	themePreference: ThemePreference;
 	themeLabels: ThemeLabels;
+	accountLabel: string;
+	languageLabel: string;
+	closeLabel: string;
 	children: React.ReactNode;
 }) {
 	const awaiting: Awaited<ReturnType<typeof loadAwaitingIncidents>> = { count: 0, items: [] };
@@ -69,13 +76,13 @@ export async function AppShell({
 
 	const roleBadge = <Badge tone={roleTone(role)}>{roleLabel}</Badge>;
 	const avatar = (
-		<span className="grid size-8 place-items-center rounded-control border border-ink-600 bg-ink-800 font-display text-body font-semibold text-fog-100">
+		<span className="hidden size-8 place-items-center rounded-control border border-ink-600 bg-ink-800 font-display text-body font-semibold text-fog-100 sm:grid">
 			{initials || "LL"}
 		</span>
 	);
 
 	return (
-		<div className="min-h-screen">
+		<div className="min-h-dvh">
 			<a
 				href="#main"
 				className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-panel focus:border focus:border-signal-500 focus:bg-ink-800 focus:px-3 focus:py-2 focus:text-body focus:text-fog-50"
@@ -84,40 +91,54 @@ export async function AppShell({
 			</a>
 			<Sidebar labels={navLabels} role={role} />
 			<div className="lg:pl-[248px]">
-				<header className="sticky top-0 z-20 border-b border-ink-700 bg-ink-950 px-4 py-3 md:px-6">
-					<div className="flex items-center justify-between gap-3">
+				<header className="sticky top-0 z-20 border-b border-ink-700 bg-ink-950 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] md:px-6">
+					<div className="flex items-center justify-between gap-2 sm:gap-3">
 						<div className="flex min-w-0 items-center gap-2.5">
 							<LogoMark className="size-7 shrink-0 sm:hidden" decorative />
 							<div className="min-w-0">
-								<p className="truncate text-meta text-fog-500">{org.name}</p>
-								<p className="truncate text-body font-medium text-fog-100">{user.email}</p>
+								<p
+									className="truncate text-body font-medium text-fog-100 sm:text-meta sm:font-normal sm:text-fog-500"
+									title={org.name}
+								>
+									{org.name}
+								</p>
+								<p className="truncate text-meta text-fog-500 sm:hidden">{roleLabel}</p>
+								<p className="hidden truncate text-body font-medium text-fog-100 sm:block">
+									{user.email}
+								</p>
 							</div>
 						</div>
-						<div className="flex shrink-0 items-center gap-2">
+						<div className="flex shrink-0 items-center gap-1 sm:gap-2">
 							<CommandPalette role={role} />
 							<IncidentBell locale={locale} initial={awaiting} />
 							<span className="hidden sm:inline-flex">{roleBadge}</span>
 							<div className="hidden items-center gap-2 sm:flex">
 								<ThemeToggle initialPreference={themePreference} labels={themeLabels} />
-								<LocaleSwitcher />
+								<LocaleSwitcher label={languageLabel} />
 								<LogoutButton locale={locale} label={signOutLabel} />
 							</div>
 							{avatar}
-						</div>
-					</div>
-					<div className="mt-2 flex items-center justify-between gap-2 border-t border-ink-700/70 pt-2 sm:hidden">
-						{roleBadge}
-						<div className="flex items-center gap-2">
-							<ThemeToggle initialPreference={themePreference} labels={themeLabels} />
-							<LocaleSwitcher />
-							<LogoutButton locale={locale} label={signOutLabel} />
+							<AccountMenu
+								initials={initials}
+								name={user.name}
+								email={user.email}
+								roleLabel={roleLabel}
+								roleTone={roleTone(role)}
+								locale={locale}
+								themePreference={themePreference}
+								themeLabels={themeLabels}
+								languageLabel={languageLabel}
+								accountLabel={accountLabel}
+								closeLabel={closeLabel}
+								signOutLabel={signOutLabel}
+							/>
 						</div>
 					</div>
 				</header>
 				<main
 					id="main"
 					tabIndex={-1}
-					className="mx-auto w-full max-w-7xl px-4 pb-24 pt-6 md:px-6 lg:pb-10"
+					className="mx-auto w-full max-w-7xl px-4 pb-[calc(5.5rem_+_env(safe-area-inset-bottom))] pt-6 md:px-6 lg:pb-10"
 				>
 					{children}
 				</main>

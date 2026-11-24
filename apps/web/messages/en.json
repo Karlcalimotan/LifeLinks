@@ -17,6 +17,7 @@
 		"copy": "Copy",
 		"copied": "Copied",
 		"close": "Close",
+		"language": "Language",
 		"skipToContent": "Skip to main content"
 	},
 	"search": {
@@ -60,6 +61,9 @@
 		"settings": "Settings",
 		"signOut": "Sign out",
 		"menu": "Menu",
+		"more": "More",
+		"account": "Account",
+		"primary": "Primary navigation",
 		"notifications": "Notifications"
 	},
 	"roles": {
@@ -113,6 +117,7 @@
 		"viewAll": "View all",
 		"attention": "Needs attention",
 		"allClear": "All clear",
+		"kpiDefinitions": "What these numbers mean",
 		"kpiOpenIncidents": "Open incidents",
 		"kpiOpenHint": "Suspected, confirmed or acknowledged",
 		"kpiAwaitingAck": "Awaiting acknowledgement",

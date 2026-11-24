@@ -1,8 +1,8 @@
 import { FleetLegend } from "@/components/map/fleet-legend";
+import { LeafletMap } from "@/components/map/leaflet-map";
 import { MapEscape } from "@/components/map/map-escape";
 import { MapToolbar } from "@/components/map/map-toolbar";
 import { MarkerGlyph, markerBadgeTone } from "@/components/map/marker-glyph";
-import { SchematicMap } from "@/components/map/schematic-map";
 import { VehiclePanel } from "@/components/map/vehicle-panel";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -131,7 +131,7 @@ export default async function MapPage({
 						: "grid gap-4 lg:grid-cols-[minmax(0,260px)_minmax(0,1fr)]"
 				}
 			>
-				<Card className="order-1 flex min-w-0 flex-col overflow-hidden">
+				<Card className="order-3 flex min-w-0 flex-col overflow-hidden lg:order-1">
 					<div className="flex flex-col gap-3 border-b border-ink-700 p-4">
 						<div className="flex items-baseline justify-between gap-2">
 							<h2 className="font-display text-emphasis font-semibold tracking-tight text-fog-100">
@@ -177,7 +177,7 @@ export default async function MapPage({
 							) : null}
 						</div>
 					) : (
-						<div className="max-h-96 divide-y divide-ink-700/70 overflow-y-auto">
+						<div className="divide-y divide-ink-700/70 lg:max-h-96 lg:overflow-y-auto">
 							{filtered.map((vehicle) => {
 								const isSelected = selected?.id === vehicle.id;
 								return (
@@ -239,7 +239,7 @@ export default async function MapPage({
 					)}
 				</Card>
 
-				<Card className="order-2 flex min-w-0 flex-col overflow-hidden">
+				<Card className="order-1 flex min-w-0 flex-col overflow-hidden lg:order-2">
 					<div className="flex flex-wrap items-start justify-between gap-2 border-b border-ink-700 p-4">
 						<div className="min-w-0">
 							<h2 className="font-display text-emphasis font-semibold tracking-tight text-fog-100">
@@ -254,7 +254,7 @@ export default async function MapPage({
 						</div>
 						<Link
 							href={fitAllHref}
-							className="inline-flex h-8 items-center gap-1.5 rounded-panel border border-ink-600 px-3 text-meta font-medium text-fog-100 transition-colors hover:bg-ink-700/60"
+							className="inline-flex h-10 items-center gap-1.5 rounded-panel border border-ink-600 px-3 text-meta font-medium text-fog-100 transition-colors hover:bg-ink-700/60 sm:h-8"
 						>
 							<Maximize2 className="size-3.5" aria-hidden="true" />
 							{t("fitAll")}
@@ -266,7 +266,7 @@ export default async function MapPage({
 							<EmptyState title={t("empty.noPositionsTitle")} body={t("empty.noPositionsBody")} />
 						</div>
 					) : (
-						<SchematicMap
+						<LeafletMap
 							markers={positions.map((vehicle) => ({
 								id: vehicle.id,
 								plate: vehicle.plateNo,
@@ -278,9 +278,7 @@ export default async function MapPage({
 								href: buildMapHref(query, { vehicle: vehicle.id }),
 							}))}
 							stateLabels={stateLabels}
-							staleLabel={t("panel.staleFix")}
 							mapLabel={t("mapLabel", { count: positions.length })}
-							schematicNote={t("schematicNote")}
 						/>
 					)}
 
@@ -299,7 +297,7 @@ export default async function MapPage({
 							vehicle={selected}
 							locale={locale}
 							closeHref={buildMapHref(query, { vehicle: null })}
-							className="order-3 lg:col-span-2 xl:col-span-1"
+							className="order-2 lg:order-3 lg:col-span-2 xl:col-span-1"
 							labels={{
 								close: t("panel.close"),
 								driver: t("panel.driver"),
