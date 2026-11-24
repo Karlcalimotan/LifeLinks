@@ -159,8 +159,42 @@ stale fix is still sent.
 After three abnormal resets in ten minutes the device enters safe mode. It stops
 non-essential work (OTA, periodic polling) but **continues to monitor impacts and
 continues to alert**. `alertingAllowed()` returns true in safe mode by design,
-and a native test pins that behavior. A reset during a pending countdown is
-recovered on boot: the incident id is persisted before the countdown starts.
+and a native test pins that behavior. A reset during a pending countdown is not
+recovered on boot: the unit boots to `Idle`, and the incident must be resolved
+from the portal.
+
+## Hardware watchdog
+
+The `loop()` task is subscribed to the ESP32 task watchdog with a **120 s**
+timeout and panic enabled. If the loop stops progressing, the board panics and
+reboots instead of staying hung.
+
+The timeout is larger than every bounded blocking phase in the firmware. The
+longest single modem wait is 30 s (`AT+HTTPACTION`), one complete HTTP request
+can spend 87 s across its steps, and a heartbeat adds a 3 s signal query before
+the POST. The guard is fed at the end of each bounded phase, never inside a
+wait: the top of the loop, the impact/alert pass, between the SMS and the
+incident POST, the setup portal pass, the heartbeat and command poll, and each
+command acknowledgement. A genuine hang stops the next feed.
+
+A watchdog reset is a reboot, not a recovery of the alarm. The latched
+`Alerting` state is lost, the unit boots to `Idle`, and the incident must be
+resolved from the portal as described above. The watchdog proves the device is
+alive; it does not preserve an alert across a reset.
+
+### Bench step
+
+The synthetic hang is a human bench step and is not run automatically:
+
+1. Build and flash `env:esp32dev-bench`. The default build refuses the command.
+2. With the tracker `Idle` and no active incident, send `TEST_WDT` and confirm
+   it only prints the warning.
+3. Send `TEST_WDT CONFIRM`. The loop stops feeding the watchdog.
+4. After about 120 s confirm the `Task watchdog got triggered` panic and the
+   reboot to the boot banner.
+
+Never run the step during an alert. Do not treat it as verified until it runs
+on a real unit.
 
 ## Privacy
 
@@ -187,6 +221,8 @@ Verified in this repository:
 - the server/firmware configuration contract (Vitest + `pnpm stack:check`)
 - the three-role permission model and vehicle-owner scoping (Vitest)
 - the web build, typecheck, unit tests and the API envelope
+- the watchdog timeout and feed placement: compiled, with a compile-time check
+  that the timeout exceeds one worst-case modem phase
 
 Not verified here:
 
@@ -195,6 +231,8 @@ Not verified here:
 - GPS cold-start time in your installation
 - false-positive rate on real roads
 - power behavior with the actual buck, cells and modem
+- the watchdog reset on hardware, and the absence of a false reset through a
+  normal alert, cancel and acknowledgement cycle (bench step above)
 
 Do not claim those are solved until the bench checklist in
 [`hardware.md`](hardware.md) passes.

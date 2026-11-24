@@ -119,11 +119,13 @@ environment. The sketch needs the ESP32 core and is excluded from that build.
 
 These are inputs for the Phase 1 audit, not changes made by the setup:
 
-1. **Watchdog is not enabled.** No `esp_task_wdt` use; a hung modem call is not
-   recovered by a reset.
+1. **Watchdog is enabled, bench proof pending.** The `loop()` task is
+   subscribed to `esp_task_wdt` with a 120 s timeout and panic enabled; feeds
+   sit between bounded phases. The synthetic hang is a hardware bench step.
 2. **The modem/GPS path still blocks.** `main.ino` has bounded waits, but several
    AT calls block the loop for seconds; `delay()` is used inside the transport
-   and during PWRKEY power-on.
+   and during PWRKEY power-on. The watchdog now bounds a hang that outlives
+   those waits.
 3. **No offline alert queue.** A failed SMS/HTTP alert is retried only while the
    device stays in the alert state; it is not replayed after a reboot.
 4. **No reset-reason logging or boot self-test.** The reset history class exists,

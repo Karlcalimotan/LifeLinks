@@ -34,6 +34,7 @@
 #include <WebServer.h>
 #include <WiFi.h>
 #include <Wire.h>
+#include <esp_task_wdt.h>
 #include <esp_wifi.h>
 #include <math.h>
 
@@ -60,6 +61,48 @@
 #ifndef LIFELINK_API_BASE
 #define LIFELINK_API_BASE "https://lifelink.example.com"
 #endif
+
+// Hardware watchdog. Only the loop task is subscribed here; an idle-task
+// subscription would watch idle0, not this sketch.
+//
+// Timeout budget, from the blocking A7670E transport:
+//   - the longest single AT wait is 30 s (AT+HTTPACTION);
+//   - one complete modemHttpRequest() can spend at most 87 s across its steps;
+//   - a heartbeat or LOCATE adds the 3 s AT+CSQ signal query, so a bounded
+//     modem phase is about 90 s.
+// 120 s leaves 30 s of margin over that phase. The longest boot step is the
+// ~11 s modem PWRKEY sequence, below the same timeout. If any modem step grows,
+// raise this constant in the same change.
+static const uint32_t kWatchdogTimeoutS = 120;
+static_assert(kWatchdogTimeoutS * 1000UL > 90000UL,
+			  "watchdog timeout must exceed one worst-case modem phase");
+
+bool g_watchdogActive = false;
+
+void beginWatchdog() {
+	const esp_err_t initialized = esp_task_wdt_init(kWatchdogTimeoutS, true);
+	if (initialized != ESP_OK) {
+		Serial.printf("[WDT] init failed (%d); running without the task watchdog\n",
+					  static_cast<int>(initialized));
+		return;
+	}
+	const esp_err_t subscribed = esp_task_wdt_add(nullptr);
+	if (subscribed != ESP_OK) {
+		Serial.printf("[WDT] could not subscribe the loop task (%d); running without it\n",
+					  static_cast<int>(subscribed));
+		return;
+	}
+	g_watchdogActive = true;
+	Serial.printf("[WDT] task watchdog %lus, panic on, loop task subscribed\n",
+				  static_cast<unsigned long>(kWatchdogTimeoutS));
+}
+
+// Call only after a bounded phase has returned. A feed inside a wait would hide
+// exactly the hang this watchdog exists to catch.
+void feedWatchdog() {
+	if (!g_watchdogActive) return;
+	esp_task_wdt_reset();
+}
 
 TinyGPSPlus gps;
 Adafruit_MPU6050 mpu;
@@ -1774,6 +1817,9 @@ void sendCommandAck(const String& commandId, const char* status, const char* det
 
 void handleCommands(JsonArray commands) {
 	for (JsonObject command : commands) {
+		// The previous command's acknowledgement is a bounded modem request;
+		// reaching this line proves it returned. A hung handler never feeds.
+		feedWatchdog();
 		const String id = command["id"] | "";
 		const String kind = command["kind"] | "";
 		if (id.isEmpty()) continue;
@@ -1784,6 +1830,8 @@ void handleCommands(JsonArray commands) {
 		if (kind == "LOCATE") {
 			const String body = heartbeatPayload(0, 0, false, 0, 0, false);
 			modemHttpRequest("POST", "/api/device/ingest", body, nullptr);
+			// The acknowledgement below is a second request in this command.
+			feedWatchdog();
 		} else if (kind == "TEST_ALERT") {
 			g_buzzer.setPattern(fw::BuzzerPattern::Alerting, millis());
 			g_testAlertUntil = millis() + 3000;
@@ -1886,6 +1934,28 @@ bool readIgnition() {
 	return analogRead(hw::kIgnitionAdc) > 1800;
 }
 
+#ifdef LIFELINK_BENCH_WDT
+/**
+ * Bench-only proof for the watchdog. The loop task blocks without feeding, so
+ * the task watchdog must panic and reboot the board. It is compiled only in
+ * env:esp32dev-bench and the caller refuses it unless the tracker is Idle.
+ *
+ * The window is 60 s longer than the timeout. If this function returns, the
+ * watchdog did not fire and the build or configuration must be investigated.
+ */
+void runWatchdogBenchTest() {
+	const uint32_t windowMs = (kWatchdogTimeoutS + 60UL) * 1000UL;
+	const uint32_t deadlineMs = millis() + windowMs;
+	Serial.printf("[TEST] TEST_WDT: no feed for %lu s; expect a panic and a reboot\n",
+				  static_cast<unsigned long>(windowMs / 1000UL));
+	Serial.flush();
+	while (static_cast<int32_t>(deadlineMs - millis()) > 0) {
+		delay(100);
+	}
+	Serial.println("[TEST] TEST_WDT: no reset observed; check the watchdog configuration");
+}
+#endif
+
 void handleSerialProvisioning() {
 	static String line;
 	while (Serial.available()) {
@@ -1943,6 +2013,28 @@ void handleSerialProvisioning() {
 					fw::MinInterval(static_cast<uint32_t>(g_config.heartbeatIntervalS * 1000.0f));
 				g_heartbeatTimer.mark(millis());
 				Serial.println("[CFG] reset to factory defaults");
+			} else if (line == "TEST_WDT") {
+				Serial.println(
+					"[TEST] TEST_WDT is a bench proof: it blocks until the watchdog resets "
+					"the board.");
+#ifdef LIFELINK_BENCH_WDT
+				Serial.println("[TEST] send TEST_WDT CONFIRM while Idle; never during an alert");
+#else
+				Serial.println(
+					"[TEST] not built into this firmware; use env:esp32dev-bench to enable it");
+#endif
+			} else if (line == "TEST_WDT CONFIRM") {
+#ifdef LIFELINK_BENCH_WDT
+				if (g_safety.state() != fw::AlertState::Idle || !g_incidentId.isEmpty() ||
+					g_testAlertUntil != 0) {
+					Serial.println("[TEST] TEST_WDT refused: the tracker is not Idle");
+				} else {
+					runWatchdogBenchTest();
+				}
+#else
+				Serial.println(
+					"[TEST] TEST_WDT is not built into this firmware; use env:esp32dev-bench");
+#endif
 			} else if (line == "REBOOT") {
 				ESP.restart();
 			}
@@ -1977,6 +2069,9 @@ void setup() {
 	Serial.println("[FIRMWARE] LifeLink " FW_VERSION);
 	Serial.println(
 		"[WIRING] MPU+OLED 21/22, SW-420 27, cancel 33, GPS 16/17, modem 18/19, buzzer 25");
+	// Start the watchdog before the boot work. The modem PWRKEY sequence is the
+	// longest step at about 11 s, so a setup that hangs also reboots.
+	beginWatchdog();
 
 	prefs.begin("lifelink", false);
 	g_deviceId = prefs.getString("device_id", chipMac());
@@ -2040,6 +2135,9 @@ void setup() {
 }
 
 void loop() {
+	// A new iteration started, so the previous one returned. Every feed below
+	// marks a completed bounded phase; none sits inside a wait.
+	feedWatchdog();
 	handleSerialProvisioning();
 	readGps();
 	applyPendingConfig();
@@ -2086,6 +2184,8 @@ void loop() {
 			g_safety.startCountdown(now, g_config);
 			g_buzzer.setPattern(fw::BuzzerPattern::Countdown, now);
 			sendIncident("SUSPECTED", false);
+			// A driver cancel in the same pass may follow with sendCancel().
+			feedWatchdog();
 		} else if (decision == fw::ImpactDecision::Reject) {
 			Serial.println("[IMPACT] rejected as a false positive");
 		}
@@ -2097,6 +2197,8 @@ void loop() {
 		if (state == fw::AlertState::Cancelled && g_lastState != fw::AlertState::Cancelled) {
 			Serial.println("[IMPACT] cancelled by driver");
 			sendCancel();
+			// The all-clear SMS may follow in this pass after a remote cancel.
+			feedWatchdog();
 			g_buzzer.setPattern(fw::BuzzerPattern::Cancelled, now);
 			g_cancelledAt = now;
 		}
@@ -2108,6 +2210,10 @@ void loop() {
 
 		if (state == fw::AlertState::Alerting && g_safety.shouldRetry(now)) {
 			sendSmsAlerts();
+			// Two SMS are bounded at 54 s and the incident POST at 87 s. The
+			// feed sits between them, not inside either wait, so an SOS that
+			// hangs still trips the watchdog.
+			feedWatchdog();
 			sendIncident("CONFIRMED", false);
 			g_safety.markAlertSent(now);
 		}
@@ -2137,6 +2243,7 @@ void loop() {
 		if (g_allClearPending && state != fw::AlertState::Alerting) {
 			g_allClearPending = false;
 			sendAllClearSms();
+			feedWatchdog();
 		}
 
 		g_lastState = state;
@@ -2147,9 +2254,16 @@ void loop() {
 		updateStatusLed(now);
 	}
 
+	// The impact/alert pass above can include two SMS and an incident POST; it
+	// is complete here.
+	feedWatchdog();
+
 	// WiFi is serviced after the impact/alert pass so the safety-critical sample
-	// is always taken before any portal work.
+	// is always taken before any portal work. The setup portal has no inner
+	// loop: it is one bounded pass of this function, and a request that hangs
+	// never reaches the feed below.
 	serviceWifiCommissioning(millis());
+	feedWatchdog();
 
 	if (g_testAlertUntil > 0 && now > g_testAlertUntil) {
 		g_buzzer.setPattern(fw::BuzzerPattern::Off, now);
@@ -2172,11 +2286,16 @@ void loop() {
 			const String body = heartbeatPayload(
 				0, 0, false, gps.speed.isValid() ? gps.speed.kmph() : 0, batteryV, readIgnition());
 			modemHttpRequest("POST", "/api/device/ingest", body, nullptr);
+			// One heartbeat is bounded at 90 s (signal query plus POST).
+			feedWatchdog();
 		}
 
 		if (g_commandTimer.ready(now)) {
 			g_commandTimer.mark(now);
 			pollCommands();
+			// pollCommands feeds per command, so the poll GET and the last ACK
+			// are each bounded below the timeout.
+			feedWatchdog();
 		}
 	}
 

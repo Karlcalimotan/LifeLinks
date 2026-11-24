@@ -59,6 +59,67 @@ include the headers directly. The `native` environment needs a host C/C++
 compiler (gcc/g++ on Linux, MinGW-w64 on Windows). `scripts/verify.sh` adds the
 ESP32 build, static analysis and the clang-format check.
 
+## Hardware watchdog
+
+The Arduino `loop()` task is subscribed to the ESP32 task watchdog
+(`esp_task_wdt`) with a **120 s** timeout and panic enabled. A loop that stops
+progressing panics and reboots the board instead of staying hung.
+
+The timeout is sized from the blocking A7670E transport, which is the longest
+bounded work in the sketch:
+
+| Bound | Time |
+| --- | --- |
+| longest single AT wait (`AT+HTTPACTION`) | 30 s |
+| one complete `modemHttpRequest()` (every step at its timeout) | 87 s |
+| heartbeat or `LOCATE` (3 s `AT+CSQ` plus the POST) | 90 s |
+| watchdog timeout | 120 s, 30 s above the largest phase |
+
+The GPS read drains the UART without waiting, so it adds no bounded wait. The
+watchdog starts near the top of `setup()`, before NVS and modem bring-up, so a
+hung boot also reboots. The longest boot step is the ~11 s modem PWRKEY
+sequence, still well below the timeout.
+
+Feeds mark the end of a bounded phase, never a point inside a wait:
+
+- the start of `loop()`, which proves the previous iteration returned;
+- after the impact/alert pass, including a driver cancel or all-clear SMS;
+- between the two SMS and the incident POST in the alert path;
+- after one setup-portal or stored-WiFi pass;
+- after the heartbeat and after the command poll, and per command, because
+  each acknowledgement is a separate request.
+
+A real hang stops the next feed, so the panic fires within 120 s.
+
+A watchdog reset is a full reboot. It ends a latched `Alerting` alarm exactly
+like a power loss: the unit boots to `Idle`, and the portal must resolve the
+incident.
+
+### Bench step (human, not automated)
+
+The check never runs automatically and must not run during an alert. Build the
+bench environment, the only build that compiles the blocking command:
+
+```bash
+pio run -d firmware -e esp32dev-bench -t upload   # human owner only
+pio device monitor -b 115200
+```
+
+With the tracker `Idle` and no active incident:
+
+1. Send `TEST_WDT`. The device prints the warning and asks for confirmation; it
+   does not block.
+2. Send `TEST_WDT CONFIRM`. The loop stops feeding the watchdog.
+3. After about 120 s the serial log shows the task watchdog panic
+   (`Task watchdog got triggered`) and the board reboots to the normal boot
+   banner.
+4. The default `esp32dev` build refuses the command with
+   `[TEST] TEST_WDT is not built into this firmware`.
+
+Do not treat this as verified until it runs on a real unit. The bench
+environment is not part of the CI matrix, so rebuild it when the serial handler
+or the watchdog code changes.
+
 ## Provisioning
 
 The primary setup path is the device-hosted WiFi portal. Serial provisioning is
@@ -355,7 +416,7 @@ the integration, not as a formality.
 - **SMS cost while latched.** The retry ladder runs until the acknowledgement
   arrives, so an unacknowledged unit keeps sending on the configured interval.
 - **The AT transport is blocking.** A slow network can delay the loop. The
-  watchdog and the retry ladder bound the damage, but a non-blocking state
+  120 s watchdog and the retry ladder bound the damage, but a non-blocking state
   machine is the next step. A blocking heartbeat can also delay a portal
   response, but the join itself continues in the WiFi stack.
 - **The filter is tuned on the bench, not on a large road dataset.** The
