@@ -14,6 +14,19 @@ inversion.
 5. The system must keep working when the backend, the car battery or the GPS is
    unavailable.
 
+## Detection is always on
+
+There is no arm or disarm. The tracker monitors impacts from boot, whether the
+ignition is on or off, and the console offers only Locate and Test alert as
+tracker actions. A posted `ARM` or `DISARM` command is acknowledged as
+`{ "detail": "unsupported" }` and changes no safety state. Historical
+`DeviceCommand` rows may still carry those kinds; they describe a past request,
+not a working control.
+
+There is also no parked mode. The parked-impact setting has been retired from
+Settings and no code reads it; an impact while parked goes through the same
+filter, countdown and alert path as any other impact.
+
 ## State machine
 
 ```

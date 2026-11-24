@@ -60,6 +60,11 @@ The routes are idempotent:
 - commands: delivered until acknowledged or expired; the device dedupes by id
 - a repeated incident never creates a second alert storm
 
+The console queue is limited to `LOCATE`, `TEST_ALERT` and `SET_CONFIG`. `ARM`
+and `DISARM` remain in `CommandKind` for historical rows only: the console
+rejects them and the firmware acknowledges them as `unsupported` without
+changing state. Crash detection is always on.
+
 ### 3. Firmware (`firmware/`)
 
 The sketch is orchestration only. The decisions live in Arduino-free headers so
@@ -105,6 +110,9 @@ InvitationToken, MembershipPermission
 - `DeviceConfigOverride` is the optional per-tracker layer over `OrgSettings`.
   A null column inherits the organisation value; the row is deleted when every
   field inherits again.
+- `OrgSettings.parkedImpactAlerts` is reserved and not enforced. Settings does
+  not expose it, no code reads it, and it is not part of the firmware
+  configuration envelope. The column stays to avoid a destructive migration.
 - `AuditLog` records member changes (acknowledge, resolve, false alarm,
   configuration, device token rotation, invite, accept, revoke, re-invite) and
   platform changes (`platform.org_suspended`, `platform.org_reinstated` with the

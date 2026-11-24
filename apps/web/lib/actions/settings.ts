@@ -29,7 +29,6 @@ const settingsSchema = z.object({
 	sosRetryS: z.number().int().min(30).max(300),
 	telemetryRetentionDays: z.number().int().min(1).max(3650),
 	incidentRetentionDays: z.number().int().min(1).max(3650),
-	parkedImpactAlerts: z.boolean(),
 });
 
 export async function updateSettingsAction(formData: FormData) {
@@ -58,7 +57,6 @@ export async function updateSettingsAction(formData: FormData) {
 		sosRetryS: num(formData, "sosRetryS"),
 		telemetryRetentionDays: num(formData, "telemetryRetentionDays"),
 		incidentRetentionDays: num(formData, "incidentRetentionDays"),
-		parkedImpactAlerts: formData.get("parkedImpactAlerts") === "on",
 	});
 	if (!parsed.success) {
 		redirect(`/${locale}/settings?error=invalid`);
@@ -91,7 +89,6 @@ export async function updateSettingsAction(formData: FormData) {
 				incidentRetentionDays: data.incidentRetentionDays,
 				alertPhones: phones,
 				alertEmails: emails,
-				parkedImpactAlerts: data.parkedImpactAlerts,
 			},
 			update: {
 				impactThresholdG: data.impactThresholdG,
@@ -104,7 +101,6 @@ export async function updateSettingsAction(formData: FormData) {
 				incidentRetentionDays: data.incidentRetentionDays,
 				alertPhones: phones,
 				alertEmails: emails,
-				parkedImpactAlerts: data.parkedImpactAlerts,
 			},
 		}),
 		prisma.auditLog.create({

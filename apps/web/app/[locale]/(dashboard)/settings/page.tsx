@@ -361,16 +361,6 @@ async function SettingsForm({
 								disabled={!editable}
 							/>
 						</Field>
-						<label className="flex items-center gap-2 text-meta text-fog-500 sm:col-span-2">
-							<input
-								type="checkbox"
-								name="parkedImpactAlerts"
-								defaultChecked={settings.parkedImpactAlerts}
-								disabled={!editable}
-								className="size-4 rounded border-ink-600 bg-ink-950 accent-signal-500"
-							/>
-							{t("parkedImpactAlerts")}
-						</label>
 					</CardContent>
 				</Card>
 			</div>

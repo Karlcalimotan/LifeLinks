@@ -73,6 +73,9 @@ enum AlertStatus {
 
 enum CommandKind {
   LOCATE
+  /// Historical only. The console rejects these, and the firmware acknowledges
+  /// them as `unsupported` without changing any safety state. Crash detection
+  /// is always on.
   ARM
   DISARM
   TEST_ALERT
@@ -518,6 +521,9 @@ model OrgSettings {
   incidentRetentionDays  Int     @default(365)
   alertPhones            Json    @default("[]")
   alertEmails            Json    @default("[]")
+  /// Reserved, not enforced. No code reads this column and Settings does not
+  /// expose it. Crash detection is always on, so parked impacts are treated
+  /// like any other impact. Kept to avoid a destructive migration.
   parkedImpactAlerts     Boolean @default(false)
 
   org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)

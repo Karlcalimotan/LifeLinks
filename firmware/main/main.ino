@@ -130,7 +130,6 @@ uint32_t g_configRev = 0;
 String g_pendingConfig;
 uint32_t g_pendingRev = 0;
 bool g_configPending = false;
-bool g_armed = true;
 bool g_mpuOk = false;
 
 // Optional status panel. It is never part of the safety path; see display.h.
@@ -1837,10 +1836,13 @@ void handleCommands(JsonArray commands) {
 		} else if (kind == "TEST_ALERT") {
 			g_buzzer.setPattern(fw::BuzzerPattern::Alerting, millis());
 			g_testAlertUntil = millis() + 3000;
-		} else if (kind == "ARM") {
-			g_armed = true;
-		} else if (kind == "DISARM") {
-			g_armed = false;
+		} else if (kind == "ARM" || kind == "DISARM") {
+			// Crash detection is always on, so these commands are answered but
+			// deliberately change no state. The ACK tells the console the command
+			// was received and not applied.
+			Serial.println("[CMD] arm/disarm unsupported; detection stays on");
+			sendCommandAck(id, "ACKED", "unsupported");
+			continue;
 		} else if (kind == "SET_CONFIG") {
 			// The config object is applied from the same poll response.
 		} else if (kind == "CANCEL_ALERT") {
