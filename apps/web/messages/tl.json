@@ -978,7 +978,7 @@
 		"logEmptyFilteredBody": "Alisin ang status o channel filter para makita ang lahat ng row.",
 		"openIncident": "Buksan ang insidente para sa {plate}",
 		"contactsTitle": "Mga emergency contact",
-		"contactsSubtitle": "Mga taong nakatala para sa organisasyong ito. Ang alert route ay nagpapadala sa Settings targets, hindi sa mga contact na ito; read-only ang contacts dito.",
+		"contactsSubtitle": "Mga taong nakatala para sa organisasyong ito. Ang mga aktibong contact sa isang sasakyan ang unang tumatanggap ng alerts nito, bago ang Settings targets ng organisasyon. Minamahalaan ang contacts sa pahina ng sasakyan.",
 		"contactName": "Pangalan",
 		"contactPhone": "Telepono",
 		"contactEmail": "Email",
