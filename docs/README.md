@@ -2,7 +2,8 @@
 
 | Document | What it covers |
 | --- | --- |
-| [user-guide.md](user-guide.md) | Driver, responder and administrator tasks, phone install, privacy, troubleshooting and a printable quick card |
+| [user-guide.md](user-guide.md) | Driver, responder and administrator tasks, vehicles and contacts, retention, phone install, privacy, troubleshooting and a printable quick card |
+| [pwa.md](pwa.md) | Installable console, offline shell, cache policy and update flow |
 | [architecture.md](architecture.md) | Layers, data model, auth, device contract, extension points |
 | [design.md](design.md) | Night Highway Dispatch palette, type, logo, layout and accessibility |
 | [wiring.md](wiring.md) | Canonical pin map, power chain, pre-power checklist |

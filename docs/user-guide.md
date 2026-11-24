@@ -9,8 +9,8 @@ The console has English and Tagalog text. This guide uses the English labels.
 This guide is checked against the code in this repository. The tracker's
 physical behaviour is described from the firmware and its host tests. The bench
 run on a real unit is still pending, so section 2 says what is designed and
-what has not been proven on hardware. Where a control does nothing yet, the
-guide says so.
+what has not been proven on hardware. Where a hardware claim has not been
+bench-verified, the guide says so.
 
 ## 1. What LifeLink does
 
@@ -46,6 +46,9 @@ The tracker sends a heartbeat every 30 seconds by default. A heartbeat carries
 its last position, battery voltage when the sense divider is fitted, signal
 strength, firmware version and the configuration revision it has applied.
 
+Crash detection is always on while the tracker is powered. There is no arm or
+disarm control.
+
 An impact or a tilt starts a short confirmation step. The tracker then starts
 the countdown and sends a `SUSPECTED` report to the console. If the countdown
 expires, the tracker sends the SOS SMS and a `CONFIRMED` report, then retries
@@ -53,6 +56,12 @@ both on the configured interval until the alarm is acknowledged or stood down.
 
 The GPS is not a condition for the SOS. If the tracker has no current fix, it
 sends the last known position with the age of that fix.
+
+The firmware runs a 120-second task watchdog with panic enabled. A loop or boot
+phase that stops progressing resets the board. A watchdog reset is a full
+reboot, so it ends a latched alarm the same way a power loss does: the unit
+boots idle and the console must resolve the incident. The reset path is in the
+firmware; the physical `TEST_WDT` bench step has not been run.
 
 ### The console
 
@@ -68,9 +77,9 @@ The console has three tenant roles:
 
 | Role | Scope |
 | --- | --- |
-| Vehicle owner | Their own vehicles and incidents |
+| Vehicle owner | Their own vehicles and incidents; can add, edit and archive their own vehicles and emergency contacts |
 | CDRRMO / Pulis | The whole organisation fleet and every incident |
-| Admin | The whole organisation, plus trackers, members and settings |
+| Admin | The whole organisation, plus vehicles, contacts, trackers, members and settings |
 
 A platform administrator has a separate console for organisation suspension.
 On its own, that role is not a tenant role and does not grant access to fleet or
@@ -81,7 +90,7 @@ incident data.
 The tracker sends two independent signals:
 
 ```text
-Tracker ──── SMS ─────────────────────▶ phones configured in Settings
+Tracker ──── SMS ─────────────────────▶ vehicle contacts, then Settings fallback
    │
    └──── HTTPS incident report ───────▶ console ──── browser push ───▶ responders
              ▲                              │
@@ -91,10 +100,12 @@ Tracker ──── SMS ──────────────────�
 The SMS path does not depend on the console. The HTTPS path does not depend on
 the SMS. Either can arrive when the other fails.
 
-The SMS goes only to the phone numbers configured for the tracker. In normal
-use those are the first two numbers in Settings. It does not go to emergency
-services unless one of those numbers is an emergency service. The console never
-sends the SOS SMS. The tracker sends it from its own SIM.
+The SMS goes only to the phone numbers configured for the tracker. The tracker
+uses the vehicle's active emergency contacts first, up to two. If the vehicle
+has no active contacts, it uses the first two organisation numbers from
+Settings. It does not go to emergency services unless one of those numbers is
+an emergency service. The console never sends the SOS SMS. The tracker sends it
+from its own SIM.
 
 ### What is automatic
 
@@ -105,13 +116,13 @@ sends the SOS SMS. The tracker sends it from its own SIM.
 | SOS SMS | Yes, after the countdown | Sent by the tracker, not the server |
 | HTTPS incident report | Yes, after the countdown | Retried until acknowledged or stood down |
 | Incident record and timeline | Yes | Created when the report reaches the console |
-| Alert rows | Yes | One row per configured phone and email target |
+| Alert rows | Yes | One row per routed phone and email target |
 | Browser push | Yes, if configured | Only for confirmed incidents |
 | Tracker command pickup | Yes | The tracker polls for commands |
+| Retention deletion | Yes, daily | Telemetry and incidents older than the organisation periods are removed when the cron secret is configured |
 | Call to emergency services | No | A person must make the call |
 | Server-side SMS or email | No | No sender runs in this build |
 | Acknowledge and resolve | No | A responder or admin decides |
-| Retention deletion | No | Settings are stored, but no cleanup job runs |
 
 ### What is not automatic
 
@@ -123,34 +134,42 @@ sends the SOS SMS. The tracker sends it from its own SIM.
   addresses create alert rows, but no email sender is implemented.
 - The console does not resolve an incident by itself. A responder acknowledges
   and resolves it.
-- The console does not delete old telemetry or incidents automatically. The
-  retention values are saved, but the cleanup job is not implemented.
 - The console does not decide that an incident is a false alarm. The tracker
   must confirm a stand-down before the incident closes as a false alarm.
+- Retention cleanup is a daily scheduled job, not an immediate delete when a
+  record passes its cutoff.
 
 ### Known limits in this build
 
 | Limit | Effect |
 | --- | --- |
 | No server SMS or email sender | New alert rows stay `Queued`. The tracker's own SMS is the SMS that reaches phones. |
-| No retention job | The retention settings do not delete data yet. |
-| Arm and Disarm are not applied | The firmware stores an armed flag, but the detection loop never reads it. Neither command changes crash detection. |
-| No vehicle or contact editor | Vehicles and emergency contacts are loaded outside the console. Contacts are read-only and are not used for alert routing. |
-| Installable shell is a separate change | The install steps in section 5 describe the installable version. A deployment without it is online-only. |
-| Parked-impact setting has no effect | The value is saved but not read by the device or the alert path. |
-| Physical bench pending | The logic is tested on the host. SMS delivery, cancel timing, GPS and power behaviour are not proven for a particular unit until the bench checklist passes. |
+| No battery-backed RTC | Device timestamps use GPS UTC. Without a fix, the console may fall back to receipt time and the send-time measurement is omitted. The RTC choice is still open (issue #106). |
+| Watchdog reset not bench-verified | The 120-second task watchdog is in the firmware. The `TEST_WDT` reset has not been run on hardware. |
+| Pin map and physical bench pending | The pin map, wiring, sensors, SMS delivery, power path and cancel behaviour are not proven for a particular unit until the bench checklist passes. |
 
 ### Bench status
 
 The pure logic has host tests: false-positive filtering, the countdown, cancel,
 retry, acknowledgement latch, faults, GPS quality, power bands and the SMS body.
-The server and firmware configuration contract is also tested.
+The server and firmware configuration contract, the retention job, the vehicle
+and contact flows, and the installable cache policy also have automated tests.
 
-The physical run is still a human task. It must cover a synthetic impact, the
-countdown, the cancel button, SMS delivery, the acknowledgement silence and a
-power cut. Use the checklist in [`hardware.md`](hardware.md). Do not treat a
-tracker as commissioned until that checklist passes. The repository does not
-claim a bench result for a particular unit.
+The following remain human bench work. The repository does not claim a result
+for them:
+
+- **Pin map and wiring:** the canonical map is in `pins.h` and
+  [`wiring.md`](wiring.md). Power, continuity and sensor bring-up are checked on
+  the physical unit.
+- **Physical tracker run:** a synthetic impact, the countdown, the cancel
+  button, SMS delivery, the acknowledgement silence and a power cut.
+- **Watchdog reset:** build `env:esp32dev-bench` and follow the `TEST_WDT` step
+  in [`hardware.md`](hardware.md). The default build refuses the test command.
+- **RTC:** there is no battery-backed real-time clock yet. The module decision
+  is issue #106. Until it is fitted, device times depend on GPS UTC.
+
+Do not treat a tracker as commissioned until the checklist in
+[`hardware.md`](hardware.md) passes.
 
 ## 2. Driver quick card
 
@@ -223,8 +242,8 @@ to a reminder, but the alarm is still latched.
   position and the age of the fix.
 - The alarm latches until someone at the console stops it or the unit loses
   power. There is no timed silence.
-- A reboot or power loss ends the latch. The unit boots idle and does not
-  resume the alarm. The console must resolve the incident manually.
+- A reboot, a watchdog reset or power loss ends the latch. The unit boots idle
+  and does not resume the alarm. The console must resolve the incident manually.
 - There is no persistent event queue. A failed alert is retried while the unit
   is alerting, but it is not replayed after a reboot.
 - The buzzer and the SMS are only proven on a unit that has passed the bench
@@ -323,12 +342,24 @@ notification or a push alert. The detail page shows:
 - **Evidence**: an acceleration and tilt chart when the payload contains
   samples, plus peak acceleration, tilt, vibration count, speed and GPS age;
 - the last position and its fix age, or a note that the payload had no GPS fix;
-- **Timeline**: detection, the cancel-window close, cancellation, audit actions
-  and device events;
-- **Alert targets**: one row per configured phone and email, with channel,
-  target, status and attempt count;
+- **Timeline**: detection, the cancel-window close, cancellation, audit actions,
+  device events, and the tracker send time when it is available;
+- **Alert targets**: one row per routed phone and email, with channel, target,
+  status and attempt count;
 - **Actions**: acknowledge, resolve, false alarm and cancel controls, depending
   on the incident state and your permissions.
+
+If the tracker supplied a send time, the timeline also shows **Tracker sent at**
+the tracker clock time and **Console received** the delay in seconds. The send
+time is captured when the countdown expires and is repeated unchanged on every
+retry. It is GPS UTC, not network time, and it is absent without a GPS fix, so
+no delay is shown then. The console hides the delay when the gap is negative or
+longer than one hour because that points to a clock error, not a slow link.
+
+The measured interval runs from the start of the alert to the receipt of the
+first `CONFIRMED` report. It includes the SMS attempts that run before the
+incident HTTP post. The send time is not the impact time; the detected time is
+separate. A transmission-time test needs a GPS fix at dispatch.
 
 The incident page does not embed a street map. It shows the coordinates and an
 **Open in Maps** link. The **Live map** page is the schematic fleet view.
@@ -470,9 +501,10 @@ to open the list.
 
 **The Notifications page** in the navigation is the delivery record and the
 contact list. It is available to responders and admins. It shows the alert
-policy, the configured phone and email targets, the alert log, and the
-organisation's emergency contacts. The contacts are read-only and are not used
-for alert routing in this build. The targets come from Settings.
+policy, the organisation phone and email fallback, the alert log, and a
+read-only list of the organisation's emergency contacts. Contacts are edited on
+the vehicle's Settings tab. The alert log rows include the vehicle contacts that
+were routed for each incident, plus the organisation fallback.
 
 The Notifications page also states **Sender not connected**. No SMS, email or
 HTTP sender runs in this build, so new alert rows stay `Queued`. Call emergency
@@ -505,10 +537,11 @@ member's subscriptions.
 ### If you are a vehicle owner
 
 A vehicle owner account sees **My vehicles** and only the incidents for those
-vehicles. The owner can open incidents and resolve one after the bureau has
-acknowledged it, but does not have the bureau acknowledgement permission by
-default. The Trackers, Settings and Notifications pages are not available to
-this role.
+vehicles. The owner can add, edit and archive their own vehicles and emergency
+contacts. They can open incidents and resolve one after the bureau has
+acknowledged it, but do not have the bureau acknowledgement permission by
+default. The Trackers page, the organisation Settings page and the Notifications
+page are not available to this role. The vehicle's own Settings tab is.
 
 If you need to acknowledge alarms, use an account that has the acknowledgement
 permission, normally a responder or admin.
@@ -617,20 +650,18 @@ the rest of the boot once the alert state leaves idle.
 
 #### Tracker commands
 
-The tracker detail page has four command buttons. Each command is queued and
+The tracker detail page has two command buttons. Each command is queued and
 valid for ten minutes. The tracker picks it up on its next poll.
 
 | Command | What it does |
 | --- | --- |
 | Locate now | Asks the tracker to send a heartbeat and position update |
 | Test alert | Sounds the buzzer for about three seconds. It does not send an SMS or create an incident. |
-| Arm | Sets the armed flag, which the detection loop does not read |
-| Disarm | Clears the armed flag, which the detection loop does not read |
 
-**Arm and Disarm do not change crash detection in the current firmware.** The
-firmware stores the armed flag, but the impact detection loop never reads it. Do
-not use either command as a workshop or safety control. The Disarm confirmation
-dialog says crash detection stops, but the code does not apply the flag yet.
+Crash detection is always on. There is no Arm or Disarm control, and a direct
+request for either command is refused. A watchdog reset ends a latched alarm
+the same way a power loss does: the tracker reboots idle and the console must
+resolve the incident.
 
 #### Per-tracker configuration
 
@@ -664,24 +695,76 @@ confirmation requires typing the tracker MAC. This cannot be undone.
 ### Vehicles and emergency contacts
 
 The **Vehicles** page lists every vehicle, its driver, its tracker, the last
-seen time and the vehicle status. Open a vehicle for four tabs:
+seen time and the vehicle status. A vehicle owner sees their own vehicles. An
+admin sees the whole organisation.
 
-- **Overview**: current position, GPS fix age, speed, battery, ignition, tracker
-  details and firmware.
-- **Trips**: the five most recent trips.
-- **Incidents**: the five most recent incidents for the vehicle.
-- **Settings**: maintenance mode.
+#### Add a vehicle
 
-Maintenance mode is a fleet marker. It does not stop crash detection or alert
-delivery. The tracker and the alert path keep working while a vehicle is in the
-workshop. Only an admin can change it, and the change is audited.
+Open **Add vehicle** on the Vehicles page. The form has:
 
-The console cannot add or edit a vehicle, driver or emergency contact in this
-build. Vehicle records are loaded outside the console. The **Emergency
-contacts** list on the Notifications page is read-only, and those contacts are
-not used for alert routing. Alert targets are the phone and email lists in
-Settings. Vehicle and contact editing with alert routing is a known gap, not a
-hidden setting.
+- plate, make and model, which are required;
+- year, VIN, driver name and driver phone, which are optional;
+- an owner, for an admin only. The admin can leave it **Unassigned** or choose
+  an active member of the organisation.
+
+A vehicle owner does not see the owner field. A vehicle they add belongs to
+them. A duplicate plate in the organisation is refused. Select **Add vehicle**
+to save.
+
+#### Edit a vehicle
+
+Open the vehicle, select **Settings**, and use **Vehicle details**. An owner can
+change the plate, make, model, year, VIN, driver name and driver phone on their
+own vehicle. An admin can also reassign the owner to an active member or leave
+the vehicle unassigned. Select **Save vehicle**. Every change is audited.
+
+#### Emergency contacts
+
+The vehicle **Settings** tab also has **Emergency contacts**. Select **Add
+emergency contact** and enter a name, phone number, optional email and an
+**Active** checkbox. A phone number must have 10 to 15 digits. The form rejects
+a phone value already used by another contact in the organisation, and the alert
+routing also removes local and international spellings of the same number.
+
+- **Edit contact** changes the name, number, email or active state. Select
+  **Save contact**.
+- **Archive contact** keeps the row in the record and audit trail but stops it
+  from receiving alerts.
+- Only active contacts receive alerts. Re-open an archived contact and check
+  **Active** to put it back on the list.
+- Every contact change is audited.
+
+The Notifications page has a read-only list of the organisation's contacts.
+Edit them on the vehicle.
+
+#### Alert routing order
+
+The vehicle's active contacts are alerted first:
+
+- The web alert queue creates a target row for each active vehicle contact,
+  then for the organisation phone and email lists. Duplicates are removed and
+  each channel is capped at 10 targets.
+- The tracker's own SOS SMS uses the active vehicle contacts, at most two
+  because the firmware keeps two slots. If the vehicle has no active contacts,
+  it falls back to the organisation phone list. When vehicle contacts exist,
+  the organisation numbers are not used for the tracker SMS.
+- The first number in the tracker's list is the callback number in the SMS.
+
+The organisation phone and email lists in Settings remain the fallback for
+vehicles without contacts, and the web queue still includes them after the
+vehicle contacts.
+
+#### Maintenance and archive
+
+**Maintenance mode** is a fleet marker. It does not stop crash detection or
+alert delivery. The tracker and the alert path keep working while a vehicle is
+in the workshop. Only an admin can change maintenance mode, and the change is
+audited. A retired vehicle cannot be put in maintenance.
+
+**Archive vehicle** moves the vehicle to `RETIRED`. It keeps the vehicle, its
+incidents, trips and tracker history. It never hard-deletes a vehicle. The
+archive action is available to the vehicle owner and to an admin, and it is
+audited. A retired vehicle no longer offers the archive action.
 
 To assign a tracker, open the tracker and use **Edit tracker**. The vehicle page
 does not assign trackers.
@@ -732,15 +815,17 @@ settings** button. Select it after a change.
 - **Organization name**: shown in the console header.
 - **Phone numbers**: one per line, international format. Numbers need 10 to 15
   digits after other characters are removed. Invalid lines are dropped. Up to
-  20 numbers are kept.
+  20 numbers are kept. These are the organisation fallback numbers.
 - **Email addresses**: one per line. Invalid addresses are dropped. Up to 20 are
   kept. Email rows are queued, but no sender is implemented.
 
-The tracker caches the first two phone numbers from this list. The first number
-is also the callback number in the SOS SMS. Changes reach the tracker on its
-next successful poll. A number you remove can stay in the tracker's cache until
-a new number replaces it or the unit is factory reset, so check the tracker
-after changing contacts.
+The tracker uses the vehicle's active contacts first, up to two. It uses this
+organisation list only when the vehicle has no active contacts. The first
+number in the resolved list is also the callback number in the SOS SMS. Changes
+reach the tracker on its next successful poll.
+
+A number you remove can stay in the tracker's cache until a new number replaces
+it or the unit is factory reset, so check the tracker after changing contacts.
 
 #### Crash thresholds
 
@@ -766,12 +851,49 @@ the organisation value.
 - **Telemetry retention**: default 30 days, range 1 to 3650.
 - **Incident retention**: default 365 days, range 1 to 3650.
 
-The values are stored and shown in the privacy notice, but **no automatic
-deletion job runs in this build**. Data remains until an operator removes it.
-Do not tell drivers that old data is deleted automatically.
+A daily cleanup enforces both periods per organisation:
 
-The **Alert on impacts while parked** checkbox is saved but is not read by the
-device or the alert path. It has no effect in this build.
+- `GET /api/cron/retention` runs once a day at 18:15 UTC, which is 02:15 the
+  next day in Asia/Manila. Vercel may start it within the 18:00 UTC hour, so
+  treat it as a nightly window. The schedule runs on the production deployment;
+  a preview deployment does not run it.
+- Telemetry samples older than the telemetry period are deleted.
+- Incidents older than the incident period are deleted with their alert rows.
+  Device commands are kept, but their incident link is cleared.
+- The job works in bounded batches of 5,000 rows, up to 20 batches per
+  organisation and table per run. If the cap is reached, the response and audit
+  row say `truncated: true` and the next daily run continues.
+- Each run writes one `retention.cleanup` audit row per organisation with the
+  cutoffs, configured days, deleted counts, batch counts, `dryRun` and
+  `truncated`. It never writes personal data.
+
+The job fails closed. `CRON_SECRET` must be set in the Vercel Production
+environment and the project redeployed. A missing or blank secret returns `503`
+and deletes nothing. A wrong `Authorization` header returns `401`. Vercel sends
+the project's `CRON_SECRET` as the bearer token on scheduled runs.
+
+An organisation without an `OrgSettings` row is skipped. Open Settings and save
+once to create the row before relying on retention for that organisation.
+
+##### Dry run and manual run
+
+A dry run counts what would be deleted and deletes nothing. It writes the same
+audit row with `dryRun: true`.
+
+```bash
+# Dry run: counts only.
+curl -s -H "Authorization: Bearer $CRON_SECRET" \
+  "https://<production-host>/api/cron/retention?dryRun=1"
+
+# Real cleanup.
+curl -s -H "Authorization: Bearer $CRON_SECRET" \
+  "https://<production-host>/api/cron/retention"
+```
+
+The JSON response reports, per organisation, both cutoffs, the telemetry,
+incident and alert-row counts, the batch counts and whether the run was
+truncated. It does not return row contents, coordinates, phone numbers or the
+secret.
 
 ### Audit log
 
@@ -789,7 +911,11 @@ The log records operator and system actions such as:
   `device.token_rotated`, `device.command_queued`
 - `member.invited`, `member.invite_accepted`, `member.revoked`,
   `member.reinvited`
-- `settings.updated`, `vehicle.maintenance`
+- `vehicle.created`, `vehicle.updated`, `vehicle.archived`,
+  `vehicle.maintenance`
+- `emergency_contact.created`, `emergency_contact.updated`,
+  `emergency_contact.archived`
+- `settings.updated`, `retention.cleanup`
 - `platform.org_suspended`, `platform.org_reinstated`
 
 The log is read-only. There is no delete or edit control.
@@ -812,9 +938,10 @@ The **Notifications** page is available to responders and admins. It shows:
 - the sender warning, which states that no SMS, email or HTTP sender runs;
 - the alert policy, including that severity is a display aid and that there is
   no escalation chain;
-- the phone and email targets from Settings;
+- the organisation phone and email fallback from Settings;
 - the delivery log, filtered by status and channel;
-- the emergency contacts, read-only.
+- a read-only list of the organisation's emergency contacts. Edit contacts on
+  the vehicle's Settings tab.
 
 The log statuses are Queued, Sent, Failed and Acknowledged. Channels are SMS,
 Email and HTTP. New rows stay Queued in this build. A row's target is the phone
@@ -823,60 +950,90 @@ recorded on the row.
 
 ## 5. Install the console on a phone
 
-The console works in a mobile browser. The installable version adds a home
-screen icon and a branded offline page. Install support is being delivered
-separately from this guide. If your deployment does not show an install action
-yet, use the browser's Add to Home Screen shortcut and treat the console as
-online-only.
+LifeLink is installable. The installed console runs in its own window, opens
+from a home-screen icon and keeps a small public offline shell. Installation
+and the service worker require HTTPS, except on `localhost`.
 
-### Android with Chrome
+Where the browser offers an install path, the dashboard shows a dismissible
+banner. An admin also sees an install card at the top of **Settings**. Both
+disappear when the console is already running as an installed app.
 
-1. Open the console in Chrome and sign in.
-2. If the console shows an install banner or card, select **Install**.
-3. If it does not, open the Chrome menu with the three dots and choose **Install
-   app** or **Add to Home screen**.
-4. Confirm the prompt. Open the new icon and sign in if the app asks.
+### Android with Chrome, Edge or Samsung Internet
 
-The installed app opens the dashboard. Use the language switch in the header if
-you need Tagalog.
+1. Open the console and sign in.
+2. Use **Install** on the dashboard banner, or on the Settings card if you are an
+   admin.
+3. If the browser does not show an install prompt, open the browser menu and
+   choose **Install app** or **Add to Home screen**.
+4. Confirm the prompt. Open the new icon. It opens the console in the current
+   language, at the dashboard when you are signed in or at the login page.
 
-### iPhone and iPad with Safari
+### iPhone and iPad
 
-1. Open the console in Safari. Add to Home Screen is a Safari feature. Other
-   browsers on iOS do not offer the same install path.
-2. Tap the Share button.
-3. Scroll down and choose **Add to Home Screen**.
-4. Tap **Add**. Open the new icon and sign in.
+1. Open the console in Safari. Safari is the only iOS browser that can add
+   LifeLink to the Home Screen.
+2. Safari does not show an install prompt. The dashboard banner, and the
+   Settings card for admins, show **Add to Home Screen** instead.
+3. Tap the Share button, scroll down and choose **Add to Home Screen**, then
+   tap **Add**.
+4. If you opened the site in Chrome, Firefox, Edge or an in-app browser on iOS,
+   the banner, or the Settings card for admins, says **Open this site in Safari**
+   because those browsers cannot install it.
 
 Browser alerts on iPhone and iPad require the Home Screen app. Open the
 installed icon, sign in, then use the bell, **Browser alerts** and **Enable
 alerts**. Web push on iOS needs iOS 16.4 or later.
 
-### What the offline page does
+### Desktop
 
-The installable build adds a service worker and a branded offline page. The page
-is public and static. It tells you the console is offline and does not show a
-cached dashboard, incident, map, vehicle or account page. If the deployment you
-use does not include the offline shell yet, the browser's own offline error is
-what you will see.
+Use the install icon in the browser address bar, or the browser menu. If the
+browser does not offer an install prompt, use the browser menu. An admin can also
+check the Settings card for the install path.
 
-An offline page is not an offline incident viewer. You cannot open, acknowledge
-or resolve an incident while the phone has no connection. The console does not
-queue an action for later. Reconnect and open the page again.
+### The install card and banner
+
+- The dashboard banner has **Not now**, and **Install** when the browser can
+  prompt. **Not now** hides it for 30 days.
+- The admin Settings card has **Install** when the browser can prompt.
+- Both surfaces hide when the console is running as an installed app.
+- The installed icon opens `/`, which redirects to the visitor's language and
+  then to the dashboard or login. It does not freeze English or Tagalog.
+
+### Updates
+
+When a new version is ready, the console shows **A new version is ready** with
+**Reload** and **Later**. **Reload** activates the waiting service worker and
+reloads the page once. **Later** dismisses the notice. The old version keeps
+working until you reload.
+
+### The offline page
+
+Navigation is network-first. If the network request fails, the console serves
+`/offline.html`. The page is branded, public, available in English and Tagalog,
+and has a **Retry** link back to the console. It says that the screen contains no
+live data.
+
+The offline page is not an offline incident viewer. You cannot open, acknowledge
+or resolve an incident while the phone has no connection, and the console does
+not queue an action for later. Reconnect, then retry.
 
 ### Private data is never cached offline
 
-Private incident data is never cached for offline use.
+Private console data is never cached:
 
-- In the installable build, the service worker caches only public static assets
-  and the offline page.
-- It does not cache authenticated pages, API responses, RSC payloads, incident
-  details, vehicle positions, alert targets or account data.
-- The current push service worker has no fetch handler and does not use the
-  Cache API. The installable build adds a fetch handler only for the public
-  assets and the offline page.
+- Only public static assets are cached: the Next.js build assets under
+  `/_next/static/`, the icons, the manifest, the offline page and the brand
+  marks.
+- API responses, RSC payloads, HTML documents, authenticated pages, incident or
+  vehicle data and cross-origin requests are never cached.
+- The worker also refuses an allowlisted response when it is HTML, JSON, RSC,
+  marked `no-store` or `private`, or is not a successful same-origin response.
+- The offline page has no API call and no private data. It is the only console
+  page stored on the device.
 - This rule protects a shared phone after sign-out or an account switch. A
   cached incident page could show one user's data to the next person.
+
+See [`pwa.md`](pwa.md) for the cache policy and update flow.
 
 ## 6. Privacy and data
 
@@ -888,14 +1045,17 @@ LifeLink stores the data it needs to alert and to explain what happened:
 - organisation membership and role;
 - vehicle plate, make, model, year, VIN when present, driver name and driver
   phone;
+- emergency contacts, including their name, phone, optional email and the
+  vehicle they belong to;
 - tracker MAC, label, approval status, token hash, firmware version and
   hardware variant;
 - last position, speed, battery voltage, signal strength, satellites, ignition
   state and configuration revision;
 - trips and telemetry samples;
 - incidents, including peak acceleration, tilt, vibration count, speed,
-  coordinates, GPS age, evidence samples, status and resolution, plus timeline
-  entries built from audit and device event rows;
+  coordinates, GPS age, evidence samples, status, resolution and the tracker
+  send time when supplied, plus timeline entries built from audit and device
+  event rows;
 - alert targets, alert delivery rows, device commands and device events;
 - audit rows, invitation token hashes and push subscriptions;
 - browser push endpoints and their encryption keys.
@@ -906,9 +1066,9 @@ Access is scoped to the organisation that owns the vehicle.
 
 | Role | Can see |
 | --- | --- |
-| Vehicle owner | Their own vehicles and those vehicles' incidents |
+| Vehicle owner | Their own vehicles, those vehicles' incidents, and those vehicles' emergency contacts |
 | CDRRMO / Pulis | The whole organisation fleet and every incident |
-| Admin | The whole organisation, plus members, trackers, settings, audit and health |
+| Admin | The whole organisation, plus vehicles, contacts, members, trackers, settings, audit and health |
 | Platform administrator | Organisation records and suspension status. On its own, this role does not open the tenant fleet or incident pages. |
 
 Members of other organisations cannot see your vehicles or incidents in the
@@ -923,12 +1083,18 @@ The retention values are in Settings:
 - telemetry, default 30 days;
 - incidents, default 365 days.
 
-They are saved, and the privacy notice explains that automatic deletion is not
-enabled. Data remains until an operator removes it. Incident evidence may need
-to be kept for insurance or legal review.
+A daily cleanup enforces both periods. Telemetry samples and incidents older
+than the configured period are deleted automatically. Incidents are deleted
+with their alert rows, and their device commands lose the incident link. The job
+is bounded and records counts in the audit log. See the retention section above
+for the `CRON_SECRET` requirement and the dry run.
 
-Deleting a tracker removes its trips, samples and incidents. The console has no
-delete control for a vehicle or an account.
+Incident evidence is kept for the configured period because it may be needed
+for insurance or legal review.
+
+Deleting a tracker removes its trips, samples and incidents. A vehicle is
+archived as `RETIRED`, not deleted, and the console has no delete control for an
+account.
 
 ### Device and invitation tokens
 
@@ -948,15 +1114,17 @@ session cookie. The cookie is not readable by page scripts.
 ### SMS, push and location
 
 - The SOS SMS contains the plate, the last position and its age, the speed and,
-  when configured, a callback number. It goes only to the configured phones. SMS
-  is not end-to-end encrypted, so the mobile carrier and the recipient can read
-  it.
+  when configured, a callback number. It goes to the vehicle's active emergency
+  contacts first, or to the organisation phone fallback when the vehicle has
+  none. SMS is not end-to-end encrypted, so the mobile carrier and the recipient
+  can read it.
 - Browser push carries the plate and a short sentence, plus the incident link.
   It does not carry coordinates, the driver's name, a phone number or evidence.
   The push service and the lock screen can see what is in the notification.
-- Location is personal data. The console scopes it to the organisation and, for
-  a vehicle owner, to their own vehicles.
-- Audit rows record who changed an incident, a member, a tracker or a setting.
+- Location and contact details are personal data. The console scopes them to the
+  organisation and, for a vehicle owner, to their own vehicles and contacts.
+- Audit rows record who changed an incident, a vehicle, a contact, a member, a
+  tracker or a setting, and each retention cleanup.
 
 ## 7. Troubleshooting
 
@@ -970,11 +1138,15 @@ session cookie. The cookie is not readable by page scripts.
 | A command expired | The tracker did not collect it within ten minutes | Open the incident or tracker and send the command again once the tracker is back. Commands are not replayed after expiry. |
 | False alarm or cancel did not close the incident | The tracker answered `too_late`, `unknown_incident`, `failed`, an unconfirmed reply, or never collected the command | The incident stays open on purpose. Check the tracker. Retry after an expired command. Do not tell anyone the alarm stopped until the tracker confirms. |
 | The organisation is suspended | The tenant is disabled at the organisation level | Contact the service operator. Only a platform administrator can reinstate the organisation. A tenant admin cannot. |
-| You see the offline page or the browser's offline error | The phone has no connection | Reconnect and open the page again. The console does not show cached incident data and does not queue an acknowledgement or resolve action. |
-| No SOS SMS arrived | The tracker may have no SIM service, no coverage, no configured phone, or a failed modem call | Check the tracker power and SIM, and check that Settings has at least one valid phone number. The tracker caches the first two numbers and picks up changes on its next poll. The console cannot send the SMS for it. |
+| You see the offline page | The phone has no connection | Reconnect and open the page again. The console does not show cached incident data and does not queue an acknowledgement or resolve action. |
+| No install button appears | The browser cannot prompt, the site is on plain HTTP, or the console is already installed | Use HTTPS. On iPhone or iPad open the site in Safari and use Share, then Add to Home Screen. On desktop use the browser menu or address-bar install icon. The Settings card names the available path. |
+| A new version is ready but you do not see it | A waiting service worker is serving the old page until you reload | Select **Reload** in the update prompt. If you dismissed it, reload the page and the prompt returns while the new worker is waiting. |
+| No SOS SMS arrived | The tracker may have no SIM service, no coverage, no active contact, or a failed modem call | Check the tracker power and SIM. Check that the vehicle has an active emergency contact or that Settings has a valid fallback phone. The tracker uses up to two contacts first, then the organisation fallback. The console cannot send the SMS for it. |
+| An emergency contact did not get an alert | The contact is archived, the phone has no service, or the vehicle has other contacts that filled the two tracker slots | Check the contact is **Active**, the number has 10 to 15 digits, and the vehicle assignment is correct. The tracker uses at most two contacts. The web alert queue also creates email rows, but no sender runs. |
 | The console has no incident but someone received an SOS SMS | The SMS path worked and the HTTPS report did not | Act on the SMS. Ask for the plate, position and fix age. The console cannot show an incident that never reached the server. |
 | An incident stays suspected | The tracker reported the impact at the countdown start and the post-countdown report did not arrive | Treat it as live until you know otherwise. Call the driver if a number is shown, and check the tracker. The SMS may still have gone out. |
-| Arm or Disarm did not change detection | The current firmware stores the armed flag but never reads it | Do not rely on either command. Use the physical power switch or disconnect the unit for workshop work, and report the mismatch to the project owner. |
+| No tracker send time or console delay is shown | The tracker had no GPS fix at dispatch, or the gap is negative or over one hour | Treat the missing measurement as unknown, not zero. The detected time is still on the incident. A transmission-time test needs a GPS fix. |
+| Retention did not delete old data | The cron is disabled, the secret is missing, the organisation has no settings row, or the run hit its batch cap | Check `CRON_SECRET` in Vercel Production and redeploy. A missing secret returns `503` and deletes nothing; a wrong header returns `401`. Save Settings once for the organisation. Check the `retention.cleanup` audit rows and the Cron Jobs log. If the response says `truncated: true`, the next daily run continues. |
 | You cannot sign in | The email or password is wrong, the membership was revoked, or the login rate limit was hit | Check the credentials. Wait ten minutes after five failed attempts. A revoked membership fails like a wrong password. Ask an admin to re-invite you if the membership was revoked. |
 | A tracker is approved but reports no incidents | A common cause is an unassigned tracker. Check the assignment and the last heartbeat before assuming the unit is faulty. | Open the tracker and use **Edit tracker** to assign a vehicle. The incident route refuses an unassigned tracker. |
 
@@ -990,16 +1162,18 @@ Print this section and keep a copy in the vehicle and at the response desk.
 - **After the alert starts:** the cancel button does not stop the SMS.
 - **Long beep, solid light:** alert sent and latched. It keeps retrying.
 - **After 10 minutes:** slower beep, still latched, never silent.
-- **The SMS goes to configured contacts, not to emergency services.**
-- **Power loss or reboot:** the alarm stops, the unit boots idle, and the
-  console must resolve the incident.
+- **The SMS goes to the vehicle's active contacts first, then the organisation
+  fallback. It does not go to emergency services.**
+- **Power loss, reboot or watchdog reset:** the alarm stops, the unit boots
+  idle, and the console must resolve the incident.
 - **LifeLink is an aid, not a replacement for emergency services.**
 
 ### Responder
 
 1. Open **Incidents** or the **Needs attention** queue.
 2. Open the confirmed incident. Check the plate, driver, time, evidence and
-   position.
+   position. If shown, the tracker send time and console delay measure the link;
+   no GPS fix means no measurement.
 3. Call the driver if a number is shown. Call emergency services if needed.
 4. Select **Acknowledge**. Wait for **Alarm latched, waiting for tracker** to
    clear. The tracker must confirm before the status changes.
@@ -1013,6 +1187,8 @@ Print this section and keep a copy in the vehicle and at the response desk.
 
 ### Administrator
 
+- **Vehicles:** add or edit, add active emergency contacts, archive as
+  `RETIRED`. Contacts are alerted first; the tracker uses at most two.
 - **Trackers:** register, copy the token once, assign a vehicle, approve pending
   units.
 - **Rotate token:** copy the new token and update the tracker immediately. The
@@ -1020,9 +1196,8 @@ Print this section and keep a copy in the vehicle and at the response desk.
 - **WiFi setup:** join `LifeLink-XXXX`, open `192.168.4.1`, use a 2.4 GHz
   network. WiFi is setup only; 4G carries alerts.
 - **Health:** check offline trackers, pending commands and queued alerts.
-- **Settings:** phone numbers feed the tracker's SMS cache. The first two are
-  used. Email rows queue but no sender runs.
-- **Retention:** values are saved but no automatic deletion runs.
-- **Arm and Disarm do not change detection in this firmware.**
-- **Bench:** do not commission a unit until the checklist in
-  [`hardware.md`](hardware.md) passes.
+- **Detection is always on. There is no Arm or Disarm.**
+- **Retention:** runs nightly. Set `CRON_SECRET` in Vercel Production, redeploy
+  and dry-run with `?dryRun=1` before a real run.
+- **Bench:** pin map, watchdog reset, RTC #106 and the hardware checklist are
+  not verified until the physical bench passes.
