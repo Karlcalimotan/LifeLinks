@@ -978,7 +978,7 @@
 		"logEmptyFilteredBody": "Clear the status or channel filter to see every row.",
 		"openIncident": "Open incident for {plate}",
 		"contactsTitle": "Emergency contacts",
-		"contactsSubtitle": "People on file for this organisation. The alert route sends to the Settings targets, not these contacts; contacts are read-only here.",
+		"contactsSubtitle": "People on file for this organisation. Active contacts on a vehicle receive its alerts first, then the organisation Settings targets. Contacts are managed on the vehicle page.",
 		"contactName": "Name",
 		"contactPhone": "Phone",
 		"contactEmail": "Email",
