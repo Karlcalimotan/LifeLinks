@@ -14,6 +14,7 @@ export const INCIDENT_DETAIL_SELECT = {
 	tripId: true,
 	clientIncidentId: true,
 	detectedAt: true,
+	sentAt: true,
 	peakAccelG: true,
 	tiltDeg: true,
 	vibrationCount: true,

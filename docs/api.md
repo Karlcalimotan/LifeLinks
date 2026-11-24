@@ -146,6 +146,7 @@ in the past is ignored and the receipt time is used.
   "device_id": "AA:BB:CC:DD:EE:01",
   "incident_id": "tf-1a2b3c4d-0001",
   "detected_at": 1763472000,
+  "sent_at": 1763472015,
   "peak_accel_g": 3.8,
   "tilt_deg": 72,
   "vibration_count": 14,
@@ -162,6 +163,12 @@ in the past is ignored and the receipt time is used.
 ```
 
 - `status` is `SUSPECTED`, `CONFIRMED` or `CANCELLED`.
+- `sent_at` is the Unix second when the countdown expired and the alert
+  started. The tracker captures it once and repeats the same value on every
+  retry; a `SUSPECTED` report before the countdown, or a tracker whose clock was
+  never set, omits it. The console stores `sentAt` only when the value passes
+  the same clock-plausibility check as `detected_at`, and a retry never replaces
+  a stored value.
 - The first call creates the incident and queues the configured alert targets.
 - A `SUSPECTED` incident can be upgraded to `CONFIRMED` by a later retry with the
   same `incident_id`; alerts are queued only once.

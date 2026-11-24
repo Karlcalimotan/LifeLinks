@@ -30,3 +30,18 @@ export function resolveDeviceTime(value: number | null | undefined, now = new Da
 	}
 	return now;
 }
+
+/**
+ * Optional device timestamp with no receipt-time fallback. Unlike
+ * `resolveDeviceTime`, an absent, zero or implausible value stays absent: this
+ * feeds measurements such as the send-to-receive delay, where substituting the
+ * console clock would fabricate the very number being measured.
+ */
+export function resolveOptionalDeviceTime(
+	value: number | null | undefined,
+	now = new Date(),
+): Date | null {
+	if (value == null || value <= 0) return null;
+	if (!plausibleEpochSeconds(value, now.getTime())) return null;
+	return epochSecondsToDate(value);
+}

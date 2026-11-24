@@ -380,6 +380,7 @@ model ImpactEvent {
   tripId            String?
   clientIncidentId  String
   detectedAt        DateTime
+  sentAt            DateTime?
   peakAccelG        Float
   tiltDeg           Float
   vibrationCount    Int          @default(0)

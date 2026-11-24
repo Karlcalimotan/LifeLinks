@@ -369,6 +369,91 @@ describe("POST /api/device/incident", () => {
 		});
 	});
 
+	it("stores the device send time from the dispatched report", async () => {
+		const sentAt = Math.floor(Date.now() / 1000) - 4;
+
+		await POST(request({ sent_at: sentAt }));
+
+		const created = mocks.impactCreate.mock.calls[0]?.[0]?.data as { sentAt: Date | null };
+		expect(created.sentAt?.getTime()).toBe(sentAt * 1000);
+	});
+
+	it("stores no send time when the device clock was never set", async () => {
+		await POST(request({ sent_at: 0 }));
+		await POST(request());
+
+		const zero = mocks.impactCreate.mock.calls[0]?.[0]?.data as { sentAt: Date | null };
+		const missing = mocks.impactCreate.mock.calls[1]?.[0]?.data as { sentAt: Date | null };
+		expect(zero.sentAt).toBeNull();
+		expect(missing.sentAt).toBeNull();
+	});
+
+	it("does not store a send time from an implausible device clock", async () => {
+		await POST(request({ sent_at: 1 }));
+
+		const created = mocks.impactCreate.mock.calls[0]?.[0]?.data as { sentAt: Date | null };
+		expect(created.sentAt).toBeNull();
+	});
+
+	it("keeps the original send time when a confirmed report is retried", async () => {
+		const stored = new Date("2026-11-25T09:59:55.000Z");
+		mocks.findUnique.mockResolvedValue({
+			id: "inc-1",
+			status: "CONFIRMED",
+			lat: null,
+			lng: null,
+			gpsAgeS: null,
+			sentAt: stored,
+			evidence: {},
+		});
+
+		const response = await POST(request({ sent_at: Math.floor(Date.now() / 1000) }));
+		const body = await response.json();
+
+		expect(body.data).toMatchObject({ duplicate: true, alerts_queued: 0 });
+		expect(mocks.impactUpdate).not.toHaveBeenCalled();
+	});
+
+	it("fills the send time when a suspected report is confirmed", async () => {
+		const sentAt = Math.floor(Date.now() / 1000) - 2;
+		mocks.findUnique.mockResolvedValue({
+			id: "inc-1",
+			status: "SUSPECTED",
+			lat: null,
+			lng: null,
+			gpsAgeS: null,
+			sentAt: null,
+			evidence: {},
+		});
+
+		await POST(request({ sent_at: sentAt }));
+
+		expect(mocks.impactUpdate).toHaveBeenCalledWith({
+			where: { id: "inc-1", status: "SUSPECTED", resolution: null },
+			data: expect.objectContaining({ sentAt: new Date(sentAt * 1000) }),
+		});
+	});
+
+	it("does not overwrite a stored send time when a suspected report is confirmed", async () => {
+		const stored = new Date("2026-11-25T09:59:55.000Z");
+		mocks.findUnique.mockResolvedValue({
+			id: "inc-1",
+			status: "SUSPECTED",
+			lat: null,
+			lng: null,
+			gpsAgeS: null,
+			sentAt: stored,
+			evidence: {},
+		});
+
+		await POST(request({ sent_at: Math.floor(Date.now() / 1000) }));
+
+		expect(mocks.impactUpdate).toHaveBeenCalledWith({
+			where: { id: "inc-1", status: "SUSPECTED", resolution: null },
+			data: expect.objectContaining({ sentAt: stored }),
+		});
+	});
+
 	it("reopens a legacy acknowledged incident when the tracker confirms the alarm", async () => {
 		mocks.findUnique.mockResolvedValue({
 			id: "inc-1",
