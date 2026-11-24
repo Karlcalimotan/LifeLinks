@@ -65,6 +65,36 @@ the demo org is the target.
    that the dashboard shows **First LifeLink** as online once the heartbeat
    arrives.
 
+## 15 g firmware rebuild (24 Nov 2026)
+
+The impact default is now **15 g**, and the MPU-6050 range is **±16 g**. The
+compiled artifact is at:
+
+```text
+firmware/.pio/build/esp32dev/firmware.bin
+SHA256 D6712AC4276825CF2C41029C38C16618BD623BF542776D775E3789A8ABAE2A15
+```
+
+The board is on **COM6** (CH340). The hardware owner flashes; the agent does
+not power or flash hardware:
+
+```text
+pio run -d firmware -t upload --upload-port COM6
+```
+
+After flashing, the old `cfg_json` in NVS still wins over the new default. Open
+the serial monitor at 115200 and clear it:
+
+```text
+RESET_CONFIG
+CONFIG
+```
+
+`RESET_CONFIG` clears only the stored device config; it keeps WiFi and device
+identity. `CONFIG` should print `"impact_threshold_g":15`. If the unit can
+reach the device API, the server's 15 g org config is applied on the next poll
+instead, and the heartbeat's `config_rev` proves it.
+
 ## Local API smoke test
 
 Before the hardware session, prove the backend path with the real token while

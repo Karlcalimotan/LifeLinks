@@ -1451,7 +1451,7 @@ async function main() {
 		where: { orgId: org.id },
 		create: {
 			orgId: org.id,
-			impactThresholdG: 2.5,
+			impactThresholdG: 15,
 			tiltThresholdDeg: 60,
 			confirmWindowMs: 200,
 			cancelWindowS: 15,

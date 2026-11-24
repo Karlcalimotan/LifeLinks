@@ -195,7 +195,12 @@
 		"acknowledgedNotice": "Incident acknowledged. The queue is up to date.",
 		"errorForbidden": "Your role cannot update this incident.",
 		"errorTransition": "The incident changed before the action ran. Open it to see the current state.",
-		"errorNotFound": "That incident no longer exists."
+		"errorNotFound": "That incident no longer exists.",
+		"thresholdTitle": "Impact alert threshold",
+		"thresholdBody": "A device queues an alert at or above this impact. It picks up a new value on its next config poll.",
+		"thresholdSaved": "Impact threshold saved. Trackers pick it up on their next config poll.",
+		"thresholdInvalid": "Enter a value between 1.5 and 16 g.",
+		"thresholdForbidden": "Only admins can change the alert threshold."
 	},
 	"analytics": {
 		"title": "Response analytics",
@@ -673,6 +678,7 @@
 		"emails": "Email addresses",
 		"emailsHint": "One per line. The server queues an email alert.",
 		"impactThreshold": "Impact threshold (g)",
+		"impactThresholdHint": "Alert at or above this impact. 15 g is the severe-crash default; the allowed range is 1.5–16 g.",
 		"tiltThreshold": "Tilt threshold (degrees)",
 		"cancelWindow": "Cancel window (seconds)",
 		"heartbeatInterval": "Heartbeat interval (seconds)",

@@ -51,9 +51,11 @@ becomes `CANCELLED`; the dashboard shows the false alarm instead of hiding it.
 | Rollover | Tilt ≥ threshold for ≥ 1 s | Confirm |
 | Crash | Impact + vibration + (speed drop ≥ 15 kph or tilt) | Confirm |
 
-These rules are a starting point, not a validated detector. Tune the thresholds
-against real driving data and record the false-positive rate. The native tests
-cover the matrix above; the vehicle bench test is what proves it.
+These rules are a starting point, not a validated detector. The default impact
+threshold is **15 g** (envelope 1.5–16 g), which deliberately targets severe
+impacts; softer crashes may not trigger it. Tune against real driving data and
+record the false-positive rate. The native tests cover the matrix above; the
+vehicle bench test is what proves it.
 
 ## Cancel window
 

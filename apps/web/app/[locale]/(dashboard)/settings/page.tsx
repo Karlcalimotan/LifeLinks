@@ -225,11 +225,12 @@ async function SettingsForm({
 								name="impactThresholdG"
 								type="number"
 								min={1.5}
-								max={5}
+								max={16}
 								step={0.1}
 								defaultValue={settings.impactThresholdG}
 								disabled={!editable}
 							/>
+							<p className="text-meta leading-snug text-fog-500">{t("impactThresholdHint")}</p>
 						</Field>
 						<Field>
 							<Label htmlFor="tiltThresholdDeg">{t("tiltThreshold")}</Label>

@@ -16,7 +16,7 @@ void tearDown(void) {}
 
 void test_defaults_match_the_spec_table(void) {
 	const DeviceConfig config = defaultConfig();
-	TEST_ASSERT_TRUE(nearlyEqual(config.impactThresholdG, 2.5f));
+	TEST_ASSERT_TRUE(nearlyEqual(config.impactThresholdG, 15.0f));
 	TEST_ASSERT_TRUE(nearlyEqual(config.tiltThresholdDeg, 60.0f));
 	TEST_ASSERT_TRUE(nearlyEqual(config.confirmWindowMs, 200.0f));
 	TEST_ASSERT_TRUE(nearlyEqual(config.cancelWindowS, 15.0f));

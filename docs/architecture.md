@@ -139,7 +139,7 @@ The server sends a versioned object in the command poll:
 {
   "version": 1,
   "rev": 123456789,
-  "impact_threshold_g": 2.5,
+  "impact_threshold_g": 15,
   "tilt_threshold_deg": 60,
   "confirm_window_ms": 200,
   "cancel_window_s": 15,

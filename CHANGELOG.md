@@ -32,6 +32,16 @@ All notable changes to this project are documented here. The format follows
 - A repeatable axe accessibility gate (`pnpm a11y`) with JSON and Markdown
   evidence; the dashboard chart scroller is keyboard accessible (#46).
 
+### Changed
+
+- Impact alert default is now **15 g** (envelope 1.5–16 g). The MPU-6050 runs
+  its ±16 g range so the threshold is measurable instead of clipping at ±8 g.
+  The web settings form and the dashboard quick editor accept the same
+  envelope. A migration changes the default for new organizations; the local
+  demo org is updated to 15 g. A reflashed unit with an older NVS `cfg_json`
+  must run `RESET_CONFIG` (or receive a server config sync) before the new
+  default takes effect.
+
 ## [0.3.0] - 2026-11-23
 
 ### Added

@@ -1,6 +1,7 @@
 import { BarChart, type BarChartDatum } from "@/components/analytics/bar-chart";
 import { AcknowledgeButton } from "@/components/dashboard/acknowledge-button";
 import { ElapsedTime } from "@/components/dashboard/elapsed-time";
+import { ImpactThresholdCard } from "@/components/dashboard/impact-threshold-card";
 import { DeviceStatusBadge, IncidentStatusBadge, SeverityBadge } from "@/components/domain/badges";
 import { FleetMap, type FleetMapLegendItem, type FleetMapMarker } from "@/components/map/fleet-map";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +11,7 @@ import { EmptyState, PageHeader } from "@/components/ui/page-header";
 import { Link } from "@/i18n/routing";
 import { acknowledgeIncidentAction } from "@/lib/actions/incidents";
 import { formatDuration } from "@/lib/analytics/aggregate";
-import { canManageIncidents } from "@/lib/auth/roles";
+import { canAdminister, canManageIncidents } from "@/lib/auth/roles";
 import { requireUser } from "@/lib/auth/session";
 import { DEVICE_OFFLINE_AFTER_MIN } from "@/lib/constants";
 import { loadDashboardData } from "@/lib/dashboard/data";
@@ -18,6 +19,7 @@ import { type FleetMarkerState, fleetMarkerState } from "@/lib/dashboard/metrics
 import { LOW_BATTERY_V } from "@/lib/device/query";
 import { deviceConnectionState, isGpsStale } from "@/lib/device/status";
 import { metadataForPage } from "@/lib/page-metadata";
+import { getOrgSettings } from "@/lib/settings/org";
 import { formatDateTime, formatRelative } from "@/lib/utils";
 import {
 	ArrowUpRight,
@@ -106,12 +108,18 @@ export default async function DashboardPage({
 	const current = await requireUser();
 	const t = await getTranslations({ locale, namespace: "dashboard" });
 	const v = await getTranslations({ locale, namespace: "vehicles" });
+	const settings = await getTranslations({ locale, namespace: "settings" });
+	const common = await getTranslations({ locale, namespace: "common" });
 
 	const now = new Date();
 	const data = await loadDashboardData(
 		{ role: current.role, orgId: current.org.id, userId: current.user.id },
 		now,
 	);
+
+	// Only admins get the editor, so other roles pay no extra settings read.
+	const canEditThreshold = canAdminister(current.role);
+	const thresholdSettings = canEditThreshold ? await getOrgSettings(current.org.id) : null;
 
 	function incidentActivityLabel(action: string): string {
 		switch (action) {
@@ -166,13 +174,19 @@ export default async function DashboardPage({
 	const notice =
 		updated === "acknowledged"
 			? { tone: "success" as const, text: t("acknowledgedNotice") }
-			: error === "forbidden"
-				? { tone: "error" as const, text: t("errorForbidden") }
-				: error === "transition"
-					? { tone: "error" as const, text: t("errorTransition") }
-					: error === "notfound"
-						? { tone: "error" as const, text: t("errorNotFound") }
-						: null;
+			: updated === "threshold"
+				? { tone: "success" as const, text: t("thresholdSaved") }
+				: error === "threshold_forbidden"
+					? { tone: "error" as const, text: t("thresholdForbidden") }
+					: error === "forbidden"
+						? { tone: "error" as const, text: t("errorForbidden") }
+						: error === "threshold"
+							? { tone: "error" as const, text: t("thresholdInvalid") }
+							: error === "transition"
+								? { tone: "error" as const, text: t("errorTransition") }
+								: error === "notfound"
+									? { tone: "error" as const, text: t("errorNotFound") }
+									: null;
 
 	const stateLabels: Record<FleetMarkerState, string> = {
 		incident: t("legendIncident"),
@@ -352,6 +366,22 @@ export default async function DashboardPage({
 					</ul>
 				</details>
 			</Card>
+
+			{canEditThreshold && thresholdSettings ? (
+				<div className="mt-4">
+					<ImpactThresholdCard
+						currentG={thresholdSettings.impactThresholdG}
+						locale={locale}
+						labels={{
+							title: t("thresholdTitle"),
+							body: t("thresholdBody"),
+							threshold: settings("impactThreshold"),
+							hint: settings("impactThresholdHint"),
+							save: common("save"),
+						}}
+					/>
+				</div>
+			) : null}
 
 			<div className="mt-4 grid items-start gap-4 xl:grid-cols-[1.2fr_1fr]">
 				<Card className="flex min-w-0 flex-col">

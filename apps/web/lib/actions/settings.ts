@@ -21,7 +21,7 @@ function num(formData: FormData, key: string): number {
 
 const settingsSchema = z.object({
 	orgName: z.string().trim().min(2, "Enter an organization name.").max(120),
-	impactThresholdG: z.number().min(1.5).max(5),
+	impactThresholdG: z.number().min(1.5).max(16),
 	tiltThresholdDeg: z.number().min(30).max(90),
 	confirmWindowMs: z.number().int().min(100).max(2000),
 	cancelWindowS: z.number().int().min(5).max(60),

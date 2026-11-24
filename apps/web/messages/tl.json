@@ -195,7 +195,12 @@
 		"acknowledgedNotice": "Na-acknowledge ang insidente. Napapanahon na ang queue.",
 		"errorForbidden": "Hindi maaaring i-update ng iyong role ang insidenteng ito.",
 		"errorTransition": "Nagbago ang insidente bago tumakbo ang aksyon. Buksan ito para makita ang kasalukuyang katayuan.",
-		"errorNotFound": "Wala na ang insidenteng iyon."
+		"errorNotFound": "Wala na ang insidenteng iyon.",
+		"thresholdTitle": "Threshold ng impact alert",
+		"thresholdBody": "Nag-queue ng alert ang device kapag umabot o lumampas sa impact na ito, at nakukuha nito ang pagbabago sa susunod na config poll.",
+		"thresholdSaved": "Na-save ang impact threshold. Makukuha ito ng mga tracker sa susunod na config poll.",
+		"thresholdInvalid": "Maglagay ng value sa pagitan ng 1.5 at 16 g.",
+		"thresholdForbidden": "Mga admin lang ang makakapagpalit ng alert threshold."
 	},
 	"analytics": {
 		"title": "Analytics ng tugon",
@@ -673,6 +678,7 @@
 		"emails": "Email addresses",
 		"emailsHint": "One per line. The server queues an email alert.",
 		"impactThreshold": "Impact threshold (g)",
+		"impactThresholdHint": "Mag-alert kapag umabot sa impact na ito. 15 g ang default para sa malubhang aksidente; 1.5–16 g ang pinapayagang hanay.",
 		"tiltThreshold": "Tilt threshold (degrees)",
 		"cancelWindow": "Cancel window (seconds)",
 		"heartbeatInterval": "Heartbeat interval (seconds)",

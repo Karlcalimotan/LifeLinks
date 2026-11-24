@@ -1900,7 +1900,8 @@ void setup() {
 		g_faults.raise(fw::Fault::Imu);
 		Serial.println("[IMU] MPU-6050 not found");
 	} else {
-		mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
+		// 15 g threshold plus headroom; the 8 g range would clip a severe impact.
+		mpu.setAccelerometerRange(MPU6050_RANGE_16_G);
 		mpu.setGyroRange(MPU6050_RANGE_500_DEG);
 		mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
 		Serial.println("[IMU] MPU-6050 ready");
