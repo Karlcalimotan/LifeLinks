@@ -62,8 +62,8 @@
 #define LIFELINK_API_BASE "https://lifelink.example.com"
 #endif
 
-// Hardware watchdog. Only the loop task is subscribed here; an idle-task
-// subscription would watch idle0, not this sketch.
+// Hardware watchdog. The sketch subscribes the loop task explicitly; ESP-IDF
+// startup already watches idle0, which does not cover this sketch's loop.
 //
 // Timeout budget, from the blocking A7670E transport:
 //   - the longest single AT wait is 30 s (AT+HTTPACTION);
@@ -82,14 +82,16 @@ bool g_watchdogActive = false;
 void beginWatchdog() {
 	const esp_err_t initialized = esp_task_wdt_init(kWatchdogTimeoutS, true);
 	if (initialized != ESP_OK) {
-		Serial.printf("[WDT] init failed (%d); running without the task watchdog\n",
-					  static_cast<int>(initialized));
+		Serial.printf(
+			"[WDT] esp_task_wdt_init failed (%d); continuing without a configured task watchdog\n",
+			static_cast<int>(initialized));
 		return;
 	}
 	const esp_err_t subscribed = esp_task_wdt_add(nullptr);
 	if (subscribed != ESP_OK) {
-		Serial.printf("[WDT] could not subscribe the loop task (%d); running without it\n",
-					  static_cast<int>(subscribed));
+		Serial.printf("[WDT] watchdog initialized at %lus but esp_task_wdt_add failed (%d); "
+					  "loop task not watched\n",
+					  static_cast<unsigned long>(kWatchdogTimeoutS), static_cast<int>(subscribed));
 		return;
 	}
 	g_watchdogActive = true;
@@ -2014,14 +2016,13 @@ void handleSerialProvisioning() {
 				g_heartbeatTimer.mark(millis());
 				Serial.println("[CFG] reset to factory defaults");
 			} else if (line == "TEST_WDT") {
-				Serial.println(
-					"[TEST] TEST_WDT is a bench proof: it blocks until the watchdog resets "
-					"the board.");
 #ifdef LIFELINK_BENCH_WDT
+				Serial.println("[TEST] TEST_WDT is a bench proof: it blocks until the watchdog "
+							   "resets the board.");
 				Serial.println("[TEST] send TEST_WDT CONFIRM while Idle; never during an alert");
 #else
-				Serial.println(
-					"[TEST] not built into this firmware; use env:esp32dev-bench to enable it");
+				Serial.println("[TEST] TEST_WDT is a bench-only command and is not built into "
+							   "this firmware; use env:esp32dev-bench");
 #endif
 			} else if (line == "TEST_WDT CONFIRM") {
 #ifdef LIFELINK_BENCH_WDT
@@ -2032,8 +2033,8 @@ void handleSerialProvisioning() {
 					runWatchdogBenchTest();
 				}
 #else
-				Serial.println(
-					"[TEST] TEST_WDT is not built into this firmware; use env:esp32dev-bench");
+				Serial.println("[TEST] TEST_WDT is a bench-only command and is not built into "
+							   "this firmware; use env:esp32dev-bench");
 #endif
 			} else if (line == "REBOOT") {
 				ESP.restart();

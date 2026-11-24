@@ -21,8 +21,9 @@ be decisive without being naive.
    can cancel inside the window.
 3. When the window expires, the device sends an **SMS** and an HTTP incident. It
    keeps retrying until the retry window elapses.
-4. **Safe mode never blocks alerting.** After repeated resets, non-essential work
-   stops, but impact detection and the SOS path stay active.
+4. **Safe mode never blocks alerting.** If reset escalation is added,
+   non-essential work may stop, but impact detection and the SOS path stay
+   active. Safe mode is not implemented in the current firmware.
 5. A stale GPS fix is sent with its age; it never blocks the SOS.
 6. The backend records a `SUSPECTED` incident immediately and upgrades it to
    `CONFIRMED` after the countdown, so the console sees the event even if the

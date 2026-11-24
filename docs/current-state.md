@@ -131,11 +131,10 @@ These are inputs for the Phase 1 audit, not changes made by the setup:
 4. **No reset-reason logging or boot self-test.** The reset history class exists,
    but `main.ino` does not feed it from `esp_reset_reason()`, and there is no
    boot check for the IMU, GPS, modem and rail.
-5. **Docs overstate two behaviours.** `docs/safety.md` says a pending countdown
-   is recovered from NVS and that three abnormal resets enter safe mode. The
-   current `main.ino` implements neither; the pure `ResetHistory` helper exists
-   but is not wired in, and the incident id is not persisted before the
-   countdown.
+5. **No reset recovery or safe-mode escalation.** Because nothing records
+   abnormal resets (gap 4), safe mode never activates. The incident id is not
+   persisted before the countdown, so a reset during a countdown is not
+   recovered either. `docs/safety.md` now states both limits plainly.
 6. **No structured logging or flash event history.** Serial logs are ad-hoc
    `Serial.printf` lines.
 7. **No OTA update path** in the firmware (the server endpoint exists, the

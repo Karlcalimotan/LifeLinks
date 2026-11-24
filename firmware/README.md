@@ -105,6 +105,10 @@ pio run -d firmware -e esp32dev-bench -t upload   # human owner only
 pio device monitor -b 115200
 ```
 
+Build immediately before the bench flash. The `.pio` build directory can hold a
+`firmware.bin` from an earlier source revision; do not flash a cached copy. The
+`-t upload` target above rebuilds first.
+
 With the tracker `Idle` and no active incident:
 
 1. Send `TEST_WDT`. The device prints the warning and asks for confirmation; it
@@ -402,7 +406,8 @@ the integration, not as a formality.
   no timed silence. After 10 minutes the buzzer slows to a reminder pattern and
   the LED stays solid.
 - `CANCEL_ALERT` and the driver-cancel path are unchanged.
-- Safe mode never suppresses the SOS.
+- Safe mode is not implemented. If reset escalation is added later, it must never
+  suppress the SOS.
 - A stale GPS fix is sent with its age.
 - See [`../docs/safety.md`](../docs/safety.md) for the full model and the bench
   checklist.

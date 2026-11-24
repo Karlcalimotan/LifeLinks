@@ -154,14 +154,20 @@ stale fix is still sent.
 - The modem is the largest load. The 1000 µF capacitor and a buck rated above
   the modem's peak current are mandatory.
 
-## Safe mode
+## Reset counting and safe mode (not implemented)
 
-After three abnormal resets in ten minutes the device enters safe mode. It stops
-non-essential work (OTA, periodic polling) but **continues to monitor impacts and
-continues to alert**. `alertingAllowed()` returns true in safe mode by design,
-and a native test pins that behavior. A reset during a pending countdown is not
-recovered on boot: the unit boots to `Idle`, and the incident must be resolved
-from the portal.
+The current firmware does **not** count abnormal resets and does **not** enter
+safe mode. `main.ino` never calls `esp_reset_reason()` and never feeds the
+`ResetHistory` helper, so a watchdog reset, a brownout and a deliberate reboot
+look the same at boot.
+
+`ResetHistory` and `alertingAllowed()` remain in `main/safety.h` as pure, tested
+helpers for a future escalation. `alertingAllowed()` always returns true: it is
+a policy placeholder, not an active mode. Any future safe mode must keep
+monitoring and alerting, because a missed SOS is the dangerous failure.
+
+A reset during a pending countdown is also not recovered: the unit boots to
+`Idle`, and the incident must be resolved from the portal.
 
 ## Hardware watchdog
 
