@@ -9,6 +9,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { AddVehicleForm, type VehicleOwnerOption } from "@/components/vehicles/add-vehicle-form";
 import { Link } from "@/i18n/routing";
 import { vehicleScope } from "@/lib/auth/roles";
 import { requireUser } from "@/lib/auth/session";
@@ -42,12 +43,34 @@ export default async function VehiclesPage({ params }: { params: Promise<{ local
 		select: VEHICLE_LIST_SELECT,
 	});
 
+	const canAddVehicle = current.role === "ADMIN" || current.role === "USER";
+	const owners: VehicleOwnerOption[] | undefined =
+		current.role === "ADMIN"
+			? (
+					await prisma.membership.findMany({
+						where: { orgId: current.org.id, revokedAt: null },
+						orderBy: { user: { name: "asc" } },
+						select: { user: { select: { id: true, name: true, email: true } } },
+					})
+				).map((membership) => membership.user)
+			: undefined;
+
 	return (
 		<>
 			<PageHeader
 				title={current.role === "USER" ? t("ownerTitle") : t("title")}
 				subtitle={current.role === "USER" ? t("ownerSubtitle") : t("subtitle")}
 			/>
+			{canAddVehicle ? (
+				<details className="mb-5 rounded-panel border border-ink-700 bg-ink-900/40">
+					<summary className="cursor-pointer px-4 py-3 text-meta font-medium text-fog-100">
+						{t("addVehicle")}
+					</summary>
+					<div className="border-t border-ink-700 p-4">
+						<AddVehicleForm locale={locale} owners={owners} />
+					</div>
+				</details>
+			) : null}
 			<Card>
 				<CardContent className="pt-5">
 					{vehicles.length === 0 ? (

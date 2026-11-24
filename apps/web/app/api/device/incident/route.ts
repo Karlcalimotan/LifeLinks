@@ -1,4 +1,4 @@
-import { type AlertTargets, alertTargetsFromSettings } from "@/lib/alerts/templates";
+import { type AlertTargets, alertTargetsForVehicle } from "@/lib/alerts/templates";
 import { ok } from "@/lib/api/envelope";
 import { badRequest, conflict, forbidden, rateLimited } from "@/lib/api/errors";
 import { withApi } from "@/lib/api/instrumentation";
@@ -163,6 +163,15 @@ export const POST = withApi(
 		// scope's narrowing has ended.
 		const vehicleId = device.vehicleId;
 
+		// The vehicle's active contacts are merged ahead of the organisation
+		// list once per request; both the new-incident path and the
+		// SUSPECTED -> CONFIRMED transition use the same targets.
+		const alertContacts = await prisma.emergencyContact.findMany({
+			where: { orgId: device.orgId, vehicleId, active: true },
+			orderBy: { createdAt: "asc" },
+			select: { phone: true, email: true, active: true },
+		});
+
 		const detectedAt = resolveDeviceTime(input.detected_at);
 		const hasFix =
 			input.lat != null && input.lng != null && isValidCoordinate(input.lat, input.lng);
@@ -187,7 +196,7 @@ export const POST = withApi(
 				(existing.status === "SUSPECTED" || existing.status === "ACKNOWLEDGED")
 			) {
 				const settingsForUpdate = await getOrgSettings(device.orgId);
-				const targets = alertTargetsFromSettings(settingsForUpdate);
+				const targets = alertTargetsForVehicle(settingsForUpdate, alertContacts);
 				let queued = 0;
 				let transitioned = false;
 				await prisma.$transaction(async (tx) => {
@@ -278,7 +287,7 @@ export const POST = withApi(
 				});
 
 				if (status !== "CANCELLED") {
-					const targets = alertTargetsFromSettings(resolved.settings);
+					const targets = alertTargetsForVehicle(resolved.settings, alertContacts);
 					deliveries = [
 						...targets.phones.map((target) => ({
 							channel: "SMS" as const,

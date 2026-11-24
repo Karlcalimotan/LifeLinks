@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
 	impactUpdate: vi.fn(),
 	alertCount: vi.fn(),
 	alertCreateMany: vi.fn(),
+	contactFindMany: vi.fn(),
 	stateCreate: vi.fn(),
 	commandFindMany: vi.fn(),
 	notifyIncidentPush: vi.fn(),
@@ -52,6 +53,7 @@ vi.mock("@/lib/prisma", () => ({
 		impactEvent: { findUnique: mocks.findUnique },
 		trip: { findFirst: mocks.tripFindFirst },
 		deviceConfigOverride: { findFirst: mocks.overrideFindFirst },
+		emergencyContact: { findMany: mocks.contactFindMany },
 		$transaction: mocks.transaction,
 	},
 }));
@@ -97,6 +99,7 @@ describe("POST /api/device/incident", () => {
 		mocks.impactUpdate.mockReset();
 		mocks.alertCount.mockReset();
 		mocks.alertCreateMany.mockReset();
+		mocks.contactFindMany.mockReset();
 		mocks.stateCreate.mockReset();
 		mocks.commandFindMany.mockReset();
 		mocks.notifyIncidentPush.mockReset();
@@ -133,6 +136,7 @@ describe("POST /api/device/incident", () => {
 		mocks.impactUpdate.mockResolvedValue({ count: 1 });
 		mocks.alertCount.mockResolvedValue(0);
 		mocks.alertCreateMany.mockResolvedValue({ count: 2 });
+		mocks.contactFindMany.mockResolvedValue([]);
 		mocks.stateCreate.mockResolvedValue({});
 		mocks.commandFindMany.mockResolvedValue([]);
 		mocks.transaction.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) =>
@@ -179,6 +183,53 @@ describe("POST /api/device/incident", () => {
 		expect(mocks.transaction.mock.invocationCallOrder[0]).toBeLessThan(
 			mocks.notifyIncidentPush.mock.invocationCallOrder[0] as number,
 		);
+	});
+
+	it("queues the vehicle contacts ahead of the organisation targets", async () => {
+		mocks.contactFindMany.mockResolvedValue([
+			{ phone: "+63 917 111 2222", email: "owner@example.com", active: true },
+			// The same number as the organisation list must not be queued twice.
+			{ phone: "+639171234567", email: null, active: true },
+		]);
+
+		const response = await POST(request());
+		const body = await response.json();
+
+		expect(response.status).toBe(200);
+		expect(mocks.contactFindMany).toHaveBeenCalledWith({
+			where: { orgId: "org-1", vehicleId: "veh-1", active: true },
+			orderBy: { createdAt: "asc" },
+			select: { phone: true, email: true, active: true },
+		});
+		expect(mocks.alertCreateMany).toHaveBeenCalledWith({
+			data: [
+				{
+					impactEventId: "inc-1",
+					channel: "SMS",
+					target: "+639171112222",
+					status: "QUEUED",
+				},
+				{
+					impactEventId: "inc-1",
+					channel: "SMS",
+					target: "+639171234567",
+					status: "QUEUED",
+				},
+				{
+					impactEventId: "inc-1",
+					channel: "EMAIL",
+					target: "owner@example.com",
+					status: "QUEUED",
+				},
+				{
+					impactEventId: "inc-1",
+					channel: "EMAIL",
+					target: "ops@example.com",
+					status: "QUEUED",
+				},
+			],
+		});
+		expect(body.data.alerts_queued).toBe(4);
 	});
 
 	it("keeps the incident when the deferred push sender rejects", async () => {
