@@ -1,3 +1,5 @@
+import { readTransmissionDelay } from "@/lib/incidents/transmission";
+import { resetRateLimitsForTests } from "@/lib/rate-limit";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -105,6 +107,7 @@ describe("POST /api/device/incident", () => {
 		mocks.notifyIncidentPush.mockReset();
 		mocks.after.mockReset();
 		afterTasks.splice(0);
+		resetRateLimitsForTests();
 		mocks.after.mockImplementation((task: () => Promise<void> | void) => {
 			afterTasks.push(task);
 		});
@@ -367,6 +370,166 @@ describe("POST /api/device/incident", () => {
 		expect(mocks.overrideFindFirst).toHaveBeenCalledWith({
 			where: { deviceId: "dev-1", orgId: "org-1" },
 		});
+	});
+
+	it("stores the device send time and receipt anchor from a dispatched report", async () => {
+		const sentAt = Math.floor(Date.now() / 1000) - 4;
+
+		await POST(request({ sent_at: sentAt }));
+
+		const created = mocks.impactCreate.mock.calls[0]?.[0]?.data as {
+			sentAt: Date | null;
+			confirmedReceivedAt: Date | null;
+		};
+		expect(created.sentAt?.getTime()).toBe(sentAt * 1000);
+		expect(created.confirmedReceivedAt).toBeInstanceOf(Date);
+	});
+
+	it("stores no timing for a suspected report before the countdown ends", async () => {
+		await POST(request({ status: "SUSPECTED", sent_at: 0 }));
+		await POST(request({ status: "SUSPECTED" }));
+
+		const zero = mocks.impactCreate.mock.calls[0]?.[0]?.data as {
+			sentAt: Date | null;
+			confirmedReceivedAt: Date | null;
+		};
+		const missing = mocks.impactCreate.mock.calls[1]?.[0]?.data as {
+			sentAt: Date | null;
+			confirmedReceivedAt: Date | null;
+		};
+		expect(zero.sentAt).toBeNull();
+		expect(zero.confirmedReceivedAt).toBeNull();
+		expect(missing.sentAt).toBeNull();
+		expect(missing.confirmedReceivedAt).toBeNull();
+	});
+
+	it("does not store a send time from an implausible device clock", async () => {
+		await POST(request({ sent_at: 1 }));
+
+		const created = mocks.impactCreate.mock.calls[0]?.[0]?.data as { sentAt: Date | null };
+		expect(created.sentAt).toBeNull();
+	});
+
+	it("keeps the stored timing when a confirmed report is retried with a different time", async () => {
+		const storedSentAt = new Date("2026-11-25T09:59:55.000Z");
+		const storedReceipt = new Date("2026-11-25T09:59:56.000Z");
+		const existing = {
+			id: "inc-1",
+			status: "CONFIRMED",
+			lat: null,
+			lng: null,
+			gpsAgeS: null,
+			sentAt: storedSentAt,
+			confirmedReceivedAt: storedReceipt,
+			evidence: {},
+		};
+		mocks.findUnique.mockResolvedValue(existing);
+
+		const response = await POST(request({ sent_at: Math.floor(Date.now() / 1000) + 120 }));
+		const body = await response.json();
+
+		expect(body.data).toMatchObject({ duplicate: true, alerts_queued: 0 });
+		// The retry returns before any write, so the row keeps both values.
+		expect(mocks.impactUpdate).not.toHaveBeenCalled();
+		expect(existing.sentAt).toBe(storedSentAt);
+		expect(existing.confirmedReceivedAt).toBe(storedReceipt);
+	});
+
+	it("fills the send time and receipt anchor when a suspected report is confirmed", async () => {
+		const sentAt = Math.floor(Date.now() / 1000) - 2;
+		mocks.findUnique.mockResolvedValue({
+			id: "inc-1",
+			status: "SUSPECTED",
+			lat: null,
+			lng: null,
+			gpsAgeS: null,
+			sentAt: null,
+			confirmedReceivedAt: null,
+			evidence: {},
+		});
+
+		await POST(request({ status: "CONFIRMED", sent_at: sentAt }));
+
+		expect(mocks.impactUpdate).toHaveBeenCalledWith({
+			where: { id: "inc-1", status: "SUSPECTED", resolution: null },
+			data: expect.objectContaining({
+				sentAt: new Date(sentAt * 1000),
+				confirmedReceivedAt: expect.any(Date),
+			}),
+		});
+	});
+
+	it("does not overwrite stored timing when a suspected report is confirmed", async () => {
+		const storedSentAt = new Date("2026-11-25T09:59:55.000Z");
+		const storedReceipt = new Date("2026-11-25T09:59:56.000Z");
+		mocks.findUnique.mockResolvedValue({
+			id: "inc-1",
+			status: "SUSPECTED",
+			lat: null,
+			lng: null,
+			gpsAgeS: null,
+			sentAt: storedSentAt,
+			confirmedReceivedAt: storedReceipt,
+			evidence: {},
+		});
+
+		await POST(request({ status: "CONFIRMED", sent_at: Math.floor(Date.now() / 1000) + 120 }));
+
+		expect(mocks.impactUpdate).toHaveBeenCalledWith({
+			where: { id: "inc-1", status: "SUSPECTED", resolution: null },
+			data: expect.objectContaining({
+				sentAt: storedSentAt,
+				confirmedReceivedAt: storedReceipt,
+			}),
+		});
+	});
+
+	it("measures the delay from the confirmed report, not from the suspected row", async () => {
+		const t0 = new Date("2026-11-25T10:00:00.000Z");
+		const t0Seconds = Math.floor(t0.getTime() / 1000);
+		vi.useFakeTimers({ now: t0 });
+		try {
+			// t0: the impact is suspected, the countdown is still running.
+			mocks.findUnique.mockResolvedValueOnce(null);
+			await POST(request({ status: "SUSPECTED" }));
+			const created = mocks.impactCreate.mock.calls[0]?.[0]?.data as {
+				sentAt: Date | null;
+				confirmedReceivedAt: Date | null;
+			};
+			expect(created.sentAt).toBeNull();
+			expect(created.confirmedReceivedAt).toBeNull();
+
+			// t0 + 15 s: the countdown expires and the CONFIRMED report arrives.
+			vi.setSystemTime(new Date(t0.getTime() + 15_000));
+			mocks.findUnique.mockResolvedValueOnce({
+				id: "inc-1",
+				status: "SUSPECTED",
+				lat: null,
+				lng: null,
+				gpsAgeS: null,
+				sentAt: null,
+				confirmedReceivedAt: null,
+				evidence: {},
+			});
+			const response = await POST(request({ status: "CONFIRMED", sent_at: t0Seconds + 15 }));
+			expect(response.status).toBe(200);
+
+			const updated = mocks.impactUpdate.mock.calls[0]?.[0]?.data as {
+				sentAt: Date | null;
+				confirmedReceivedAt: Date | null;
+			};
+			const delay = readTransmissionDelay({
+				sentAt: updated.sentAt,
+				receivedAt: updated.confirmedReceivedAt,
+			});
+			// Anchored to the confirmed receipt, so the delay is the HTTP hop,
+			// not the 15 s countdown. A createdAt anchor would be -15 s here.
+			expect(delay).not.toBeNull();
+			expect(delay?.delaySeconds).toBeGreaterThanOrEqual(0);
+			expect(delay?.delaySeconds).toBeLessThanOrEqual(1);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it("reopens a legacy acknowledged incident when the tracker confirms the alarm", async () => {

@@ -30,6 +30,23 @@ export function formatDateTime(value: Date | string | null | undefined, locale =
 	}).format(date);
 }
 
+/**
+ * 24-hour clock time (HH:MM:SS) in the console time zone. Used for the exact
+ * device send time, where the calendar date is already in the page header.
+ */
+export function formatClockTime(value: Date | string | null | undefined, locale = "en"): string {
+	if (!value) return "—";
+	const date = typeof value === "string" ? new Date(value) : value;
+	if (Number.isNaN(date.getTime())) return "—";
+	return new Intl.DateTimeFormat(locale === "tl" ? "fil-PH" : "en-PH", {
+		hour: "2-digit",
+		minute: "2-digit",
+		second: "2-digit",
+		hourCycle: "h23",
+		timeZone: "Asia/Manila",
+	}).format(date);
+}
+
 export function formatRelative(value: Date | string | null | undefined): string {
 	if (!value) return "never";
 	const date = typeof value === "string" ? new Date(value) : value;

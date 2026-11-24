@@ -16,6 +16,14 @@ const incident = {
 };
 
 describe("device JSON bounds", () => {
+	it("accepts an integer send time and rejects a negative or fractional one", () => {
+		expect(incidentSchema.safeParse({ ...incident, sent_at: 1_700_000_030 }).success).toBe(true);
+		expect(incidentSchema.safeParse({ ...incident, sent_at: 0 }).success).toBe(true);
+		for (const sent_at of [-1, 1_700_000_030.5, "1700000030"]) {
+			expect(incidentSchema.safeParse({ ...incident, sent_at }).success).toBe(false);
+		}
+	});
+
 	it("keeps the accepted incident shape for a small evidence payload", () => {
 		const result = incidentSchema.safeParse(incident);
 		expect(result.success).toBe(true);

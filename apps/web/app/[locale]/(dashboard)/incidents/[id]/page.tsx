@@ -26,9 +26,10 @@ import {
 	mergeIncidentTimeline,
 	timelineHasCancellation,
 } from "@/lib/incidents/timeline";
+import { readTransmissionDelay } from "@/lib/incidents/transmission";
 import prisma from "@/lib/prisma";
 import { isCancelActionFocus } from "@/lib/push/payload";
-import { formatDateTime, telHref } from "@/lib/utils";
+import { formatClockTime, formatDateTime, telHref } from "@/lib/utils";
 import { ExternalLink, MapPin, Phone, UserRound } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
@@ -182,6 +183,10 @@ export default async function IncidentDetailPage({
 	const statusLabel = t(STATUS_LABEL_KEYS[incident.status] ?? "statusSuspected");
 	const points = readEvidence(incident.evidence);
 	const hasFix = incident.lat != null && incident.lng != null;
+	const transmission = readTransmissionDelay({
+		sentAt: incident.sentAt,
+		receivedAt: incident.confirmedReceivedAt,
+	});
 
 	return (
 		<>
@@ -336,6 +341,19 @@ export default async function IncidentDetailPage({
 									<p className="text-xs font-medium text-fog-100">{t("timelineCancelWindow")}</p>
 									<p className="text-meta text-fog-500">
 										{formatDateTime(incident.cancelDeadline, locale)}
+									</p>
+								</li>
+							) : null}
+							{transmission ? (
+								<li className="relative">
+									<span className="absolute -left-[21px] top-1 size-2 rounded-full bg-rescue-400" />
+									<p className="text-xs font-medium text-fog-100">
+										{t("trackerSentAt", {
+											time: formatClockTime(transmission.sentAt, locale),
+										})}
+									</p>
+									<p className="text-meta text-fog-500">
+										{t("consoleDelay", { seconds: transmission.delaySeconds })}
 									</p>
 								</li>
 							) : null}

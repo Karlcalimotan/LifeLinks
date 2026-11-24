@@ -416,6 +416,8 @@
 		"timeline": "Timeline",
 		"timelineDetected": "Na-detect ang insidente",
 		"timelineCancelWindow": "Pagsasara ng cancel window ng driver",
+		"trackerSentAt": "Ipinadala ng tracker noong {time}",
+		"consoleDelay": "Natanggap ng console pagkalipas ng {seconds} s",
 		"timelineSuspected": "Pinaghihinalaang impact",
 		"timelineConfirmed": "Kumpirmadong impact",
 		"timelineAcknowledged": "Na-acknowledge",

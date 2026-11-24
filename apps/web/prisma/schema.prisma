@@ -373,30 +373,32 @@ model TelemetrySample {
 }
 
 model ImpactEvent {
-  id                String       @id @default(cuid())
-  orgId             String
-  deviceId          String
-  vehicleId         String
-  tripId            String?
-  clientIncidentId  String
-  detectedAt        DateTime
-  peakAccelG        Float
-  tiltDeg           Float
-  vibrationCount    Int          @default(0)
-  speedKph          Float?
-  lat               Float?
-  lng               Float?
-  gpsAgeS           Int?
-  status            ImpactStatus @default(CONFIRMED)
-  cancelDeadline    DateTime?
-  cancelledAt       DateTime?
-  cancelRequestedAt DateTime?
-  ackRequestedAt    DateTime?
-  resolvedAt        DateTime?
-  resolution        String?
-  evidence          Json?
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  id                  String       @id @default(cuid())
+  orgId               String
+  deviceId            String
+  vehicleId           String
+  tripId              String?
+  clientIncidentId    String
+  detectedAt          DateTime
+  sentAt              DateTime?
+  confirmedReceivedAt DateTime?
+  peakAccelG          Float
+  tiltDeg             Float
+  vibrationCount      Int          @default(0)
+  speedKph            Float?
+  lat                 Float?
+  lng                 Float?
+  gpsAgeS             Int?
+  status              ImpactStatus @default(CONFIRMED)
+  cancelDeadline      DateTime?
+  cancelledAt         DateTime?
+  cancelRequestedAt   DateTime?
+  ackRequestedAt      DateTime?
+  resolvedAt          DateTime?
+  resolution          String?
+  evidence            Json?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
 
   org      Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
   device   TrackerDevice   @relation(fields: [deviceId], references: [id], onDelete: Cascade)

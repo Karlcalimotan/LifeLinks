@@ -416,6 +416,8 @@
 		"timeline": "Timeline",
 		"timelineDetected": "Incident detected",
 		"timelineCancelWindow": "Driver cancel window closes",
+		"trackerSentAt": "Tracker sent at {time}",
+		"consoleDelay": "Console received {seconds} s later",
 		"timelineSuspected": "Impact suspected",
 		"timelineConfirmed": "Impact confirmed",
 		"timelineAcknowledged": "Acknowledged",
