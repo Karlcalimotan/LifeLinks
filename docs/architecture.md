@@ -69,7 +69,7 @@ they can be compiled and tested on the host:
 | --- | --- |
 | `config.h` | Class A envelope, class B operational defaults, NVS persistence |
 | `filters.h` | Impact/tilt/vibration fusion, false-positive rejection, debounce |
-| `safety.h` | Countdown, cancel, retry, faults, reset history, safe mode |
+| `safety.h` | Countdown, cancel, retry, faults, reset-history helper (not wired) |
 | `gps.h` | Fix quality rules |
 | `power.h` | ADC scaling, main/backup/critical classification |
 | `status.h` | Buzzer patterns |
