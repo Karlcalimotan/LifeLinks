@@ -1,3 +1,4 @@
+import { alertPhonesForDevice } from "@/lib/alerts/templates";
 import { ok } from "@/lib/api/envelope";
 import { badRequest, forbidden, rateLimited } from "@/lib/api/errors";
 import { withApi } from "@/lib/api/instrumentation";
@@ -10,7 +11,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * The tracker's command poll. It carries two things:
- * - queued commands (locate, arm/disarm, test alert, config)
+ * - queued commands (locate, test alert, cancel, acknowledgement, config)
  * - the versioned firmware config object
  *
  * Commands are delivered until acknowledged or expired; the device dedupes by
@@ -53,10 +54,20 @@ export const GET = withApi(
 		});
 
 		const resolved = await getDeviceConfig(device.orgId, device.id);
+		// The owner's contacts for this tracker's vehicle are the people who
+		// should get the tracker's own SMS. The organisation list stays as the
+		// fallback when the vehicle has no active contacts.
+		const contacts = device.vehicleId
+			? await prisma.emergencyContact.findMany({
+					where: { orgId: device.orgId, vehicleId: device.vehicleId, active: true },
+					orderBy: { createdAt: "asc" },
+					select: { phone: true, active: true },
+				})
+			: [];
 
 		return ok({
 			server_time: Math.floor(now.getTime() / 1000),
-			alert_phones: resolved.settings.alertPhones,
+			alert_phones: alertPhonesForDevice(contacts, resolved.settings.alertPhones),
 			commands: commands.map((command) => ({
 				id: command.id,
 				kind: command.kind,

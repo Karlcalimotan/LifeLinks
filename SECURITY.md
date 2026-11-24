@@ -58,6 +58,33 @@ set. Do not run the seed against a shared or production database.
   `RLS_TEST_DATABASE_URL` point at a disposable database. Never run it against
   production.
 
+## Data retention
+
+- `OrgSettings.telemetryRetentionDays` and `incidentRetentionDays` are enforced
+  by the single scheduled cleanup at `GET /api/cron/retention`
+  (`apps/web/app/api/cron/retention/route.ts`). There is no other automatic
+  deletion path.
+- The route accepts only `Authorization: Bearer <CRON_SECRET>` and compares it
+  in constant time. When `CRON_SECRET` is unset it returns `503` before any
+  database read or write, so the job fails closed rather than deleting
+  unauthenticated. A missing or wrong header returns `401`.
+- The secret is server-only. It is never returned in a response, written to an
+  audit row or sent to the browser, and the route is `force-dynamic`.
+- Deletion is cutoff-based and bounded: at most 5,000 rows per batch and 20
+  batches per organisation and table per invocation. There is no unbounded
+  full-table delete, and rows newer than the cutoff are not selected. A stored
+  period that is not a positive number is skipped.
+- `AlertDelivery` rows are removed with their incident inside one batch
+  transaction. `DeviceCommand` rows are not deleted; their incident link is
+  set to null by the existing foreign key.
+- Every run writes one `AuditLog` row per organisation: action
+  `retention.cleanup`, target organisation, and metadata with the cutoffs,
+  configured days, deleted counts, batch counts, `dryRun` and `truncated`.
+  Audit metadata contains no coordinates, phone numbers, plate numbers,
+  evidence or raw rows.
+- The route is idempotent and has no cross-invocation lock. Vercel can deliver
+  a scheduled run more than once; a duplicate run simply finds fewer rows.
+
 ## Platform administration
 
 - A platform administrator is a separate `PlatformAdmin` row keyed to a

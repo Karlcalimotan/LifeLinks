@@ -190,6 +190,12 @@ the result.
 24. **Shared bus**: with the panel and the MPU-6050 on the same bus, confirm the
     heartbeat still carries plausible `accel_g`/`tilt_deg` values and the panel
     does not corrupt the IMU readings.
+25. **Watchdog reset**: build `env:esp32dev-bench` and open the serial monitor.
+    With the unit `Idle` and no active incident, send `TEST_WDT` and confirm it
+    only prints the warning. Then send `TEST_WDT CONFIRM`. Confirm the loop
+    stops for about 120 s, the log shows `Task watchdog got triggered`, and the
+    board reboots to the boot banner. The default build must refuse the command.
+    Never run this during an alert.
 
 ## Bill of materials
 

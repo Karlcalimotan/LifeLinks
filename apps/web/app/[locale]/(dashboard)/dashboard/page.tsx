@@ -3,6 +3,7 @@ import { AcknowledgeButton } from "@/components/dashboard/acknowledge-button";
 import { ElapsedTime } from "@/components/dashboard/elapsed-time";
 import { DeviceStatusBadge, IncidentStatusBadge, SeverityBadge } from "@/components/domain/badges";
 import { FleetMap, type FleetMapLegendItem, type FleetMapMarker } from "@/components/map/fleet-map";
+import { InstallBanner } from "@/components/pwa/install-prompt";
 import { Badge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -289,6 +290,7 @@ export default async function DashboardPage({
 
 	return (
 		<>
+			<InstallBanner />
 			<PageHeader
 				title={current.role === "USER" ? t("ownerTitle") : t("title")}
 				subtitle={current.role === "USER" ? t("ownerSubtitle") : t("subtitle")}

@@ -118,6 +118,21 @@ void test_alerting_pattern_switches_to_reminder_after_ten_minutes(void) {
 	                  static_cast<int>(alertingPattern(kAlertReminderAfterMs)));
 }
 
+void test_dispatch_sent_at_is_back_dated_to_the_countdown_expiry(void) {
+	const uint32_t expiry = 15000;
+	// Observed exactly at the deadline: no correction.
+	TEST_ASSERT_EQUAL_UINT32(1700000000, dispatchSentAt(1700000000, expiry, expiry));
+	// Observed 7 s late after a blocking phase: the expiry, not the observation.
+	TEST_ASSERT_EQUAL_UINT32(1700000001, dispatchSentAt(1700000008, expiry + 7000, expiry));
+	// An unset GPS clock stays unset, so the report omits sent_at.
+	TEST_ASSERT_EQUAL_UINT32(0, dispatchSentAt(0, expiry + 7000, expiry));
+	// Lateness beyond the guard is a clock anomaly, not a correction.
+	TEST_ASSERT_EQUAL_UINT32(
+	    1700000400, dispatchSentAt(1700000400, expiry + kMaxExpiryCorrectionMs + 1, expiry));
+	// A deadline still in the future is an anomaly too.
+	TEST_ASSERT_EQUAL_UINT32(1700000000, dispatchSentAt(1700000000, expiry - 1000, expiry));
+}
+
 void test_power_classification_and_adc(void) {
 	TEST_ASSERT_EQUAL(static_cast<int>(PowerState::Main),
 	                  static_cast<int>(classifyPower(true, 12.5f)));
@@ -272,6 +287,7 @@ int main(int, char**) {
 	RUN_TEST(test_alerting_is_a_long_beep);
 	RUN_TEST(test_reminder_is_slower_but_never_silent);
 	RUN_TEST(test_alerting_pattern_switches_to_reminder_after_ten_minutes);
+	RUN_TEST(test_dispatch_sent_at_is_back_dated_to_the_countdown_expiry);
 	RUN_TEST(test_power_classification_and_adc);
 	RUN_TEST(test_gps_fix_quality);
 	RUN_TEST(test_sms_body_is_safe_and_bounded);

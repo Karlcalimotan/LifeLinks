@@ -41,4 +41,13 @@ export const deleteDeviceSchema = z.object({
 	deviceId: z.string().trim().min(1),
 });
 
-export const commandSchema = z.enum(["LOCATE", "ARM", "DISARM", "TEST_ALERT", "SET_CONFIG"]);
+/**
+ * Commands an admin may queue from the tracker page.
+ *
+ * ARM and DISARM are deliberately absent: crash detection is always on, so
+ * queuing either command would claim a behaviour the firmware does not have.
+ * The Prisma enum keeps both values for historical rows.
+ */
+export const commandSchema = z.enum(["LOCATE", "TEST_ALERT", "SET_CONFIG"]);
+
+export type DeviceCommandKind = z.infer<typeof commandSchema>;

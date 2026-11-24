@@ -60,6 +60,11 @@ The routes are idempotent:
 - commands: delivered until acknowledged or expired; the device dedupes by id
 - a repeated incident never creates a second alert storm
 
+The console queue is limited to `LOCATE`, `TEST_ALERT` and `SET_CONFIG`. `ARM`
+and `DISARM` remain in `CommandKind` for historical rows only: the console
+rejects them and the firmware acknowledges them as `unsupported` without
+changing state. Crash detection is always on.
+
 ### 3. Firmware (`firmware/`)
 
 The sketch is orchestration only. The decisions live in Arduino-free headers so
@@ -69,7 +74,7 @@ they can be compiled and tested on the host:
 | --- | --- |
 | `config.h` | Class A envelope, class B operational defaults, NVS persistence |
 | `filters.h` | Impact/tilt/vibration fusion, false-positive rejection, debounce |
-| `safety.h` | Countdown, cancel, retry, faults, reset history, safe mode |
+| `safety.h` | Countdown, cancel, retry, faults, reset-history helper (not wired) |
 | `gps.h` | Fix quality rules |
 | `power.h` | ADC scaling, main/backup/critical classification |
 | `status.h` | Buzzer patterns |
@@ -105,6 +110,9 @@ InvitationToken, MembershipPermission
 - `DeviceConfigOverride` is the optional per-tracker layer over `OrgSettings`.
   A null column inherits the organisation value; the row is deleted when every
   field inherits again.
+- `OrgSettings.parkedImpactAlerts` is reserved and not enforced. Settings does
+  not expose it, no code reads it, and it is not part of the firmware
+  configuration envelope. The column stays to avoid a destructive migration.
 - `AuditLog` records member changes (acknowledge, resolve, false alarm,
   configuration, device token rotation, invite, accept, revoke, re-invite) and
   platform changes (`platform.org_suspended`, `platform.org_reinstated` with the
@@ -122,6 +130,24 @@ InvitationToken, MembershipPermission
   explicit per-member overrides; a missing row means "use the role default".
   `Membership.revokedAt` is a soft revoke: the row keeps the person and the
   audit trail, and every request treats it as absent.
+- `EmergencyContact.vehicleId` attaches a contact to one vehicle; a null
+  `vehicleId` is the organisation-level fallback and only an admin may create
+  it. Deleting a vehicle cascades its contacts, so the console archives a
+  vehicle as `RETIRED` instead of deleting a row that has incidents or a
+  tracker. `@@unique([orgId, phone])` is kept on purpose: one phone is one
+  person in an organisation, so a shared contact stays on one vehicle and the
+  duplicate is reported instead of silently copied.
+- Alert routing reads both sources. `alertTargetsForVehicle` puts the active
+  vehicle contacts first, then the `OrgSettings` phones and emails, removes
+  duplicates and caps each channel at ten. The command poll uses
+  `alertPhonesForDevice`: up to two active vehicle contacts, with the
+  organisation phones as the fallback the tracker already expects. The incident
+  route queues `AlertDelivery` rows from the same merged targets, so the web
+  trail and the device SMS fallback agree.
+- Vehicle and contact writes follow the same scope as the pages: an owner may
+  register and edit only their own vehicle and the contacts on it, an admin the
+  whole organisation, and a responder neither. Every create, edit and archive
+  writes an `AuditLog` row with the actor and before/after values.
 
 ### Roles and scope
 
