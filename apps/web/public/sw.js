@@ -27,7 +27,7 @@ const STATIC_CACHE = "lifelink-static-v1";
 const STATIC_CACHE_PREFIX = "lifelink-static-";
 const { OFFLINE_URL, PRECACHE_URLS, isCacheable } = self.LifeLinkCachePolicy;
 
-const { safeNotificationUrl } = self.LifeLinkPushUrl;
+const { safeNotificationUrl: resolveNotificationUrl } = self.LifeLinkPushUrl;
 
 const ACTION_LABELS = {
 	en: "Cancel alert",
@@ -170,7 +170,7 @@ self.addEventListener("push", (event) => {
 	}
 	if (!payload || typeof payload !== "object") return;
 
-	const url = safeNotificationUrl(payload.url, self.location.origin);
+	const url = resolveNotificationUrl(payload.url, self.location.origin);
 	const plate = typeof payload.plate === "string" ? payload.plate.slice(0, 40) : "";
 	const body = typeof payload.body === "string" ? payload.body : "";
 	const incidentId = typeof payload.incidentId === "string" ? payload.incidentId : "";
@@ -191,7 +191,7 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
 	event.notification.close();
-	const url = safeNotificationUrl(event.notification.data?.url, self.location.origin);
+	const url = resolveNotificationUrl(event.notification.data?.url, self.location.origin);
 	event.waitUntil(openIncident(url));
 });
 
