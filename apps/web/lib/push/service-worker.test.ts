@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { createContext, runInContext } from "node:vm";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(path.join(process.cwd(), "public/sw.js"), "utf8");
@@ -111,5 +112,75 @@ describe("service worker", () => {
 	it("delegates URL safety to the tested guard", () => {
 		expect(source).toContain('importScripts("/sw-url.js")');
 		expect(source).toContain("safeNotificationUrl");
+	});
+});
+
+describe("worker evaluation", () => {
+	it("evaluates in a classic worker scope with the real imports", () => {
+		const root = path.join(process.cwd(), "public");
+		const workerSelf: Record<string, unknown> = {
+			location: { origin: "http://localhost:3000" },
+			addEventListener: () => {},
+			registration: {},
+			clients: {
+				claim: async () => {},
+				matchAll: async () => [],
+				openWindow: async () => {},
+			},
+			skipWaiting: () => {},
+		};
+		const sandbox: Record<string, unknown> = {
+			self: workerSelf,
+			URL,
+			console,
+			Response: class {
+				ok = true;
+				type = "basic";
+				headers = new Headers();
+			},
+			caches: {
+				open: async () => ({
+					add: async () => {},
+					match: async () => undefined,
+					put: async () => {},
+				}),
+				keys: async () => [],
+				delete: async () => true,
+			},
+			fetch: async () => {
+				throw new Error("no network in the worker evaluation test");
+			},
+		};
+		const context = createContext(sandbox);
+		sandbox.importScripts = (...names: string[]) => {
+			for (const name of names) {
+				const file = path.join(root, name.replace(/^\//, ""));
+				runInContext(readFileSync(file, "utf8"), context, { filename: file });
+			}
+		};
+
+		expect(() => runInContext(source, context, { filename: "sw.js" })).not.toThrow();
+
+		const pushUrl = workerSelf.LifeLinkPushUrl as
+			| { safeNotificationUrl: (value: unknown, origin: string) => string }
+			| undefined;
+		expect(typeof pushUrl?.safeNotificationUrl).toBe("function");
+		expect(pushUrl?.safeNotificationUrl("/en/incidents/1", "http://localhost:3000")).toBe(
+			"/en/incidents/1",
+		);
+		expect(pushUrl?.safeNotificationUrl("//evil.com", "http://localhost:3000")).toBe("/");
+
+		const policy = workerSelf.LifeLinkCachePolicy as
+			| { classifyRequest: (request: unknown) => string }
+			| undefined;
+		expect(
+			policy?.classifyRequest({
+				url: "http://localhost:3000/en/dashboard",
+				method: "GET",
+				mode: "navigate",
+				origin: "http://localhost:3000",
+				headers: new Headers(),
+			}),
+		).toBe("navigation");
 	});
 });
