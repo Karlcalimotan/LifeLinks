@@ -912,8 +912,8 @@
 	},
 	"privacy": {
 		"title": "Privacy notice",
-		"body": "Iniimbak ng LifeLink ang lokasyon ng sasakyan at crash telemetry para makapagpadala ng emergency alerts. Ang location data ay makikita lamang ng mga miyembro ng iyong organization. Nako-configure ang retention periods sa Settings, pero hindi pa naka-enable ang automatic deletion, kaya mananatili ang data hanggang sa tanggalin ito ng service operator.",
-		"extra": "Hiwalay ang retention settings ng telemetry at incident evidence. Hindi pa ipinapatupad ng automatic cleanup job ang mga panahong ito. Itinatago ang incident evidence dahil maaaring kailanganin para sa insurance o legal review. Hindi maaaring i-query ng mga miyembro ng ibang organization ang iyong mga sasakyan o insidente."
+		"body": "Iniimbak ng LifeLink ang lokasyon ng sasakyan at crash telemetry para makapagpadala ng emergency alerts. Ang location data ay makikita lamang ng mga miyembro ng iyong organization. Ipinapatupad ng araw-araw na scheduled cleanup ang retention periods sa Settings: awtomatikong tinatanggal ang telemetry at incident records na mas luma kaysa sa nakatakdang panahon. Itinatago ang incident evidence sa loob ng nakatakdang panahon dahil maaaring kailanganin para sa insurance o legal review.",
+		"extra": "Hiwalay ang retention settings ng telemetry at incident evidence, at ang settings ng bawat organization ang umiiral sa sarili nitong data. Ang cleanup ay nagtatanggal ng lumang rows sa bounded batches at nagtatala ng bilang sa audit log. Hindi maaaring i-query ng mga miyembro ng ibang organization ang iyong mga sasakyan o insidente."
 	},
 	"terms": {
 		"title": "Terms of use",

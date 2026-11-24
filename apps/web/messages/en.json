@@ -912,8 +912,8 @@
 	},
 	"privacy": {
 		"title": "Privacy notice",
-		"body": "LifeLink stores vehicle location and crash telemetry to deliver emergency alerts. Location data is available only to members of your organization. Retention periods are configurable in Settings, but automatic deletion is not yet enabled, so data remains until the service operator removes it.",
-		"extra": "Telemetry and incident evidence have separate retention settings. Those periods are not yet enforced by an automatic cleanup job. Incident evidence is kept because it may be needed for insurance or legal review. Members of other organizations cannot query your vehicles or incidents."
+		"body": "LifeLink stores vehicle location and crash telemetry to deliver emergency alerts. Location data is available only to members of your organization. The retention periods in Settings are enforced by a scheduled daily cleanup: telemetry and incident records older than the configured period are deleted automatically. Incident evidence is kept for the configured period because it may be needed for insurance or legal review.",
+		"extra": "Telemetry and incident evidence have separate retention settings, and each organization's settings apply to its own data. The cleanup removes old rows in bounded batches and records counts in an audit log. Members of other organizations cannot query your vehicles or incidents."
 	},
 	"terms": {
 		"title": "Terms of use",

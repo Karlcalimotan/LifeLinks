@@ -166,9 +166,11 @@ recovered on boot: the incident id is persisted before the countdown starts.
 
 - Location is personal data. Access is scoped to the organization that owns the
   vehicle.
-- Telemetry and incident retention are configurable in Settings. The configured
-  periods are not yet enforced by an automatic deletion job; data remains until
-  an operator removes it.
+- Telemetry and incident retention are configured per organisation in
+  Settings and enforced by a scheduled cleanup that deletes rows older than
+  each configured period. The cleanup writes an audit row with cutoffs and
+  counts only. A stored period that is not a positive number is skipped, so
+  corrupt configuration cannot delete recent data.
 - The SMS contains coordinates and a callback number; only configured contacts
   receive it.
 - The server never logs device tokens. The database stores only the hash.
