@@ -17,7 +17,7 @@
 		{ "action": "shell", "resource": "pio run *upload*", "effect": "deny" },
 		{ "action": "shell", "resource": "pio run -t upload*", "effect": "deny" },
 		{ "action": "shell", "resource": "pio run --target upload*", "effect": "deny" },
-		{ "action": "shell", "resource": "gh pr merge*", "effect": "deny" },
+		{ "action": "shell", "resource": "gh pr merge*", "effect": "allow" },
 		{ "action": "shell", "resource": "git push*", "effect": "ask" },
 		{ "action": "shell", "resource": "git push --force*", "effect": "deny" },
 		{ "action": "shell", "resource": "git push -f*", "effect": "deny" },
