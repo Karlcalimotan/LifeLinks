@@ -10,6 +10,8 @@
   - a frame is flushed only when the rendered lines changed;
   - at most one flush per kDisplayMinDrawGapMs;
   - the caller skips the display entirely while the alert state is not Idle;
+	the one exception is the impact frame, drawn once at the confirmation with
+	showNow() and then frozen through the alert and the post-alert window;
   - no delay() call, and the 1 KB frame is sent as I2C bursts at 400 kHz
 	(about 25 ms), so a flush cannot sit inside a countdown or an SOS.
 */
@@ -69,7 +71,27 @@ class StatusDisplay {
 		if (!present_) return false;
 		const bool changed = !matches(screen);
 		if (!drawGate_.shouldDraw(nowMs, changed)) return false;
+		draw(screen, nowMs);
+		return true;
+	}
 
+	/**
+	 * Draw a one-shot screen immediately, ignoring the minimum redraw gap.
+	 *
+	 * This exists for the impact frame. It is rendered exactly once, at the
+	 * impact confirmation, and the home clock changes every second, so the last
+	 * home frame can be inside kDisplayMinDrawGapMs. show() would drop that
+	 * frame and the alert path never calls again to retry it. One frame, no
+	 * retry, no delay: the cost is the same bounded ~25 ms flush.
+	 */
+	bool showNow(const DisplayScreen& screen, uint32_t nowMs) {
+		if (!present_) return false;
+		draw(screen, nowMs);
+		return true;
+	}
+
+  private:
+	void draw(const DisplayScreen& screen, uint32_t nowMs) {
 		oled_.clearDisplay();
 		const uint8_t rows = screen.lineCount < kDisplayRows ? screen.lineCount : kDisplayRows;
 		for (uint8_t row = 0; row < rows; row += 1) {
@@ -83,10 +105,8 @@ class StatusDisplay {
 			copyDisplayText(source, drawn_[row], sizeof(drawn_[row]));
 		}
 		drawGate_.markDrawn(nowMs);
-		return true;
 	}
 
-  private:
 	bool matches(const DisplayScreen& screen) const {
 		if (!drawGate_.hasDrawn()) return false;
 		for (uint8_t row = 0; row < kDisplayRows; row += 1) {

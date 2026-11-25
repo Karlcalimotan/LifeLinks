@@ -17,7 +17,14 @@ GPIO 1/3 stay free for the USB monitor.
   The sketch reads acceleration magnitude and tilt relative to gravity. The
   gyro is available but the first version confirms on acceleration + tilt +
   vibration, not on integration. The accelerometer runs its ±16 g range so the
-  default 15 g impact threshold is measurable without clipping.
+  default 15 g impact threshold is measurable without clipping. AD0 is tied to
+  3.3 V so the IMU answers at `0x69`; the DS3231 owns `0x68`.
+- **DS3231 RTC**: battery-backed I2C clock at `0x68` on the shared bus. It is
+  temperature-compensated (±2 ppm from 0 to +40 °C, about a minute a year) and
+  keeps counting from the CR2032 while the tracker is unpowered. The firmware
+  corrects it from GPS when the two differ by more than 5 s, at most once an
+  hour and only while `Idle`. An unset module reads 2000-01-01, which the
+  firmware treats as unknown rather than as a timestamp.
 - **SW-420**: the common module's DO is LOW when vibration is detected. Verify
   the polarity on your module with a meter; change the comparison in
   `main.ino` if your board is inverted.
@@ -81,8 +88,9 @@ The tracker can drive an optional 128x64 SSD1306 OLED as a commissioning and
 bench aid. It is not part of the safety path and the firmware never reads it
 back.
 
-- **Bus:** the shared I2C bus already used by the MPU-6050. SDA GPIO 21, SCL
-  GPIO 22, VCC 3V3, GND. Do not use the 5 V rail; the panel is a 3.3 V part.
+- **Bus:** the shared I2C bus already used by the MPU-6050 and the DS3231. SDA
+  GPIO 21, SCL GPIO 22, VCC 3V3, GND. Do not use the 5 V rail; the panel is a
+  3.3 V part.
 - **Address:** `0x3C`, fixed in `firmware/main/display.h`. Some modules are
   strapped to `0x3D`; use a `0x3C` module or change the constant and rebuild.
 - **Reset:** no RES line is wired. The driver initialises with `reset=false`.
@@ -101,7 +109,8 @@ back.
 | `PROVISIONING` | The setup AP is open. Join `LifeLink-XXXX` and open `192.168.4.1`. |
 | `JOINING` | A stored-network check or a portal join is in progress; the SSID, progress dots and `Try n of 3` are shown. |
 | `WIFI OK` | A portal join was verified and saved; the SSID and IP stay for about 3 s. |
-| Home | `WiFi: setup`, `WiFi: joining` or `WiFi: joined`, the device ID, an optional UUID, and `Uplink: 4G modem`. |
+| Home | `WiFi: setup`, `WiFi: joining` or `WiFi: joined`, the device ID, an optional UUID, `Uplink: 4G modem`, and `Time HH:MM:SS` when the clock is known. |
+| `IMPACT ALERT` | Drawn once at the impact confirmation and frozen for the alert: `IMPACT ALERT`, `Time HH:MM:SS` (or `Time unknown`), `Do not power off`. |
 
 `WiFi: joined` means the unit joined a WiFi network. It does **not** mean the
 tracker is online: telemetry, commands and SOS stay on the A7670E. The home
@@ -114,7 +123,50 @@ writes it today). A UUID longer than 21 characters is truncated on the panel.
 If the panel is absent or the I2C init fails, the firmware logs
 `[OLED] no SSD1306 at 0x3C - continuing without a display` and runs normally.
 The display is redrawn only when the text changes (at most every 250 ms) and is
-skipped entirely while the alert state is not `Idle`.
+skipped entirely while the alert state is not `Idle`; the single exception is
+the one impact frame, forced at the confirmation with `showNow()` and then
+frozen until the tracker returns to `Idle` (about five minutes after an
+acknowledgement).
+
+## Real-time clock (DS3231)
+
+The impact time is captured at the trigger, not at the SMS. The phone's
+timestamp is receipt time, and a cold GPS fix indoors can take minutes, so the
+tracker carries its own battery-backed clock.
+
+- **Bus and address:** DS3231 at `0x68` on SDA 21 / SCL 22, VCC 3V3, GND. The
+  MPU-6050 moved to `0x69` (AD0 to 3V3); the SSD1306 stays at `0x3C`. No new
+  ESP32 pin is used. See [`wiring.md`](wiring.md) for the module wiring and the
+  coin-cell caveat.
+- **Backup:** a CR2032 keeps the clock and the oscillator running with VCC off.
+  It lasts for years at room temperature; the exact life depends on the cell and
+  the temperature, so treat any figure as an estimate, not a service interval.
+- **Drift:** ±2 ppm from 0 to +40 °C (about a minute a year) and ±3.5 ppm over
+  the full −40 to +85 °C range (about two minutes a year). The firmware corrects
+  it from GPS when the two differ by more than 5 s, at most once an hour and
+  only while `Idle`, so a correction never lands in a countdown or an SOS.
+- **Timestamp at trigger:** at the impact confirmation, before the countdown,
+  the firmware stores `bestEpochSeconds()` — the RTC first, the GPS fix second,
+  `0` when neither knows the time. That value is the `detected_at` of every
+  incident payload for that incident, including retries; `sent_at` is the
+  countdown expiry and is a separate field. `0` means unknown, and the console
+  falls back to its receipt time for the row.
+- **Coin-cell replacement:** power the unit down, replace the cell the right way
+  round, then boot. The log says
+  `[RTC] lost power - set the time with SET_TIME <epoch> or wait for GPS`. The
+  clock reads 2000-01-01 until it is set, and the firmware treats that as
+  unknown. Set it with `SET_TIME <epoch>`, or let the first valid GPS fix
+  correct it. A flat cell never blocks an alert; it only removes the
+  power-loss-proof timestamp.
+- **Missing RTC:** `begin()` probes `0x68` once. When nothing answers, the log
+  says `[RTC] no DS3231 - continuing without it`, every read returns `0`, and
+  `bestEpochSeconds()` falls back to GPS. The IMU, panel, countdown and SOS path
+  are unchanged.
+- **OLED:** the home screen appends `Time HH:MM:SS` when the clock is known and
+  omits the line otherwise. The impact screen always shows a time row: the
+  impact time, or `Time unknown` when there was none.
+- **UTC only:** the RTC and the payload are UTC. The console and the phone
+  render local time; the panel never converts.
 
 ## Bench checklist
 
@@ -169,8 +221,8 @@ the result.
     operation without a reboot.
 18. **Display present**: boot a provisioned unit with the panel connected.
     Confirm the home screen shows the device ID that matches the boot log and
-    `STATUS`, `WiFi: joined` after a successful stored join, and
-    `Uplink: 4G modem`.
+    `STATUS`, `WiFi: joined` after a successful stored join,
+    `Uplink: 4G modem`, and `Time HH:MM:SS` when the clock is known.
 19. **Display absent**: unplug the panel and boot. Confirm the serial log says
     `[OLED] no SSD1306 at 0x3C - continuing without a display`, the unit still
     joins its stored network and sends a heartbeat/SMS, and there is no reset
@@ -185,18 +237,46 @@ the result.
     display returns to `PROVISIONING` (no `WIFI OK`) and the stored credentials
     are unchanged.
 23. **Alert isolation**: trigger a countdown and let it alert with the panel
-    connected. Confirm the display does not update during the countdown or the
-    alert, the buzzer/cancel/ack timing is unchanged, and the display updates
-    again after the acknowledgement.
-24. **Shared bus**: with the panel and the MPU-6050 on the same bus, confirm the
-    heartbeat still carries plausible `accel_g`/`tilt_deg` values and the panel
-    does not corrupt the IMU readings.
+    connected. Confirm the panel shows the impact screen once at confirmation,
+    does not update again during the countdown or the alert, the buzzer, cancel
+    and ack timing are unchanged, and the display updates again once the tracker
+    returns to `Idle` after the acknowledgement.
+24. **Shared bus**: with the panel, the MPU-6050 and the DS3231 on the same bus,
+    confirm the heartbeat still carries plausible `accel_g`/`tilt_deg` values
+    and that the panel and the RTC do not corrupt the IMU readings.
 25. **Watchdog reset**: build `env:esp32dev-bench` and open the serial monitor.
     With the unit `Idle` and no active incident, send `TEST_WDT` and confirm it
     only prints the warning. Then send `TEST_WDT CONFIRM`. Confirm the loop
     stops for about 120 s, the log shows `Task watchdog got triggered`, and the
     board reboots to the boot banner. The default build must refuse the command.
     Never run this during an alert.
+26. **RTC present**: boot with the DS3231 fitted. Confirm
+    `[RTC] DS3231 ready at 0x68` and that `TIME` reports `source=rtc`,
+    `present=yes` and a plausible `HH:MM:SS`. Confirm the OLED home screen
+    appends the same `Time HH:MM:SS`.
+27. **Timestamp survives power loss**: with the clock set, remove the 12 V feed
+    and USB, wait a minute, and power up again. Confirm `TIME` still shows the
+    correct time (`lost_power=no`) and that the next incident's `detected_at`
+    matches the impact moment, not the SMS receipt time.
+28. **Set the clock**: send `SET_TIME 1767225600` and confirm
+    `[TIME] DS3231 set to 00:00:00 UTC`, then `TIME` reports it. Confirm
+    `SET_TIME 123` is rejected with
+    `[TIME] SET_TIME rejected: expected a Unix epoch for 2024-2099`.
+29. **RTC absent**: unplug the DS3231 and boot. Confirm
+    `[RTC] no DS3231 - continuing without it`, the IMU and panel still work, the
+    tracker still detects and dispatches an incident, and `detected_at` falls
+    back to the GPS time or `0`. The home screen must omit the clock line and
+    the impact screen must show `Time unknown` when neither clock exists.
+30. **Impact screen**: trigger a synthetic impact. Confirm the panel shows
+    `IMPACT ALERT`, the impact time and `Do not power off` within the countdown,
+    and that it matches the `TIME` reading at the trigger (within a second or
+    two). Confirm the frame stays frozen through the alert and that the home
+    screen returns about five minutes after the acknowledgement, when the
+    tracker goes back to `Idle`.
+31. **Drift correction**: with a GPS fix, confirm `TIME` shows the RTC within
+    5 s of GPS. Leave the unit running for over an hour outdoors and confirm
+    `[RTC] synced from GPS to ...` appears at most once an hour and never
+    during a countdown or an alert.
 
 ## Bill of materials
 
@@ -204,6 +284,7 @@ the result.
 | --- | --- |
 | ESP32 DevKit V1 (30-pin) | Controller |
 | MPU-6050 (GY-521) | Acceleration and tilt |
+| DS3231 RTC module + CR2032 | Battery-backed impact timestamp, shared I2C at `0x68` |
 | SW-420 | Vibration confirmation |
 | NEO-6M (GY-GPS6MV2) | Location |
 | A7670E Cat-1 | SMS / HTTP uplink |

@@ -17,15 +17,19 @@ main/
   power.h             ADC scaling and power bands (Arduino-free)
   provisioning.h      WiFi AP name, form/NVS rules, boot reset (Arduino-free)
   display.h           optional SSD1306 driver (I2C 0x3C)
-  display_format.h    screen text, IPv4, state labels (Arduino-free)
+  display_format.h    screen text, clock line, IPv4, state labels (Arduino-free)
+  rtc.h               DS3231 clock at 0x68 on the shared I2C bus
+  rtc_format.h        clock window and "HH:MM:SS" text (Arduino-free)
   status.h            buzzer patterns (Arduino-free)
   modem.h             SOS SMS body (Arduino-free)
   hardware.h          hw:: aliases over pins.h
 test/
   test_config/        envelope and defaults
-  test_display/       screen text, IPv4, state labels, refresh gate, panel width
+  test_config_apply/  validation and apply rules
+  test_display/       screen text, clock line, IPv4, state labels, refresh gate
   test_filters/       pothole, crash, rollover, door slam, debounce
   test_provisioning/  AP name, form/NVS limits, boot reset gesture
+  test_rtc/           clock window and "HH:MM:SS" formatting
   test_safety/        countdown, cancel, retry, latch/ack, faults, power, GPS, SMS
 ```
 
@@ -50,11 +54,14 @@ which leaves room for a future signed OTA slot.
 
 ## Incident timing
 
-The incident payload carries two device times, both GPS UTC epoch seconds from
-the tracker's fix:
+The incident payload carries two device times:
 
-- `detected_at` is the impact detection. It is `0` when the clock was not set,
-  and the console falls back to its receipt time for the row.
+- `detected_at` is the impact detection. It is taken at the impact confirmation,
+  before the countdown, from the best available clock: the battery-backed DS3231
+  first, the GPS fix second, `0` when neither knows the time. The RTC value is
+  already UTC epoch seconds and survives power loss, so a unit with a fitted
+  clock reports the real impact time even with no GPS fix. `0` means unknown and
+  the console falls back to its receipt time for the row.
 - `sent_at` is the countdown expiry, the moment the emergency alert starts. It
   is derived from the countdown deadline, not from the loop pass that notices
   the expiry, so a blocking modem phase cannot add its delay. The value is
@@ -224,6 +231,8 @@ SET_PHONE1 +639171234567
 SET_PHONE2 +639181234567
 SET_PLATE ABC 1234
 STATUS
+TIME
+SET_TIME 1767225600
 REBOOT
 ```
 
@@ -238,6 +247,66 @@ leaving the Device Token field blank.
 The server command poll also sends `alert_phones`; the firmware caches the first
 two numbers in NVS so the SMS path keeps working if the backend is unreachable.
 
+## Real-time clock (DS3231)
+
+The impact time is captured at the trigger, not when the SMS leaves. A phone's
+timestamp is receipt time, and a cold GPS fix indoors can take minutes, so the
+tracker carries its own battery-backed clock.
+
+- **Bus and address:** DS3231 at `0x68` on the shared I2C bus (SDA 21, SCL 22),
+  VCC 3V3, GND. The MPU-6050 moved to `0x69` by tying AD0 to 3V3, so the RTC can
+  own `0x68`; the SSD1306 stays at `0x3C`. No ESP32 pin was added.
+- **Backup:** a CR2032 keeps the clock and the oscillator running with the
+  tracker unpowered. It lasts for years at room temperature; the exact life
+  depends on the cell and the temperature, so treat any figure as an estimate.
+- **Drift:** ±2 ppm from 0 to +40 °C (about a minute a year), ±3.5 ppm over the
+  full −40 to +85 °C range. The firmware corrects the RTC from GPS when the two
+  differ by more than 5 s, at most once an hour and only while `Idle`, so a
+  correction never lands in a countdown or an SOS.
+- **Timestamp at trigger:** at the impact confirmation the firmware stores
+  `bestEpochSeconds()` — the RTC first, the GPS fix second, `0` when neither
+  knows the time — and every incident payload for that incident reports it as
+  `detected_at`, including retries. `sent_at` is the countdown expiry and stays
+  GPS-derived.
+- **Missing RTC:** `begin()` probes `0x68` once. When nothing answers, the log
+  says `[RTC] no DS3231 - continuing without it`, every read returns `0`, and
+  the timestamp falls back to GPS. The IMU, panel, countdown and SOS path are
+  unchanged.
+- **Coin cell:** after a replacement or a flat cell the log says
+  `[RTC] lost power - set the time with SET_TIME <epoch> or wait for GPS`. The
+  module reads 2000-01-01 until it is set, which the firmware treats as unknown.
+  The first valid GPS fix also corrects it.
+
+### Serial commands
+
+```
+TIME
+SET_TIME 1767225600
+```
+
+- `TIME` prints both clocks and which one is in use:
+
+  ```
+  [TIME] rtc=1767225600 (00:00:00) gps=0 (--:--:--) source=rtc present=yes lost_power=no
+  ```
+
+  `source` is `rtc`, `gps` or `none`; `--:--:--` means that clock is unknown.
+- `SET_TIME <epoch>` writes a UTC Unix epoch to the DS3231. The value must be
+  inside 2024-2099, otherwise the command is rejected:
+  `[TIME] SET_TIME rejected: expected a Unix epoch for 2024-2099`. With no
+  module fitted it fails with `[TIME] SET_TIME failed: no DS3231 at 0x68`.
+- Both are UTC. The console and phone render local time; the device never
+  converts.
+
+### Bench verification (human, issue #54)
+
+Not verified until it runs on a real unit. Minimum: boot with the module fitted
+and confirm `[RTC] DS3231 ready at 0x68` and `source=rtc`; remove all power,
+restore it, and confirm the time survived; trigger an incident and confirm
+`detected_at` matches the impact, not the SMS; unplug the module and confirm the
+tracker still dispatches with the GPS fallback. The full list is in
+[`../docs/hardware.md`](../docs/hardware.md), items 26-31.
+
 ## Status display (SSD1306)
 
 The production firmware drives an optional 128x64 SSD1306 panel on the shared
@@ -247,8 +316,8 @@ I2C bus. It is a commissioning and bench aid, not a safety indicator.
 | --- | --- |
 | VCC | 3V3 (the panel is a 3.3 V part; do not use the 5 V rail) |
 | GND | GND |
-| SDA | GPIO 21, shared with the MPU-6050 |
-| SCL | GPIO 22, shared with the MPU-6050 |
+| SDA | GPIO 21, shared with the MPU-6050 and the DS3231 |
+| SCL | GPIO 22, shared with the MPU-6050 and the DS3231 |
 | RES | not connected; the driver initialises with `reset=false` |
 | Address | `0x3C` |
 
@@ -263,7 +332,8 @@ in `main/display.h` changed and a rebuild. Do not power the panel from 5 V.
 | `PROVISIONING` | the setup AP is open | `WiFi setup`, `Join network:`, the `LifeLink-XXXX` AP name, `Open 192.168.4.1` |
 | `JOINING` | a stored-network check or a portal join is in progress | the SSID, `Working` with progress dots, and `Try n of 3` for the stored check |
 | `WIFI OK` | about 3 s after a verified portal save | `WiFi OK - saved`, the SSID, the IP, `Uplink: 4G modem` |
-| Home | every other time | `WiFi: setup` / `WiFi: joining` / `WiFi: joined`, the device ID (`g_deviceId`), an optional UUID, `Uplink: 4G modem` |
+| Home | every other time | `WiFi: setup` / `WiFi: joining` / `WiFi: joined`, the device ID (`g_deviceId`), an optional UUID, `Uplink: 4G modem`, and `Time HH:MM:SS` when the clock is known |
+| `IMPACT ALERT` | once, at the impact confirmation | `IMPACT ALERT`, `Time HH:MM:SS` (or `Time unknown`), `Do not power off` |
 
 **"Joined" means joined to WiFi, not online.** The WiFi radio is
 commissioning-only: telemetry, commands and SOS stay on the A7670E. The home and
@@ -273,13 +343,18 @@ radio is switched off after commissioning, so `WiFi: joined` is a
 commissioning result, not a live association.
 
 The device token is never displayed. `display_format.h` has no token input at
-all; the home screen receives only the WiFi state, `g_deviceId`, and an optional
-UUID.
+all; the home screen receives only the WiFi state, `g_deviceId`, an optional
+UUID and the clock epoch.
 
 The UUID line is shown only when one already exists. The firmware reads the
 optional NVS key `device_uuid` and never derives or invents one. Nothing writes
 that key today, so the line is normally absent. A UUID longer than 21 characters
 is truncated on the panel; the full value stays in NVS.
+
+The clock line is `Time HH:MM:SS` (UTC), appended last on the home screen. It is
+present only when the RTC or the GPS knows the time; a unit with neither omits
+the line, so the identity block never moves. With a UUID and a clock the home
+screen uses all 8 rows of the panel; a new line would have to replace one.
 
 Screen text is sanitised to printable ASCII: control bytes and anything above
 0x7E render as `?`, so a UTF-8 SSID cannot produce a broken glyph or split a
@@ -296,7 +371,12 @@ The build pins Adafruit SSD1306 2.5.17, Adafruit GFX 1.13.0 and Adafruit BusIO
 - The driver redraws only when the rendered text changes, at most once per
   250 ms. A full 1024-byte frame at 400 kHz takes about 25 ms.
 - The caller skips the display entirely while the alert state is not `Idle`, so
-  no I2C traffic can sit inside a countdown, an alert or an acknowledgement.
+  no I2C traffic can sit inside a countdown or an SOS. The single exception is
+  the impact frame: it is forced once with `showNow()` at the confirmation, at
+  the start of the countdown, and then frozen until the tracker returns to
+  `Idle`. The force is needed because the home clock changes every second, so
+  the last home frame can be inside the 250 ms gap; `show()` would drop the only
+  impact frame the alert path ever requests.
 - The display is serviced after the buzzer is written and before the blocking
   modem block. There are no `delay()` calls in the display path.
 - The library switches the bus to 400 kHz for its own transfers and restores
@@ -306,18 +386,20 @@ The build pins Adafruit SSD1306 2.5.17, Adafruit GFX 1.13.0 and Adafruit BusIO
   a longer flush (about 100 ms at 100 kHz).
 
 The pure layout and refresh gate live in `main/display_format.h` and are
-covered by `test/test_display`, so the screen text, IPv4 formatting, AP name,
-state labels and redraw rule are testable without a panel. Hardware checks are
-in [`../docs/hardware.md`](../docs/hardware.md); they are not a bench claim.
+covered by `test/test_display`, so the screen text, the clock line, IPv4
+formatting, AP name, state labels and redraw rule are testable without a panel.
+Hardware checks are in [`../docs/hardware.md`](../docs/hardware.md); they are
+not a bench claim.
 
 ### Bench checks (human)
 
-The full list is in [`../docs/hardware.md`](../docs/hardware.md), items 18-24.
-The minimum is: boot with the panel connected and confirm the home screen; boot
-with it unplugged and confirm the firmware still joins and reports; run a portal
-join and confirm `JOINING`, then `WIFI OK`, then home; trigger an alert and
-confirm the display does not update during the alert. None of this is a bench
-claim until it runs on a real unit.
+The full list is in [`../docs/hardware.md`](../docs/hardware.md), items 18-24 for
+the display and 26-31 for the RTC. The minimum is: boot with the panel connected
+and confirm the home screen and its clock line; boot with it unplugged and
+confirm the firmware still joins and reports; run a portal join and confirm
+`JOINING`, then `WIFI OK`, then home; trigger an impact and confirm the impact
+screen appears once and then stays frozen. None of this is a bench claim until
+it runs on a real unit.
 
 ## Acknowledgement latch (`ACK_INCIDENT`)
 
@@ -454,10 +536,15 @@ the integration, not as a formality.
   but anyone in radio range can load it while it is open. The 10-minute
   lifetime and physical control of the unit are the mitigations; a per-unit AP
   password is future work.
-- **The status display is not a safety indicator.** It is frozen while the alert
-  state is not `Idle`, and the firmware never reads it back. A panel that fails
-  after boot can add a bounded I2C wait to the loop; the alert state machine and
-  the modem path do not depend on it.
-- **The display shares the I2C bus with the IMU.** A wiring fault on the panel
-  can affect the MPU-6050 too. The panel is optional: boot with it disconnected
-  to isolate an I2C problem.
+- **The status display is not a safety indicator.** It freezes on the impact
+  screen while the alert state is not `Idle`, and the firmware never reads it
+  back. A panel that fails after boot can add a bounded I2C wait to the loop; the
+  alert state machine and the modem path do not depend on it.
+- **The RTC is a convenience, not a guarantee.** Drift is about a minute a year
+  and a flat or missing CR2032 loses the clock until the next GPS fix or
+  `SET_TIME`. Everything is UTC with no timezone conversion, and the device never
+  invents a time: `detected_at` is `0` and the impact screen says `Time unknown`
+  when neither clock is set.
+- **The display shares the I2C bus with the IMU and the RTC.** A wiring fault on
+  one device can affect the others. The panel is optional: boot with it
+  disconnected to isolate an I2C problem.

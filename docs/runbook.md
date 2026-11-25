@@ -83,9 +83,10 @@ shown once by the console's tracker registration form.
 Expected boot lines:
 
 ```text
-[FIRMWARE] LifeLink 0.2.0
-[WIRING] MPU 21/22, SW-420 32, cancel 33, GPS 26/27, modem 16/17, buzzer 25
-[IMU] MPU-6050 ready
+[FIRMWARE] LifeLink 0.3.1
+[WIRING] MPU 0x69+DS3231 0x68+OLED 0x3C 21/22, SW-420 27, cancel 33, GPS 16/17, modem 18/19, buzzer 25
+[IMU] MPU-6050 ready at 0x69
+[RTC] DS3231 ready at 0x68
 [WIFI] ...
 [READY] LifeLink tracker online
 ```
@@ -103,9 +104,11 @@ Expected boot lines:
 | Symptom | Check |
 | --- | --- |
 | No serial output | Correct COM port, 115200 baud, USB cable is data-capable |
-| `MPU-6050 not found` | SDA 21 / SCL 22, 3V3 and GND, I2C address 0x68 |
-| No GPS fix | Antenna view of the sky, NEO-6M TX to GPIO 26, 9600 baud, allow cold-start time |
-| Modem does not answer `AT` | 5 V rail, common ground, PWRKEY pulse, SIM seated, UART 16/17 crossed correctly |
+| `MPU-6050 not found at 0x69` | SDA 21 / SCL 22, 3V3 and GND, AD0 tied to 3.3V (0x69; 0x68 belongs to the DS3231) |
+| `no DS3231` on boot | RTC VCC/GND and SDA 21 / SCL 22; the tracker continues without it, using GPS time |
+| RTC time wrong after a battery change | Set it with `SET_TIME <epoch>`; the DS3231 resyncs from GPS within an hour once Idle |
+| No GPS fix | Antenna view of the sky, NEO-6M TX to GPIO 16, 9600 baud, allow cold-start time |
+| Modem does not answer `AT` | 5 V rail, common ground, PWRKEY pulse, SIM seated, UART 18/19 crossed correctly |
 | SMS not delivered | SIM credit, carrier bands, phone number format, `AT+CMGS` response |
 | HTTP 401/403 | Device token missing or revoked; reprovision with `SET_TOKEN` |
 | Random resets during transmit | 1000 µF capacitor, buck current rating, battery discharge capability |

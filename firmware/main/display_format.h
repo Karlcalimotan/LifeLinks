@@ -6,6 +6,9 @@
   grid, ASCII sanitising, the setup AP name, the IPv4 text, the state labels and
   the refresh gate. The driver (display.h) only moves these lines to the panel.
 
+  The clock text comes from rtc_format.h, so the DS3231 window, the "HH:MM:SS"
+  shape and the "unknown" rule stay in one place and are tested once.
+
   Security rule encoded here: the device token is deliberately absent from this
   API. No screen builder accepts or formats a token, so a screen can never
   render one. The home screen carries the device id and, only when it already
@@ -19,6 +22,7 @@
 #include <string.h>
 
 #include "provisioning.h"
+#include "rtc_format.h"
 
 namespace fw {
 
@@ -27,6 +31,7 @@ namespace fw {
 static const size_t kDisplayColumns = 21;
 static const size_t kDisplayRows = 8;
 static const size_t kIpv4TextMax = 16;	// "255.255.255.255" plus the NUL
+static const size_t kClockLineTextMax = 14;	 // "Time HH:MM:SS" plus the NUL
 static const uint32_t kDisplayWifiOkHoldMs = 3000;
 static const uint32_t kDisplayProgressStepMs = 500;
 static const size_t kDisplayProgressDots = 4;
@@ -127,6 +132,30 @@ inline size_t progressDots(uint32_t tick) {
 	return static_cast<size_t>(tick % kDisplayProgressDots);
 }
 
+/**
+ * The one clock line both screens use: "Time HH:MM:SS" for a plausible epoch,
+ * "Time unknown" otherwise. Returns true only when a real time was rendered, so
+ * the home screen can leave the line out and the impact screen can keep an
+ * explicit "unknown" instead of inventing 00:00:00.
+ */
+inline bool formatClockLine(uint32_t epochSeconds, char* out, size_t outSize) {
+	if (out == nullptr || outSize < kClockLineTextMax) {
+		if (out != nullptr && outSize > 0) out[0] = '\0';
+		return false;
+	}
+	char clock[kClockHmsTextMax];
+	if (!formatClockHms(epochSeconds, clock, sizeof(clock))) {
+		copyDisplayText("Time unknown", out, outSize);
+		return false;
+	}
+	const int written = snprintf(out, outSize, "Time %s", clock);
+	if (written < 0 || static_cast<size_t>(written) >= outSize) {
+		out[0] = '\0';
+		return false;
+	}
+	return true;
+}
+
 inline DisplayScreen provisioningScreen(const char* apName) {
 	DisplayScreen screen{};
 	setScreenLine(screen, "WiFi setup");
@@ -181,7 +210,20 @@ inline DisplayScreen wifiOkScreen(const char* ssid, const char* ip) {
 	return screen;
 }
 
-inline DisplayScreen homeScreen(DisplayWifiState state, const char* deviceId, const char* uuid) {
+/**
+ * The armed/home summary.
+ *
+ * Layout, top to bottom (8 rows available, 8 used in the worst case):
+ *   LifeLink tracker / WiFi state / Uplink / "Device ID" / id / [UUID / uuid]
+ *   / [Time HH:MM:SS]
+ *
+ * The clock is appended last on purpose. It is the only line that can be
+ * absent, so its absence never moves the identity block, and a caller that
+ * passes no epoch gets exactly the pre-RTC screen. With a UUID and a clock the
+ * screen is full (8 rows); a new line would have to replace one.
+ */
+inline DisplayScreen homeScreen(DisplayWifiState state, const char* deviceId, const char* uuid,
+								uint32_t epochSeconds = 0) {
 	DisplayScreen screen{};
 	setScreenLine(screen, "LifeLink tracker");
 	setScreenLine(screen, wifiStateLabel(state));
@@ -193,6 +235,29 @@ inline DisplayScreen homeScreen(DisplayWifiState state, const char* deviceId, co
 		setScreenLine(screen, "UUID");
 		setScreenLine(screen, uuid);
 	}
+	char clockLine[kDisplayColumns + 1];
+	if (formatClockLine(epochSeconds, clockLine, sizeof(clockLine))) {
+		setScreenLine(screen, clockLine);
+	}
+	return screen;
+}
+
+/**
+ * The impact screen: drawn once at the impact confirmation, then frozen for the
+ * whole alert (the home screen is Idle-only) and for the five-minute PostAlert
+ * window after an acknowledgement. It therefore states only what stays true:
+ * an impact alert exists and when it happened. It never claims a current alarm
+ * state or a delivery, both of which would go stale in that window.
+ * "Do not power off" is accurate: a power loss ends the latched alarm and the
+ * portal has to resolve the incident by hand.
+ */
+inline DisplayScreen incidentScreen(uint32_t epochSeconds) {
+	DisplayScreen screen{};
+	setScreenLine(screen, "IMPACT ALERT");
+	char clockLine[kDisplayColumns + 1];
+	formatClockLine(epochSeconds, clockLine, sizeof(clockLine));
+	setScreenLine(screen, clockLine);
+	setScreenLine(screen, "Do not power off");
 	return screen;
 }
 
