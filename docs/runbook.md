@@ -65,11 +65,27 @@ tests the network before saving. See
 [`hardware.md`](hardware.md#wifi-commissioning-and-the-reset-gesture) for the
 portal and the GPIO 33 reset gesture.
 
+### Wi-Fi-only provisioning
+
+Register the tracker in the dashboard, then copy its device ID and the one-time
+token into `firmware/include/secrets.h`:
+
+```c
+#define LIFELINK_DEVICE_ID "34:84:A9:7B:8A:C8"
+#define LIFELINK_DEVICE_TOKEN "llk_..."
+#define LIFELINK_API_BASE "https://your-console.example.com"
+```
+
+The setup portal then asks only for the Wi-Fi name and password. The dashboard
+supplies the calibration thresholds and alert phones on the command poll, so no
+serial step is needed. `SET_TOKEN` still overrides the compiled token; a
+factory reset falls back to it.
+
 Serial commands remain available for bench work:
 
 ```text
 SET_ID AA:BB:CC:DD:EE:01
-SET_TOKEN tf_...
+SET_TOKEN llk_...
 SET_PHONE1 +639171234567
 SET_PHONE2 +639181234567
 SET_PLATE ABC 1234
