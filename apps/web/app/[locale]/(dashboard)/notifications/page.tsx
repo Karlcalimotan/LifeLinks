@@ -1,4 +1,5 @@
 import { AlertStatusBadge } from "@/components/notifications/alert-status-badge";
+import { NotificationLogCardList } from "@/components/notifications/notification-log-card-list";
 import { NotificationsToolbar } from "@/components/notifications/notifications-toolbar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -244,64 +245,73 @@ export default async function NotificationsPage({
 								) : null}
 							</div>
 						) : (
-							<Table className="min-w-[900px]">
-								<TableHeader>
-									<TableRow>
-										<TableHead>{t("time")}</TableHead>
-										<TableHead>{t("incident")}</TableHead>
-										<TableHead>{t("channel")}</TableHead>
-										<TableHead>{t("target")}</TableHead>
-										<TableHead>{t("status")}</TableHead>
-										<TableHead>{t("attempts")}</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{rows.map((row) => (
-										<TableRow key={row.id}>
-											<TableCell className="whitespace-nowrap text-meta text-fog-500">
-												{formatDateTime(row.createdAt, locale)}
-											</TableCell>
-											<TableCell>
-												<Link
-													href={`/incidents/${row.impact.id}`}
-													aria-label={t("openIncident", {
-														plate: row.impact.vehicle.plateNo,
-													})}
-													className="font-medium text-fog-100 hover:text-signal-300 hover:underline"
-												>
-													{row.impact.vehicle.plateNo}
-												</Link>
-												<span className="mt-0.5 block font-mono text-meta text-fog-500">
-													{row.impact.id}
-												</span>
-											</TableCell>
-											<TableCell className="text-body text-fog-300">
-												{t(CHANNEL_LABELS[row.channel])}
-											</TableCell>
-											<TableCell className="font-mono text-meta text-fog-300">
-												<span className="block max-w-64 truncate" title={row.target}>
-													{row.target}
-												</span>
-												{row.status === "FAILED" && row.error ? (
-													<span
-														className="mt-0.5 block max-w-64 truncate text-meta text-alarm-300"
-														title={row.error}
-													>
-														{row.error}
-													</span>
-												) : null}
-											</TableCell>
-											<TableCell>
-												<AlertStatusBadge
-													status={row.status}
-													label={t(STATUS_LABELS[row.status])}
-												/>
-											</TableCell>
-											<TableCell className="tabular-nums text-fog-300">{row.attempts}</TableCell>
-										</TableRow>
-									))}
-								</TableBody>
-							</Table>
+							<>
+								<div className="hidden lg:block">
+									<Table className="min-w-[900px]">
+										<TableHeader>
+											<TableRow>
+												<TableHead>{t("time")}</TableHead>
+												<TableHead>{t("incident")}</TableHead>
+												<TableHead>{t("channel")}</TableHead>
+												<TableHead>{t("target")}</TableHead>
+												<TableHead>{t("status")}</TableHead>
+												<TableHead>{t("attempts")}</TableHead>
+											</TableRow>
+										</TableHeader>
+										<TableBody>
+											{rows.map((row) => (
+												<TableRow key={row.id}>
+													<TableCell className="whitespace-nowrap text-meta text-fog-500">
+														{formatDateTime(row.createdAt, locale)}
+													</TableCell>
+													<TableCell>
+														<Link
+															href={`/incidents/${row.impact.id}`}
+															aria-label={t("openIncident", {
+																plate: row.impact.vehicle.plateNo,
+															})}
+															className="font-medium text-fog-100 hover:text-signal-300 hover:underline"
+														>
+															{row.impact.vehicle.plateNo}
+														</Link>
+														<span className="mt-0.5 block font-mono text-meta text-fog-500">
+															{row.impact.id}
+														</span>
+													</TableCell>
+													<TableCell className="text-body text-fog-300">
+														{t(CHANNEL_LABELS[row.channel])}
+													</TableCell>
+													<TableCell className="font-mono text-meta text-fog-300">
+														<span className="block max-w-64 truncate" title={row.target}>
+															{row.target}
+														</span>
+														{row.status === "FAILED" && row.error ? (
+															<span
+																className="mt-0.5 block max-w-64 truncate text-meta text-alarm-300"
+																title={row.error}
+															>
+																{row.error}
+															</span>
+														) : null}
+													</TableCell>
+													<TableCell>
+														<AlertStatusBadge
+															status={row.status}
+															label={t(STATUS_LABELS[row.status])}
+														/>
+													</TableCell>
+													<TableCell className="tabular-nums text-fog-300">
+														{row.attempts}
+													</TableCell>
+												</TableRow>
+											))}
+										</TableBody>
+									</Table>
+								</div>
+								<div className="lg:hidden">
+									<NotificationLogCardList locale={locale} rows={rows} />
+								</div>
+							</>
 						)}
 
 						{total > 0 ? (
@@ -354,34 +364,71 @@ export default async function NotificationsPage({
 						{contacts.length === 0 ? (
 							<EmptyState title={t("contactsEmptyTitle")} body={t("contactsEmptyBody")} />
 						) : (
-							<Table className="min-w-[600px]">
-								<TableHeader>
-									<TableRow>
-										<TableHead>{t("contactName")}</TableHead>
-										<TableHead>{t("contactPhone")}</TableHead>
-										<TableHead>{t("contactEmail")}</TableHead>
-										<TableHead>{t("contactStatus")}</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{contacts.map((contact) => (
-										<TableRow key={contact.id}>
-											<TableCell className="font-medium text-fog-100">{contact.name}</TableCell>
-											<TableCell className="font-mono text-meta text-fog-300">
-												{contact.phone}
-											</TableCell>
-											<TableCell className="font-mono text-meta text-fog-300">
-												{contact.email ?? "—"}
-											</TableCell>
-											<TableCell>
-												<Badge tone={contact.active ? "success" : "muted"}>
-													{contact.active ? t("contactActive") : t("contactInactive")}
-												</Badge>
-											</TableCell>
-										</TableRow>
-									))}
-								</TableBody>
-							</Table>
+							<>
+								<div className="hidden lg:block">
+									<Table className="min-w-[600px]">
+										<TableHeader>
+											<TableRow>
+												<TableHead>{t("contactName")}</TableHead>
+												<TableHead>{t("contactPhone")}</TableHead>
+												<TableHead>{t("contactEmail")}</TableHead>
+												<TableHead>{t("contactStatus")}</TableHead>
+											</TableRow>
+										</TableHeader>
+										<TableBody>
+											{contacts.map((contact) => (
+												<TableRow key={contact.id}>
+													<TableCell className="font-medium text-fog-100">{contact.name}</TableCell>
+													<TableCell className="font-mono text-meta text-fog-300">
+														{contact.phone}
+													</TableCell>
+													<TableCell className="font-mono text-meta text-fog-300">
+														{contact.email ?? "—"}
+													</TableCell>
+													<TableCell>
+														<Badge tone={contact.active ? "success" : "muted"}>
+															{contact.active ? t("contactActive") : t("contactInactive")}
+														</Badge>
+													</TableCell>
+												</TableRow>
+											))}
+										</TableBody>
+									</Table>
+								</div>
+								<div className="lg:hidden">
+									<ul className="flex flex-col divide-y divide-ink-700/70">
+										{contacts.map((contact) => (
+											<li
+												key={contact.id}
+												className="flex flex-col gap-3 py-4 first:pt-1 last:pb-1"
+											>
+												<div className="flex flex-wrap items-start justify-between gap-2">
+													<p className="min-w-0 break-words font-medium text-emphasis text-fog-100">
+														{contact.name}
+													</p>
+													<Badge tone={contact.active ? "success" : "muted"}>
+														{contact.active ? t("contactActive") : t("contactInactive")}
+													</Badge>
+												</div>
+												<dl className="grid grid-cols-1 gap-y-3 text-meta">
+													<div className="min-w-0">
+														<dt className="text-fog-500">{t("contactPhone")}</dt>
+														<dd className="mt-0.5 break-all font-mono text-fog-300">
+															{contact.phone}
+														</dd>
+													</div>
+													<div className="min-w-0">
+														<dt className="text-fog-500">{t("contactEmail")}</dt>
+														<dd className="mt-0.5 break-all font-mono text-fog-300">
+															{contact.email ?? "—"}
+														</dd>
+													</div>
+												</dl>
+											</li>
+										))}
+									</ul>
+								</div>
+							</>
 						)}
 					</CardContent>
 				</Card>

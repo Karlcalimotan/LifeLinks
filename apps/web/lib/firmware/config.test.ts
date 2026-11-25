@@ -51,7 +51,7 @@ describe("firmware config contract", () => {
 	});
 
 	it("rejects an out-of-envelope value instead of clamping it", () => {
-		const result = validateFirmwareConfig({ impactThresholdG: 9 });
+		const result = validateFirmwareConfig({ impactThresholdG: 17 });
 		expect(result.ok).toBe(false);
 		expect(result.errors.join(" ")).toContain("impactThresholdG");
 		expect(() => buildFirmwareConfig({ tiltThresholdDeg: 120 })).toThrow(
@@ -64,7 +64,7 @@ describe("firmware config contract", () => {
 		const second = buildFirmwareConfig({});
 		expect(first.rev).toBe(second.rev);
 		expect(first.version).toBe(1);
-		expect(first.impact_threshold_g).toBe(2.5);
+		expect(first.impact_threshold_g).toBe(15);
 		expect(
 			configRevision({
 				impactThresholdG: 3,

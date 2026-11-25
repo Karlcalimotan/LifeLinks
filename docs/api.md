@@ -31,7 +31,7 @@ conformance table and latency check.
 The tracker sends its provisioning token in the header:
 
 ```
-x-device-token: tf_<random>
+x-device-token: llk_<random>
 ```
 
 The database stores `sha256(token)` only. A token is shown once when the device
@@ -219,7 +219,7 @@ Returns queued commands, the alert phone list and the versioned config:
     "config": {
       "version": 1,
       "rev": 123456789,
-      "impact_threshold_g": 2.5,
+      "impact_threshold_g": 15,
       "tilt_threshold_deg": 60,
       "confirm_window_ms": 200,
       "cancel_window_s": 15,
@@ -294,10 +294,10 @@ environment variables or secrets are configured.
 ```bash
 # Seed tokens are printed by pnpm seed
 curl -s http://localhost:3000/api/device/command?device_id=AA:BB:CC:DD:EE:01 \
-  -H "x-device-token: tf_demo_navara_token"
+  -H "x-device-token: llk_demo_navara_token"
 
 curl -s -X POST http://localhost:3000/api/device/ingest \
   -H "content-type: application/json" \
-  -H "x-device-token: tf_demo_navara_token" \
+  -H "x-device-token: llk_demo_navara_token" \
   -d '{"device_id":"AA:BB:CC:DD:EE:01","heartbeat":{"battery_v":12.4,"ignition":true}}'
 ```

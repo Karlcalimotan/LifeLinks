@@ -38,6 +38,47 @@ Color is never the only carrier of meaning. Every status badge includes a
 readable label, and the critical states also carry an icon and a rail. Signal
 colors are reserved for live or actionable states; they are not decoration.
 
+## Light mode: Daylight Dispatch
+
+The console keeps the dark palette as its default identity and ships a matching
+light palette. Both are the same token contract: the `ink` scale is the surface,
+the `fog` scale is the text, and the accent `300` steps are the text-safe
+accents. Filled accents (`400`/`500`), the signal plate and its dark ink stay
+fixed, so status colour reads the same in both modes.
+
+| Token | Light value | Use |
+| --- | --- | --- |
+| `ink-950` | `#EEF3F2` | Page canvas, cool paper |
+| `ink-900` | `#E4EBEA` | Recessed surfaces |
+| `ink-800` | `#FFFFFF` | Panels and cards |
+| `ink-700` | `#CFDAD8` | Borders |
+| `ink-600` | `#AEC0BC` | Raised borders, avatars |
+| `fog-50` | `#061114` | Primary text |
+| `fog-100` | `#0D2024` | Titles and body |
+| `fog-300` | `#2E4447` | Body text |
+| `fog-500` | `#526B6E` | Secondary labels, metadata |
+| `signal-300` | `#A83405` | Active navigation, brand text |
+| `alarm-300` | `#A82018` | Critical text |
+| `caution-300` | `#7A4C00` | Warning text |
+| `rescue-300` | `#0A6485` | Information text |
+| `clear-300` | `#086348` | Healthy text |
+
+The preference is `light`, `dark` or `system` (default). It is stored in the
+`ll_theme` cookie, rendered on `<html data-theme>` on the server, and resolved
+from `prefers-color-scheme` before paint for `system`. The toggle sits on the
+login board and in the console header. Body text and secondary labels stay at
+WCAG AA (5.0:1 or better) on both paper and panels.
+
+## Mobile shell
+
+Below `lg` the sidebar becomes a five-slot bottom bar: Dashboard, Live map,
+Vehicles and Incidents, plus **More** for Analytics, Notifications, Trackers
+and Settings. The More sheet and the account sheet (appearance, language, sign
+out) are native `<dialog>` bottom sheets. Header controls are 44px on touch,
+the header is one row, and `env(safe-area-inset-*)` keeps content clear of the
+home indicator. Tables become card lists below `lg`; a scrollable chip row or
+chart gets a solid chevron cue, not a colour fade.
+
 ## Typography
 
 - **Display:** Barlow Condensed 600/700. Page titles, the incident count and

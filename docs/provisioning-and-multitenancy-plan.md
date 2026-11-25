@@ -61,7 +61,7 @@ A SoftAP portal only makes sense if the board has a WiFi role. Options in §3.
 
 | Field | Envelope | Default | Phase 1 value |
 | --- | --- | --- | --- |
-| `impact_threshold_g` | 1.5–5.0 | 2.5 | 2.8 |
+| `impact_threshold_g` | 1.5–16.0 | 15 | 15 |
 | `tilt_threshold_deg` | 30–90 | 60 | 60 |
 | `confirm_window_ms` | 100–2000 | 200 | 300 |
 | `cancel_window_s` | 5–60 | 15 | 10 |
@@ -70,8 +70,10 @@ A SoftAP portal only makes sense if the board has a WiFi role. Options in §3.
 
 Evidence: `firmware/main/config.h:23-29`, `apps/web/lib/firmware/config.ts:33-82`.
 
-Consequence: **the first server sync retunes the bench** 2.8 → 2.5 g and 10 → 15 s.
-2.5 g is more sensitive, so that is a false-positive regression unless org defaults are seeded.
+Consequence: **the first server sync retunes the bench** 2.8 → 15 g and 10 → 15 s.
+15 g is a severe-crash threshold: confirm on the bench that legitimate crashes
+still cross it, or lower it deliberately. The MPU-6050 runs its ±16 g range so
+a 15 g event is measurable without clipping.
 
 ---
 
@@ -245,9 +247,9 @@ device with no local annunciation.
 
 | Conflict | Phase 1 | LifeLinks | Decision |
 | --- | --- | --- | --- |
-| Impact ceiling | 4.5–5.5 g documented | max 5.0 | Q8 |
+| Impact ceiling | 4.5–5.5 g documented | max 16.0, default 15 | Q8 |
 | Rollover hold | 2000 ms | 1000 ms | Q9 |
-| Factory profile vs defaults | 2.8 g / 10 s | 2.5 g / 15 s | Q10 |
+| Factory profile vs defaults | 2.8 g / 10 s | 15 g / 15 s | Q10 |
 
 ---
 
@@ -284,9 +286,9 @@ Blocked: A1/A2 (timing + firmware), B1 (WiFi role), M1 (after D3).
 5. Admin-editable scope: all nine fields, or thresholds/timings only. (Recommend all nine.)
 6. WiFi role: commissioning only / + OTA / fallback uplink / none. (Recommend commissioning then OTA.)
 7. Tenancy: invites + RLS now, platform admin later; production or capstone. (Recommend later + state the product stage.)
-8. Impact ceiling: 5.0 g cap, or contract v2 at 6.0. (Recommend 5.0.)
+8. Impact ceiling: 16.0 g contract with a 15 g default. (Recommend 16.0, bench-verified.)
 9. Rollover hold: 2000 ms Phase 1 + 1000 ms LifeLinks, or standardise. (Recommend per-profile.)
-10. Seed org defaults to 2.8 g / 10 s before first sync, or accept 2.5 / 15. (Recommend seed.)
+10. Seed org defaults to 15 g / 15 s before first sync. (Recommend seed.)
 
 ## 8. Immediate risks
 
