@@ -1,10 +1,10 @@
-import { type AlertTargets, alertTargetsFromSettings } from "@/lib/alerts/templates";
+import { type AlertTargets, alertTargetsForVehicle } from "@/lib/alerts/templates";
 import { ok } from "@/lib/api/envelope";
 import { badRequest, conflict, forbidden, rateLimited } from "@/lib/api/errors";
 import { withApi } from "@/lib/api/instrumentation";
 import { isDeviceApproved, requireDevice } from "@/lib/device/auth";
 import { type IncidentInput, incidentSchema } from "@/lib/device/schema";
-import { resolveDeviceTime } from "@/lib/device/time";
+import { resolveDeviceTime, resolveOptionalDeviceTime } from "@/lib/device/time";
 import { isValidCoordinate } from "@/lib/geo";
 import { readAckIncidentDetail } from "@/lib/incidents/bureau-ack";
 import prisma from "@/lib/prisma";
@@ -42,6 +42,8 @@ interface ExistingIncident {
 	lat: number | null;
 	lng: number | null;
 	gpsAgeS: number | null;
+	sentAt: Date | null;
+	confirmedReceivedAt: Date | null;
 	evidence: Prisma.JsonValue | null;
 }
 
@@ -74,6 +76,8 @@ async function confirmExistingIncident({
 	deviceId,
 	input,
 	hasFix,
+	sentAt,
+	receivedAt,
 	targets,
 }: {
 	tx: Prisma.TransactionClient;
@@ -81,6 +85,8 @@ async function confirmExistingIncident({
 	deviceId: string;
 	input: IncidentInput;
 	hasFix: boolean;
+	sentAt: Date | null;
+	receivedAt: Date;
 	targets: AlertTargets;
 }): Promise<{ transitioned: boolean; queued: number }> {
 	const updated = await tx.impactEvent.updateMany({
@@ -91,6 +97,12 @@ async function confirmExistingIncident({
 			lat: hasFix ? input.lat : incident.lat,
 			lng: hasFix ? input.lng : incident.lng,
 			gpsAgeS: input.gps_age_s ?? incident.gpsAgeS,
+			// The first send time is the countdown expiry. A retry that carries
+			// no time, or a different one, never replaces the stored value.
+			sentAt: incident.sentAt ?? sentAt,
+			// The delay is measured from the receipt of the dispatched report,
+			// so the first CONFIRMED receipt is the anchor. Later retries keep it.
+			confirmedReceivedAt: incident.confirmedReceivedAt ?? receivedAt,
 			evidence: (input.evidence ?? incident.evidence ?? {}) as Prisma.InputJsonValue,
 		},
 	});
@@ -141,6 +153,10 @@ async function confirmExistingIncident({
  */
 export const POST = withApi(
 	async (request) => {
+		// Receipt anchor for this report. The dispatched CONFIRMED report is the
+		// one the transmission delay is measured from, not the earlier SUSPECTED
+		// row creation.
+		const receivedAt = new Date();
 		const device = await requireDevice(request);
 		if (!isDeviceApproved(device)) throw forbidden("Device is not approved.");
 
@@ -163,7 +179,19 @@ export const POST = withApi(
 		// scope's narrowing has ended.
 		const vehicleId = device.vehicleId;
 
+		// The vehicle's active contacts are merged ahead of the organisation
+		// list once per request; both the new-incident path and the
+		// SUSPECTED -> CONFIRMED transition use the same targets.
+		const alertContacts = await prisma.emergencyContact.findMany({
+			where: { orgId: device.orgId, vehicleId, active: true },
+			orderBy: { createdAt: "asc" },
+			select: { phone: true, email: true, active: true },
+		});
+
 		const detectedAt = resolveDeviceTime(input.detected_at);
+		// Measurement only: a zero, absent or implausible device clock leaves the
+		// send time unknown instead of substituting the console receipt time.
+		const sentAt = resolveOptionalDeviceTime(input.sent_at);
 		const hasFix =
 			input.lat != null && input.lng != null && isValidCoordinate(input.lat, input.lng);
 		const status =
@@ -187,7 +215,7 @@ export const POST = withApi(
 				(existing.status === "SUSPECTED" || existing.status === "ACKNOWLEDGED")
 			) {
 				const settingsForUpdate = await getOrgSettings(device.orgId);
-				const targets = alertTargetsFromSettings(settingsForUpdate);
+				const targets = alertTargetsForVehicle(settingsForUpdate, alertContacts);
 				let queued = 0;
 				let transitioned = false;
 				await prisma.$transaction(async (tx) => {
@@ -204,6 +232,8 @@ export const POST = withApi(
 						deviceId: device.id,
 						input,
 						hasFix,
+						sentAt,
+						receivedAt,
 						targets,
 					});
 					queued = result.queued;
@@ -262,6 +292,8 @@ export const POST = withApi(
 						tripId: activeTrip?.id,
 						clientIncidentId: input.incident_id,
 						detectedAt,
+						sentAt,
+						confirmedReceivedAt: status === "CONFIRMED" ? receivedAt : null,
 						peakAccelG: input.peak_accel_g,
 						tiltDeg: input.tilt_deg,
 						vibrationCount: input.vibration_count,
@@ -278,7 +310,7 @@ export const POST = withApi(
 				});
 
 				if (status !== "CANCELLED") {
-					const targets = alertTargetsFromSettings(resolved.settings);
+					const targets = alertTargetsForVehicle(resolved.settings, alertContacts);
 					deliveries = [
 						...targets.phones.map((target) => ({
 							channel: "SMS" as const,

@@ -14,6 +14,19 @@ inversion.
 5. The system must keep working when the backend, the car battery or the GPS is
    unavailable.
 
+## Detection is always on
+
+There is no arm or disarm. The tracker monitors impacts from boot, whether the
+ignition is on or off, and the console offers only Locate and Test alert as
+tracker actions. A posted `ARM` or `DISARM` command is acknowledged as
+`{ "detail": "unsupported" }` and changes no safety state. Historical
+`DeviceCommand` rows may still carry those kinds; they describe a past request,
+not a working control.
+
+There is also no parked mode. The parked-impact setting has been retired from
+Settings and no code reads it; an impact while parked goes through the same
+filter, countdown and alert path as any other impact.
+
 ## State machine
 
 ```
@@ -154,21 +167,63 @@ stale fix is still sent.
 - The modem is the largest load. The 1000 µF capacitor and a buck rated above
   the modem's peak current are mandatory.
 
-## Safe mode
+## Reset counting and safe mode (not implemented)
 
-After three abnormal resets in ten minutes the device enters safe mode. It stops
-non-essential work (OTA, periodic polling) but **continues to monitor impacts and
-continues to alert**. `alertingAllowed()` returns true in safe mode by design,
-and a native test pins that behavior. A reset during a pending countdown is
-recovered on boot: the incident id is persisted before the countdown starts.
+The current firmware does **not** count abnormal resets and does **not** enter
+safe mode. `main.ino` never calls `esp_reset_reason()` and never feeds the
+`ResetHistory` helper, so a watchdog reset, a brownout and a deliberate reboot
+look the same at boot.
+
+`ResetHistory` and `alertingAllowed()` remain in `main/safety.h` as pure, tested
+helpers for a future escalation. `alertingAllowed()` always returns true: it is
+a policy placeholder, not an active mode. Any future safe mode must keep
+monitoring and alerting, because a missed SOS is the dangerous failure.
+
+A reset during a pending countdown is also not recovered: the unit boots to
+`Idle`, and the incident must be resolved from the portal.
+
+## Hardware watchdog
+
+The `loop()` task is subscribed to the ESP32 task watchdog with a **120 s**
+timeout and panic enabled. If the loop stops progressing, the board panics and
+reboots instead of staying hung.
+
+The timeout is larger than every bounded blocking phase in the firmware. The
+longest single modem wait is 30 s (`AT+HTTPACTION`), one complete HTTP request
+can spend 87 s across its steps, and a heartbeat adds a 3 s signal query before
+the POST. The guard is fed at the end of each bounded phase, never inside a
+wait: the top of the loop, the impact/alert pass, between the SMS and the
+incident POST, the setup portal pass, the heartbeat and command poll, and each
+command acknowledgement. A genuine hang stops the next feed.
+
+A watchdog reset is a reboot, not a recovery of the alarm. The latched
+`Alerting` state is lost, the unit boots to `Idle`, and the incident must be
+resolved from the portal as described above. The watchdog proves the device is
+alive; it does not preserve an alert across a reset.
+
+### Bench step
+
+The synthetic hang is a human bench step and is not run automatically:
+
+1. Build and flash `env:esp32dev-bench`. The default build refuses the command.
+2. With the tracker `Idle` and no active incident, send `TEST_WDT` and confirm
+   it only prints the warning.
+3. Send `TEST_WDT CONFIRM`. The loop stops resetting the watchdog.
+4. After about 120 s confirm the `Task watchdog got triggered` panic and the
+   reboot to the boot banner.
+
+Never run the step during an alert. Do not treat it as verified until it runs
+on a real unit.
 
 ## Privacy
 
 - Location is personal data. Access is scoped to the organization that owns the
   vehicle.
-- Telemetry and incident retention are configurable in Settings. The configured
-  periods are not yet enforced by an automatic deletion job; data remains until
-  an operator removes it.
+- Telemetry and incident retention are configured per organisation in
+  Settings and enforced by a scheduled cleanup that deletes rows older than
+  each configured period. The cleanup writes an audit row with cutoffs and
+  counts only. A stored period that is not a positive number is skipped, so
+  corrupt configuration cannot delete recent data.
 - The SMS contains coordinates and a callback number; only configured contacts
   receive it.
 - The server never logs device tokens. The database stores only the hash.
@@ -185,6 +240,8 @@ Verified in this repository:
 - the server/firmware configuration contract (Vitest + `pnpm stack:check`)
 - the three-role permission model and vehicle-owner scoping (Vitest)
 - the web build, typecheck, unit tests and the API envelope
+- the watchdog timeout and feed placement: compiled, with a compile-time check
+  that the timeout exceeds one worst-case modem phase
 
 Not verified here:
 
@@ -193,6 +250,8 @@ Not verified here:
 - GPS cold-start time in your installation
 - false-positive rate on real roads
 - power behavior with the actual buck, cells and modem
+- the watchdog reset on hardware, and the absence of a false reset through a
+  normal alert, cancel and acknowledgement cycle (bench step above)
 
 Do not claim those are solved until the bench checklist in
 [`hardware.md`](hardware.md) passes.

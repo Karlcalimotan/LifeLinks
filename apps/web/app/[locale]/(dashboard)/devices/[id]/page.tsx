@@ -25,6 +25,7 @@ import {
 } from "@/lib/actions/devices";
 import { canAdminister, requireRole } from "@/lib/auth/session";
 import { deviceConnectionState, gpsAgeSeconds } from "@/lib/device/status";
+import type { DeviceCommandKind } from "@/lib/device/validation";
 import { CONFIG_FIELDS } from "@/lib/firmware/config";
 import { configPushState, configRevFromPayload } from "@/lib/firmware/device-config";
 import prisma from "@/lib/prisma";
@@ -36,11 +37,11 @@ import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-const COMMANDS: ReadonlyArray<{ kind: string; label: string; confirmKey?: "confirmDisarm" }> = [
+// Crash detection is always on. There is no arm or disarm control, and the
+// validation allowlist rejects both command kinds if they are posted directly.
+const COMMANDS: ReadonlyArray<{ kind: DeviceCommandKind; label: string }> = [
 	{ kind: "LOCATE", label: "Locate now" },
 	{ kind: "TEST_ALERT", label: "Test alert" },
-	{ kind: "ARM", label: "Arm" },
-	{ kind: "DISARM", label: "Disarm", confirmKey: "confirmDisarm" },
 ];
 
 export default async function DeviceDetailPage({
@@ -132,7 +133,9 @@ export default async function DeviceDetailPage({
 				<p className="mb-4 rounded border border-alarm-500/30 bg-alarm-500/10 px-3 py-2 text-xs text-alarm-300">
 					{error === "forbidden"
 						? "Your role cannot send commands."
-						: "Command could not be queued."}
+						: error === "bad_command"
+							? "That command is not supported. Crash detection is always on."
+							: "Command could not be queued."}
 				</p>
 			) : null}
 			{approved === "1" ? (
@@ -298,26 +301,18 @@ export default async function DeviceDetailPage({
 										<input type="hidden" name="locale" value={locale} />
 										<input type="hidden" name="deviceId" value={device.id} />
 										<input type="hidden" name="kind" value={entry.kind} />
-										{entry.confirmKey ? (
-											<ConfirmSubmit
-												variant="danger"
-												message={t(entry.confirmKey)}
-												confirmLabel={t("disarm")}
-												cancelLabel={common("cancel")}
-											>
-												{t("disarm")}
-											</ConfirmSubmit>
-										) : (
-											<Button type="submit" size="sm" variant="secondary">
-												{entry.label}
-											</Button>
-										)}
+										<Button type="submit" size="sm" variant="secondary">
+											{entry.label}
+										</Button>
 									</form>
 								))}
 							</div>
 						) : (
 							<p className="text-xs text-fog-500">Your role cannot send commands.</p>
 						)}
+						<p className="text-meta text-fog-500">
+							Crash detection is always on. A tracker cannot be armed or disarmed.
+						</p>
 
 						{device.commands.length === 0 ? (
 							<EmptyState title="No commands yet" />

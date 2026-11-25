@@ -42,6 +42,31 @@ inline bool incidentIdsMatch(const char* commandIncidentId, const char* activeIn
 	return strcmp(commandIncidentId, activeIncidentId) == 0;
 }
 
+/**
+ * Send time for the dispatch, back-dated to the countdown expiry.
+ *
+ * The impact pass can observe the expiry late: a blocking modem call runs after
+ * the state update, so the sample that first sees Alerting may be seconds past
+ * the deadline. The observed epoch is corrected by that measured lateness, so
+ * the report carries the moment the countdown ended rather than the moment the
+ * loop noticed it.
+ *
+ * `observedEpoch` 0 means the GPS clock is not set and stays 0, which makes the
+ * payload omit sent_at. A lateness above kMaxExpiryCorrectionMs, or a deadline
+ * still in the future, is a clock anomaly: the observation time is kept instead
+ * of applying an implausible correction.
+ */
+constexpr uint32_t kMaxExpiryCorrectionMs = 5UL * 60UL * 1000UL;
+
+inline uint32_t dispatchSentAt(uint32_t observedEpoch, uint32_t observedMs, uint32_t expiryMs) {
+	if (observedEpoch == 0) return 0;
+	const uint32_t lateMs = observedMs - expiryMs;
+	if (lateMs == 0 || lateMs > kMaxExpiryCorrectionMs) return observedEpoch;
+	const uint32_t lateS = lateMs / 1000;
+	if (lateS >= observedEpoch) return observedEpoch;
+	return observedEpoch - lateS;
+}
+
 class CrashSafety {
   public:
 	void startCountdown(uint32_t nowMs, const DeviceConfig& config) {

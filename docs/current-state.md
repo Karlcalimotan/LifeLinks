@@ -9,6 +9,10 @@
   the app-level orgId filters are authoritative.
 - **Pages:** dashboard, devices (trackers), vehicles, incidents, settings, login
   and public legal pages. Tracker detail and incident detail exist.
+- **Always-on detection:** the tracker has no arm or disarm control. The console
+  offers Locate and Test alert, and the firmware acknowledges an ARM or DISARM
+  request as `unsupported` without changing safety state. The parked-impact
+  setting is not exposed or enforced.
 - **Device API:** `/api/device/ingest` (heartbeat + batched telemetry),
   `/api/device/incident`, `/api/device/incident/cancel`, `/api/device/command`,
   `/api/device/command/ack`, plus the signed firmware check. Device tokens are
@@ -119,21 +123,22 @@ environment. The sketch needs the ESP32 core and is excluded from that build.
 
 These are inputs for the Phase 1 audit, not changes made by the setup:
 
-1. **Watchdog is not enabled.** No `esp_task_wdt` use; a hung modem call is not
-   recovered by a reset.
+1. **Watchdog is enabled, bench proof pending.** The `loop()` task is
+   subscribed to `esp_task_wdt` with a 120 s timeout and panic enabled; feeds
+   sit between bounded phases. The synthetic hang is a hardware bench step.
 2. **The modem/GPS path still blocks.** `main.ino` has bounded waits, but several
    AT calls block the loop for seconds; `delay()` is used inside the transport
-   and during PWRKEY power-on.
+   and during PWRKEY power-on. The watchdog now bounds a hang that outlives
+   those waits.
 3. **No offline alert queue.** A failed SMS/HTTP alert is retried only while the
    device stays in the alert state; it is not replayed after a reboot.
 4. **No reset-reason logging or boot self-test.** The reset history class exists,
    but `main.ino` does not feed it from `esp_reset_reason()`, and there is no
    boot check for the IMU, GPS, modem and rail.
-5. **Docs overstate two behaviours.** `docs/safety.md` says a pending countdown
-   is recovered from NVS and that three abnormal resets enter safe mode. The
-   current `main.ino` implements neither; the pure `ResetHistory` helper exists
-   but is not wired in, and the incident id is not persisted before the
-   countdown.
+5. **No reset recovery or safe-mode escalation.** Because nothing records
+   abnormal resets (gap 4), safe mode never activates. The incident id is not
+   persisted before the countdown, so a reset during a countdown is not
+   recovered either. `docs/safety.md` now states both limits plainly.
 6. **No structured logging or flash event history.** Serial logs are ad-hoc
    `Serial.printf` lines.
 7. **No OTA update path** in the firmware (the server endpoint exists, the

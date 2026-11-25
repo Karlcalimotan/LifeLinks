@@ -1,6 +1,12 @@
 {
 	"$schema": "https://openapi.vercel.sh/vercel.json",
 	"buildCommand": "pnpm build",
+	"crons": [
+		{
+			"path": "/api/cron/retention",
+			"schedule": "15 18 * * *"
+		}
+	],
 	"regions": ["sin1"],
 	"git": {
 		"deploymentEnabled": {

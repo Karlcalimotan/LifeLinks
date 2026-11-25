@@ -73,6 +73,9 @@ enum AlertStatus {
 
 enum CommandKind {
   LOCATE
+  /// Historical only. The console rejects these, and the firmware acknowledges
+  /// them as `unsupported` without changing any safety state. Crash detection
+  /// is always on.
   ARM
   DISARM
   TEST_ALERT
@@ -248,11 +251,12 @@ model Vehicle {
   updatedAt   DateTime      @updatedAt
 
   org       Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  owner     User?           @relation("VehicleOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  devices   TrackerDevice[]
-  trips     Trip[]
-  impacts   ImpactEvent[]
-  geofences Geofence[]
+  owner             User?              @relation("VehicleOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  devices           TrackerDevice[]
+  trips             Trip[]
+  impacts           ImpactEvent[]
+  geofences         Geofence[]
+  emergencyContacts EmergencyContact[]
 
   @@unique([orgId, plateNo])
   @@index([orgId, status])
@@ -369,30 +373,32 @@ model TelemetrySample {
 }
 
 model ImpactEvent {
-  id                String       @id @default(cuid())
-  orgId             String
-  deviceId          String
-  vehicleId         String
-  tripId            String?
-  clientIncidentId  String
-  detectedAt        DateTime
-  peakAccelG        Float
-  tiltDeg           Float
-  vibrationCount    Int          @default(0)
-  speedKph          Float?
-  lat               Float?
-  lng               Float?
-  gpsAgeS           Int?
-  status            ImpactStatus @default(CONFIRMED)
-  cancelDeadline    DateTime?
-  cancelledAt       DateTime?
-  cancelRequestedAt DateTime?
-  ackRequestedAt    DateTime?
-  resolvedAt        DateTime?
-  resolution        String?
-  evidence          Json?
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  id                  String       @id @default(cuid())
+  orgId               String
+  deviceId            String
+  vehicleId           String
+  tripId              String?
+  clientIncidentId    String
+  detectedAt          DateTime
+  sentAt              DateTime?
+  confirmedReceivedAt DateTime?
+  peakAccelG          Float
+  tiltDeg             Float
+  vibrationCount      Int          @default(0)
+  speedKph            Float?
+  lat                 Float?
+  lng                 Float?
+  gpsAgeS             Int?
+  status              ImpactStatus @default(CONFIRMED)
+  cancelDeadline      DateTime?
+  cancelledAt         DateTime?
+  cancelRequestedAt   DateTime?
+  ackRequestedAt      DateTime?
+  resolvedAt          DateTime?
+  resolution          String?
+  evidence            Json?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
 
   org      Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
   device   TrackerDevice   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
@@ -457,19 +463,34 @@ model DeviceStateEvent {
   @@index([type, createdAt])
 }
 
+/// A person who receives the queued SMS/email alerts. `vehicleId` attaches the
+/// contact to one vehicle; a null `vehicleId` is the organisation-level
+/// fallback that only an admin may create. Deleting a vehicle cascades its
+/// contacts, which is why the console archives a vehicle (status RETIRED)
+/// instead of deleting it once it has incidents or a tracker.
+///
+/// `@@unique([orgId, phone])` is kept deliberately: one phone is one person in
+/// an organisation, so the same number cannot be attached to two vehicles.
+/// A shared contact (a spouse with two cars) is represented by one row on the
+/// primary vehicle and the organisation phone list remains the fleet fallback.
+/// The contact form reports a duplicate phone instead of silently creating a
+/// second row.
 model EmergencyContact {
   id        String   @id @default(cuid())
   orgId     String
+  vehicleId String?
   name      String
   phone     String
   email     String?
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  org     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  vehicle Vehicle?     @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
   @@unique([orgId, phone])
   @@index([orgId, active])
+  @@index([orgId, vehicleId, active])
 }
 
 model Geofence {
@@ -502,6 +523,9 @@ model OrgSettings {
   incidentRetentionDays  Int     @default(365)
   alertPhones            Json    @default("[]")
   alertEmails            Json    @default("[]")
+  /// Reserved, not enforced. No code reads this column and Settings does not
+  /// expose it. Crash detection is always on, so parked impacts are treated
+  /// like any other impact. Kept to avoid a destructive migration.
   parkedImpactAlerts     Boolean @default(false)
 
   org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
