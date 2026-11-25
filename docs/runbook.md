@@ -111,7 +111,7 @@ Expected boot lines:
 | Modem does not answer `AT` | 5 V rail, common ground, PWRKEY pulse, SIM seated, UART 18/19 crossed correctly |
 | SMS not delivered | SIM credit, carrier bands, phone number format, `AT+CMGS` response |
 | HTTP 401/403 | Device token missing or revoked; reprovision with `SET_TOKEN` |
-| Random resets during transmit | 1000 ?F capacitor, buck current rating, battery discharge capability |
+| Random resets during transmit | 1000 µF capacitor, buck current rating, battery discharge capability |
 | False alerts on potholes | Recheck the bench matrix and tune thresholds with recorded data |
 
 ## 7. Bench and field test

@@ -259,13 +259,13 @@ tracker carries its own battery-backed clock.
 - **Backup:** a CR2032 keeps the clock and the oscillator running with the
   tracker unpowered. It lasts for years at room temperature; the exact life
   depends on the cell and the temperature, so treat any figure as an estimate.
-- **Drift:** ?2 ppm from 0 to +40 ?C (about a minute a year), ?3.5 ppm over the
-  full ?40 to +85 ?C range. The firmware corrects the RTC from GPS when the two
+- **Drift:** ±2 ppm from 0 to +40 °C (about a minute a year), ±3.5 ppm over the
+  full −40 to +85 °C range. The firmware corrects the RTC from GPS when the two
   differ by more than 5 s, at most once an hour and only while `Idle`, so a
   correction never lands in a countdown or an SOS.
 - **Timestamp at trigger:** at the impact confirmation the firmware stores
-  `bestEpochSeconds()` ? the RTC first, the GPS fix second, `0` when neither
-  knows the time ? and every incident payload for that incident reports it as
+  `bestEpochSeconds()` — the RTC first, the GPS fix second, `0` when neither
+  knows the time — and every incident payload for that incident reports it as
   `detected_at`, including retries. `sent_at` is the countdown expiry and stays
   GPS-derived.
 - **Missing RTC:** `begin()` probes `0x68` once. When nothing answers, the log
@@ -493,7 +493,7 @@ The HTTP and SMS code is a **scaffold with a bench-verification requirement**:
 - Confirm the custom header parameter (`AT+HTTPPARA="USER_DEFINED"`) is supported.
   If your firmware uses a different key, adjust `modemHttpRequest()`.
 - Confirm SMS delivery with a real handset.
-- Watch the 5 V rail during transmission. The 1000 ?F capacitor and a buck rated
+- Watch the 5 V rail during transmission. The 1000 µF capacitor and a buck rated
   above the modem's peak current are mandatory.
 
 The exact AT sequence is not universal. Treat the first bench session as part of

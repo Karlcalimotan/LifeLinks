@@ -16,11 +16,11 @@ GPIO 1/3 stay free for the USB monitor.
 - **MPU-6050**: mount rigidly to the vehicle chassis, not to a loose trim panel.
   The sketch reads acceleration magnitude and tilt relative to gravity. The
   gyro is available but the first version confirms on acceleration + tilt +
-  vibration, not on integration. The accelerometer runs its ?16 g range so the
+  vibration, not on integration. The accelerometer runs its ±16 g range so the
   default 15 g impact threshold is measurable without clipping. AD0 is tied to
   3.3 V so the IMU answers at `0x69`; the DS3231 owns `0x68`.
 - **DS3231 RTC**: battery-backed I2C clock at `0x68` on the shared bus. It is
-  temperature-compensated (?2 ppm from 0 to +40 ?C, about a minute a year) and
+  temperature-compensated (±2 ppm from 0 to +40 °C, about a minute a year) and
   keeps counting from the CR2032 while the tracker is unpowered. The firmware
   corrects it from GPS when the two differ by more than 5 s, at most once an
   hour and only while `Idle`. An unset module reads 2000-01-01, which the
@@ -141,12 +141,12 @@ tracker carries its own battery-backed clock.
 - **Backup:** a CR2032 keeps the clock and the oscillator running with VCC off.
   It lasts for years at room temperature; the exact life depends on the cell and
   the temperature, so treat any figure as an estimate, not a service interval.
-- **Drift:** ?2 ppm from 0 to +40 ?C (about a minute a year) and ?3.5 ppm over
-  the full ?40 to +85 ?C range (about two minutes a year). The firmware corrects
+- **Drift:** ±2 ppm from 0 to +40 °C (about a minute a year) and ±3.5 ppm over
+  the full −40 to +85 °C range (about two minutes a year). The firmware corrects
   it from GPS when the two differ by more than 5 s, at most once an hour and
   only while `Idle`, so a correction never lands in a countdown or an SOS.
 - **Timestamp at trigger:** at the impact confirmation, before the countdown,
-  the firmware stores `bestEpochSeconds()` ? the RTC first, the GPS fix second,
+  the firmware stores `bestEpochSeconds()` — the RTC first, the GPS fix second,
   `0` when neither knows the time. That value is the `detected_at` of every
   incident payload for that incident, including retries; `sent_at` is the
   countdown expiry and is a separate field. `0` means unknown, and the console
@@ -173,14 +173,14 @@ tracker carries its own battery-backed clock.
 These are **not** software-verified. Run them on the actual hardware and record
 the result.
 
-1. **Power**: set the buck to 5.0?5.1 V; connect the shield; confirm 5 V on the
+1. **Power**: set the buck to 5.0–5.1 V; connect the shield; confirm 5 V on the
    rail with the modem idle and transmitting.
 2. **Brownout**: transmit an SMS while watching the 5 V rail. The ESP32 must not
    reset. If it does, check the capacitor, the buck current rating and the
    battery's discharge capability.
 3. **IMU**: tilt the board slowly; the dashboard/heartbeat tilt follows. Tap the
    board; the SW-420 count increments.
-4. **GPS**: cold start outdoors; confirm satellites ? 4 and a plausible fix.
+4. **GPS**: cold start outdoors; confirm satellites ≥ 4 and a plausible fix.
 5. **Cancel**: trigger a simulated impact; press cancel inside the window;
    confirm the buzzer stops and the dashboard shows `cancelled`.
 6. **SOS**: trigger a simulated impact; do not cancel; confirm the SMS arrives
@@ -288,11 +288,11 @@ the result.
 | SW-420 | Vibration confirmation |
 | NEO-6M (GY-GPS6MV2) | Location |
 | A7670E Cat-1 | SMS / HTTP uplink |
-| Active buzzer 5 V + NPN (2N2222/S8050) + 1 k? | Cabin alarm |
+| Active buzzer 5 V + NPN (2N2222/S8050) + 1 kΩ | Cabin alarm |
 | Momentary 12 mm button | Driver cancel |
 | SSD1306 128x64 I2C OLED (0x3C) | Optional setup/status display, shared I2C |
-| LM2596S buck | 12 V ? 5 V |
+| LM2596S buck | 12 V → 5 V |
 | 18650 shield V8 + 2 cells | Backup power |
-| 1000 ?F / 16 V | Modem current buffer |
-| 2?3 A fuse + rocker switch | Protection and cutoff |
-| 1 k? / 10 k? resistors | NPN base, sense dividers |
+| 1000 µF / 16 V | Modem current buffer |
+| 2–3 A fuse + rocker switch | Protection and cutoff |
+| 1 kΩ / 10 kΩ resistors | NPN base, sense dividers |

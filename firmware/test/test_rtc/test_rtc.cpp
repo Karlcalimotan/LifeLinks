@@ -27,7 +27,7 @@ void test_plausible_epoch_accepts_the_supported_window(void) {
 
 void test_plausible_epoch_rejects_unset_and_out_of_range(void) {
 	TEST_ASSERT_FALSE(isPlausibleEpoch(0));
-	TEST_ASSERT_FALSE(isPlausibleEpoch(946684800UL));	// 2000-01-01, an unset DS3231
+	TEST_ASSERT_FALSE(isPlausibleEpoch(946684800UL));  // 2000-01-01, an unset DS3231
 	TEST_ASSERT_FALSE(isPlausibleEpoch(1704067199UL));	// one second before the window
 	TEST_ASSERT_FALSE(isPlausibleEpoch(4102444800UL));	// 2100-01-01
 	TEST_ASSERT_FALSE(isPlausibleEpoch(0xFFFFFFFFUL));

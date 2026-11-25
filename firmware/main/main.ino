@@ -1,5 +1,5 @@
 /*
-  LifeLink tracker firmware ? ESP32 DevKit V1 (30-pin).
+  LifeLink tracker firmware — ESP32 DevKit V1 (30-pin).
 
   Flow:
 	IMU + vibration + GPS -> ImpactFilter -> CrashSafety countdown
@@ -283,7 +283,7 @@ void pushSample(uint32_t t, float accelG, float tiltDeg) {
 }
 
 // ---------------------------------------------------------------------------
-// Modem (A7670E) ? AT transport
+// Modem (A7670E) — AT transport
 // ---------------------------------------------------------------------------
 
 void modemDrain() {
@@ -1640,10 +1640,9 @@ void serviceDisplay(uint32_t now) {
 		return;
 	}
 
-	g_display.show(
-		fw::homeScreen(g_homeWifiState, g_deviceId.c_str(), g_deviceUuid.c_str(),
-					   bestEpochSeconds()),
-		now);
+	g_display.show(fw::homeScreen(g_homeWifiState, g_deviceId.c_str(), g_deviceUuid.c_str(),
+								  bestEpochSeconds()),
+				   now);
 }
 
 void clearStoredWifiCredentials() {
@@ -2072,8 +2071,7 @@ void handleSerialProvisioning() {
 							  "lost_power=%s\n",
 							  static_cast<unsigned long>(rtcEpoch), rtcClock,
 							  static_cast<unsigned long>(gpsEpoch), gpsClock, source,
-							  g_rtc.present() ? "yes" : "no",
-							  g_rtc.lostPower() ? "yes" : "no");
+							  g_rtc.present() ? "yes" : "no", g_rtc.lostPower() ? "yes" : "no");
 			} else if (line.startsWith("SET_TIME ")) {
 				const String value = line.substring(9);
 				char* end = nullptr;

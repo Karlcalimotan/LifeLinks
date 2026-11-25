@@ -27,7 +27,7 @@ countdown.
 - Active buzzer 5 V, driven directly from GPIO 25 on the first board (NPN for a louder harness)
 - Vehicle 12 V, then fuse + rocker switch, then LM2596S buck (set to 5.0-5.1 V),
   then 18650 shield V8 (2 x 3200 mAh) giving the 5 V rail
-- 1000 ?F 16 V capacitor across V8 5V OUT and GND (close to the A7670E)
+- 1000 µF 16 V capacitor across V8 5V OUT and GND (close to the A7670E)
 
 ## Pin map
 
@@ -90,27 +90,27 @@ SQW and INT pins stay unconnected.
 
 ```
 Vehicle 12 V
-  ?? 2-3 A fuse + rocker switch
-       ?? LM2596S buck, set to 5.0-5.1 V with a meter BEFORE connecting the shield
-            ?? 18650 shield V8 (5V IN)
-                 ?? 5V OUT ?? 1000 ?F / 16 V ?? GND
-                      ?? ESP32 VIN (5 V)
-                      ?? A7670E VIN (5 V)
-                      ?? 3.3 V regulator on the DevKit
-                           ?? MPU-6050 VCC
-                           ?? DS3231 VCC
-                           ?? SW-420 VCC
-                           ?? NEO-6M VCC
+  └─ 2-3 A fuse + rocker switch
+       └─ LM2596S buck, set to 5.0-5.1 V with a meter BEFORE connecting the shield
+            └─ 18650 shield V8 (5V IN)
+                 └─ 5V OUT ── 1000 µF / 16 V ── GND
+                      ├─ ESP32 VIN (5 V)
+                      ├─ A7670E VIN (5 V)
+                      └─ 3.3 V regulator on the DevKit
+                           ├─ MPU-6050 VCC
+                           ├─ DS3231 VCC
+                           ├─ SW-420 VCC
+                           └─ NEO-6M VCC
 ```
 
-- The 1000 ?F capacitor is not decoration. The A7670E can pull amp-scale bursts
+- The 1000 µF capacitor is not decoration. The A7670E can pull amp-scale bursts
   during registration and transmission. Mount it close to the modem, stripe to
   GND.
 - The buck output must be set **before** the shield is connected. The shield's
   switch must be on HOLD (NORMAL cuts the output after about 10 s when the load
   is under about 30-50 mA).
 - The buzzer is a 5 V load switched by an NPN (2N2222/S8050). The ESP32 pin
-  drives the base through 1 k?; the emitter goes to GND; the buzzer negative
+  drives the base through 1 kΩ; the emitter goes to GND; the buzzer negative
   goes to the collector; the buzzer positive goes to 5 V. Add a flyback diode
   across the buzzer if it is magnetic.
 - All grounds are common. The buck, shield, ESP32, sensors and modem must share
@@ -127,9 +127,9 @@ Before powering on:
 - [ ] V8 side switch on HOLD (NORMAL cuts the output after about 10 s when the
       load is under about 30-50 mA).
 - [ ] Check +/- polarity before inserting the 18650 cells; use a matched pair.
-- [ ] 1000 ?F 16 V across V8 5V OUT and GND, striped leg to GND, close to the
+- [ ] 1000 µF 16 V across V8 5V OUT and GND, striped leg to GND, close to the
       A7670E.
-- [ ] Buzzer is switched by an NPN + 1 k? (add them if not in your parts list).
+- [ ] Buzzer is switched by an NPN + 1 kΩ (add them if not in your parts list).
 - [ ] Verify on your A7670E board: UART level (3.3 V TTL default) and minimum VIN
       (some list 5-16 V).
 - [ ] A7670E LTE bands are B1/B3/B5/B8/B20 only (no B28, B40, B41): check against
@@ -150,7 +150,7 @@ Recommended additions for the vehicle 12 V input:
 
 ## Related documents
 
-- [`hardware.md`](hardware.md) ? sensor notes, bench checklist, bill of materials.
-- [`safety.md`](safety.md) ? crash/cancel/alert state machine and false-positive
+- [`hardware.md`](hardware.md) — sensor notes, bench checklist, bill of materials.
+- [`safety.md`](safety.md) — crash/cancel/alert state machine and false-positive
   matrix.
-- [`../firmware/README.md`](../firmware/README.md) ? build, test and provisioning.
+- [`../firmware/README.md`](../firmware/README.md) — build, test and provisioning.
