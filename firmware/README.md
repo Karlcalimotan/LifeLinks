@@ -155,6 +155,27 @@ or the watchdog code changes.
 The primary setup path is the device-hosted WiFi portal. Serial provisioning is
 kept for bench work and debugging.
 
+### Build-time identity (Wi-Fi-only provisioning)
+
+Register the tracker in the dashboard, then put its ID and the one-time token in
+`firmware/include/secrets.h` (gitignored; copy `secrets.example.h`):
+
+```c
+#define LIFELINK_DEVICE_ID "34:84:A9:7B:8A:C8"
+#define LIFELINK_DEVICE_TOKEN "llk_..."
+#define LIFELINK_API_BASE "https://your-console.example.com"
+```
+
+With a valid token compiled in, the setup portal asks **only for the WiFi name
+and password**. The dashboard remains the source of truth for the calibration
+thresholds and alert phones: the command poll carries them and the firmware
+applies them automatically. The serial `SET_ID` / `SET_TOKEN` commands still
+work and take precedence; a factory reset falls back to the build identity.
+
+The token is not written to NVS when it comes from the build, so flashing a new
+build with a different token, or sending `SET_TOKEN`, replaces it. The token is
+inside the firmware binary: protect the artifact as you would the device.
+
 ### WiFi commissioning portal
 
 WiFi is **commissioning-only**: the A7670E remains the telemetry, command and
@@ -177,8 +198,9 @@ Portal:
   uppercase and zero padded (for example `LifeLink-EEFF`).
 - Address: `http://192.168.4.1` (open AP; DNS catch-all for captive-portal
   detection).
-- Page: async 2.4 GHz scan, manual SSID, password, Device ID prefilled with the
-  unit MAC, and Device Token.
+- Page: async 2.4 GHz scan, manual SSID and password. The Device ID and Device
+  Token fields appear only when no build identity is present; with a compiled
+  token the page shows the preloaded ID and asks for Wi-Fi only.
 - Test-before-save: the entered network must connect and obtain an IP within
   20 s (6 s quick-fail). Only then are `wifi_ssid`, `wifi_pass`, `device_id`,
   `device_token` and `provisioned` written. A wrong password never replaces
@@ -197,7 +219,7 @@ NVS namespace `lifelink`:
 | `wifi_ssid` | provisioned network |
 | `wifi_pass` | WPA/WPA2 passphrase, empty for an open network |
 | `device_id` | dashboard device id (the unit MAC by default) |
-| `device_token` | dashboard device token |
+| `device_token` | dashboard device token; absent when the build supplies it |
 | `device_uuid` | optional UUID; nothing writes it today, shown only when present |
 | `provisioned` | marker written only after a verified portal save |
 
@@ -213,7 +235,8 @@ started inside the window may finish after it):
   erase anything;
 - hold 5 s: clears WiFi only and reboots on release, keeping the identity;
 - hold 10 s: clears WiFi, `device_id`, `device_token`, `device_uuid` and
-  `provisioned`, then reboots.
+  `provisioned`, then reboots. A build-supplied identity is seeded again on the
+  next boot; clear it by flashing a build without it.
 
 The reset is disabled permanently if the alert state machine leaves `Idle`, so
 a long press during a countdown or SOS cannot reboot the tracker. A 5 s hold is
@@ -226,7 +249,7 @@ Serial commands remain available for bench work:
 
 ```
 SET_ID AA:BB:CC:DD:EE:01
-SET_TOKEN tf_...
+SET_TOKEN llk_...
 SET_PHONE1 +639171234567
 SET_PHONE2 +639181234567
 SET_PLATE ABC 1234

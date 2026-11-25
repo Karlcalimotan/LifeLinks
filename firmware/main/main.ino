@@ -70,6 +70,18 @@
 #define LIFELINK_API_BASE "https://lifelink.example.com"
 #endif
 
+// Optional compile-time identity. Fill these from the device row in the
+// dashboard (the token is shown once, when the tracker is registered). When a
+// valid token is present the setup portal asks only for Wi-Fi, and the
+// dashboard supplies the calibration and alert phones on the command poll.
+// They stay overridable at runtime with SET_ID / SET_TOKEN.
+#ifndef LIFELINK_DEVICE_ID
+#define LIFELINK_DEVICE_ID ""
+#endif
+#ifndef LIFELINK_DEVICE_TOKEN
+#define LIFELINK_DEVICE_TOKEN ""
+#endif
+
 // Hardware watchdog. The sketch subscribes the loop task explicitly; ESP-IDF
 // startup already watches idle0, which does not cover this sketch's loop.
 //
@@ -135,6 +147,10 @@ fw::MinInterval g_rtcSyncTimer(60UL * 60UL * 1000UL);
 
 String g_deviceId;
 String g_deviceToken;
+// True when g_deviceToken came from LIFELINK_DEVICE_TOKEN rather than NVS. A
+// build token is never written to NVS, so a later build or SET_TOKEN can
+// replace it; the NVS token still wins when one exists.
+bool g_deviceTokenFromBuild = false;
 // Optional, read-only: no flow writes this key yet, so the home screen omits
 // the UUID line unless one already exists.
 String g_deviceUuid;
@@ -559,6 +575,35 @@ void loadConfig() {
 	g_filter.setConfig(g_config);
 }
 
+/**
+ * Dashboard identity: NVS first, then the compile-time values from secrets.h,
+ * then the eFuse MAC. A valid build token makes the setup portal Wi-Fi-only.
+ * The build token is not persisted, so SET_TOKEN (NVS) still overrides it and
+ * a new build can supply a different one. Never log the token itself.
+ */
+void loadIdentity() {
+	const String storedId = prefs.getString("device_id", "");
+	if (fw::isValidStoredDeviceId(storedId.c_str())) {
+		g_deviceId = storedId;
+	} else if (fw::isValidStoredDeviceId(LIFELINK_DEVICE_ID)) {
+		g_deviceId = LIFELINK_DEVICE_ID;
+	} else {
+		g_deviceId = chipMac();
+	}
+
+	const String storedToken = prefs.getString("device_token", "");
+	if (fw::isValidStoredToken(storedToken.c_str())) {
+		g_deviceToken = storedToken;
+		g_deviceTokenFromBuild = false;
+	} else if (fw::isValidStoredToken(LIFELINK_DEVICE_TOKEN)) {
+		g_deviceToken = LIFELINK_DEVICE_TOKEN;
+		g_deviceTokenFromBuild = true;
+	} else {
+		g_deviceToken = "";
+		g_deviceTokenFromBuild = false;
+	}
+}
+
 // ---------------------------------------------------------------------------
 // WiFi commissioning portal
 // ---------------------------------------------------------------------------
@@ -910,8 +955,8 @@ String buildPortalPage(const String& ssid, const String& error) {
 	String page = portalPageHead("LifeLink device setup");
 	page.reserve(9000);
 	page += F("<main><section class=\"card\"><h1>Device setup</h1>"
-			  "<p class=\"lede\">Join this tracker to a 2.4 GHz Wi-Fi network and register its "
-			  "identity. The tracker tests the network before saving anything.</p>");
+			  "<p class=\"lede\">Join this tracker to a 2.4 GHz Wi-Fi network. The tracker tests "
+			  "the network before saving anything.</p>");
 	if (!error.isEmpty()) {
 		page += F("<p class=\"error\">");
 		page += htmlEscape(error);
@@ -942,20 +987,28 @@ String buildPortalPage(const String& ssid, const String& error) {
 			  "autocomplete=\"new-password\" autocapitalize=\"none\" spellcheck=\"false\">"
 			  "<p class=\"hint\">Leave empty for an open network; otherwise 8-63 characters. "
 			  "The password is never shown again.</p>"
-			  "<h2><span class=\"step\">2</span> Device identity</h2>"
-			  "<p class=\"note\">Find these in the LifeLink dashboard under Devices. The Device ID "
-			  "is this unit's Wi-Fi MAC.</p>"
+			  "<h2><span class=\"step\">2</span> Device identity</h2>");
+	if (fw::hasProvisionedIdentity(g_deviceId.c_str(), g_deviceToken.c_str())) {
+		page += F("<p class=\"note\">This tracker is preloaded as <code>");
+		page += htmlEscape(portalDeviceIdForDisplay());
+		page += F("</code>. Enter only the Wi-Fi name and password.</p>");
+	} else {
+		page +=
+			F("<p class=\"note\">Find these in the LifeLink dashboard under Devices. The Device "
+			  "ID is this unit's Wi-Fi MAC.</p>"
 			  "<label for=\"device_id\">Device ID</label>"
 			  "<input id=\"device_id\" name=\"device_id\" type=\"text\" maxlength=\"64\" required "
 			  "autocomplete=\"off\" autocapitalize=\"none\" spellcheck=\"false\" value=\"");
-	page += htmlEscape(portalDeviceIdForDisplay());
-	page +=
-		F("\"><label for=\"device_token\">Device Token</label>"
-		  "<input id=\"device_token\" name=\"device_token\" type=\"password\" maxlength=\"128\" "
-		  "autocomplete=\"new-password\" autocapitalize=\"none\" spellcheck=\"false\">"
-		  "<p class=\"hint\">");
-	page += tokenHint;
-	page += F("</p><button class=\"btn primary\" type=\"submit\">Connect and save</button>"
+		page += htmlEscape(portalDeviceIdForDisplay());
+		page += F(
+			"\"><label for=\"device_token\">Device Token</label>"
+			"<input id=\"device_token\" name=\"device_token\" type=\"password\" maxlength=\"128\" "
+			"autocomplete=\"new-password\" autocapitalize=\"none\" spellcheck=\"false\">"
+			"<p class=\"hint\">");
+		page += tokenHint;
+		page += F("</p>");
+	}
+	page += F("<button class=\"btn primary\" type=\"submit\">Connect and save</button>"
 			  "</form><p class=\"note\">The tracker joins the network and waits for an IP address "
 			  "before writing to flash. If the join fails, the portal stays open, the stored "
 			  "credentials are unchanged, and the reason is shown here.</p></section></main>");
@@ -1176,7 +1229,11 @@ bool savePortalProvisioning() {
 	ok = prefs.putString("wifi_ssid", g_portalPendingSsid) > 0 && ok;
 	ok = prefs.putString("wifi_pass", g_portalPendingPass) > 0 && ok;
 	ok = prefs.putString("device_id", g_portalPendingDeviceId) > 0 && ok;
-	ok = prefs.putString("device_token", g_portalPendingToken) > 0 && ok;
+	// A token compiled into the build stays out of NVS: the next build can
+	// supply a different one, and SET_TOKEN still overrides it.
+	if (!g_deviceTokenFromBuild) {
+		ok = prefs.putString("device_token", g_portalPendingToken) > 0 && ok;
+	}
 	if (ok) ok = prefs.putBool("provisioned", true) > 0;
 	return ok;
 }
@@ -1655,10 +1712,10 @@ void clearStoredIdentity() {
 	prefs.remove("device_token");
 	prefs.remove("device_uuid");
 	prefs.remove("provisioned");
-	g_deviceId = chipMac();
-	g_deviceToken = "";
 	g_deviceUuid = "";
 	g_provisioned = false;
+	// Fall back to the build identity, if one was compiled in.
+	loadIdentity();
 }
 
 void serviceBootReset(uint32_t now, bool alertActive) {
@@ -2039,6 +2096,7 @@ void handleSerialProvisioning() {
 				Serial.println("[SETUP] device id saved");
 			} else if (line.startsWith("SET_TOKEN ")) {
 				g_deviceToken = line.substring(10);
+				g_deviceTokenFromBuild = false;
 				prefs.putString("device_token", g_deviceToken);
 				Serial.println("[SETUP] token saved");
 			} else if (line.startsWith("SET_PHONE1 ")) {
@@ -2178,8 +2236,7 @@ void setup() {
 	beginWatchdog();
 
 	prefs.begin("lifelink", false);
-	g_deviceId = prefs.getString("device_id", chipMac());
-	g_deviceToken = prefs.getString("device_token", "");
+	loadIdentity();
 	g_deviceUuid = prefs.getString("device_uuid", "");
 	loadConfig();
 

@@ -93,6 +93,15 @@ void test_device_id_limits(void) {
 	TEST_ASSERT_FALSE(isValidStoredDeviceId(nullptr));
 }
 
+void test_identity_predicate_needs_both_values(void) {
+	TEST_ASSERT_TRUE(hasProvisionedIdentity("AA:BB:CC:DD:EE:01", "llk_12345678"));
+	TEST_ASSERT_FALSE(hasProvisionedIdentity("", "llk_12345678"));
+	TEST_ASSERT_FALSE(hasProvisionedIdentity(nullptr, "llk_12345678"));
+	TEST_ASSERT_FALSE(hasProvisionedIdentity("AA:BB:CC:DD:EE:01", ""));
+	TEST_ASSERT_FALSE(hasProvisionedIdentity("AA:BB:CC:DD:EE:01", nullptr));
+	TEST_ASSERT_FALSE(hasProvisionedIdentity("AA:BB:CC:DD:EE:01", "short"));
+}
+
 void test_form_rejects_each_invalid_field(void) {
 	TEST_ASSERT_EQUAL_INT(static_cast<int>(ProvisioningField::Ssid),
 						  static_cast<int>(validateProvisioningForm(
@@ -279,6 +288,7 @@ int main(int, char**) {
 	RUN_TEST(test_password_limits);
 	RUN_TEST(test_token_limits);
 	RUN_TEST(test_device_id_limits);
+	RUN_TEST(test_identity_predicate_needs_both_values);
 	RUN_TEST(test_form_rejects_each_invalid_field);
 	RUN_TEST(test_provisioning_requires_every_stored_value);
 	RUN_TEST(test_reset_does_not_arm_before_the_startup_grace);

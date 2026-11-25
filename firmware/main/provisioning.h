@@ -126,6 +126,15 @@ inline bool isValidStoredToken(const char* value) {
 }
 
 /**
+ * True when both a usable device ID and token are present. A token compiled
+ * into the build counts the same as one stored in NVS, so the setup portal can
+ * ask for Wi-Fi only. The portal never renders the token back.
+ */
+inline bool hasProvisionedIdentity(const char* deviceId, const char* token) {
+	return isValidStoredDeviceId(deviceId) && isValidStoredToken(token);
+}
+
+/**
  * True only when the unit has been through a verified save and every stored
  * value is still usable. A missing marker, SSID, identity or a stale WPA
  * password length reopens the setup portal instead of pretending the unit is
