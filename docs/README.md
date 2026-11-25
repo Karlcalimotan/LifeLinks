@@ -7,6 +7,7 @@
 | [architecture.md](architecture.md) | Layers, data model, auth, device contract, extension points |
 | [design.md](design.md) | Night Highway Dispatch palette, type, logo, layout and accessibility |
 | [wiring.md](wiring.md) | Canonical pin map, power chain, pre-power checklist |
+| [wiring-diagram.md](wiring-diagram.md) | Visual pin map, I2C/UART and power diagrams for the optimal build |
 | [hardware.md](hardware.md) | Sensor notes, bench checklist, bill of materials |
 | [safety.md](safety.md) | State machine, false-positive matrix, cancel, retry, privacy |
 | [api.md](api.md) | Device endpoints, payloads, error codes, idempotency |
