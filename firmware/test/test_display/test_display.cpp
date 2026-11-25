@@ -3,8 +3,9 @@
 
   Run with: pio test -d firmware -e native
 
-  The device token has no representation in display_format.h by design, so
-  there is nothing token-shaped these tests could assert on.
+  The device token has no representation in display_format.h by design. The
+  secret test below is a guard against a future line or builder that adds one,
+  not a claim that a token could reach a screen today.
 */
 #include <unity.h>
 
@@ -31,6 +32,9 @@ static void assertScreenFits(const DisplayScreen& screen) {
 		TEST_ASSERT_TRUE(strlen(screen.lines[row]) <= kDisplayColumns);
 	}
 }
+
+// 2024-06-01T12:34:56Z, inside the plausible window and not a round hour.
+static const uint32_t kTestEpoch = 1717245296UL;
 
 void test_ipv4_formats_all_octets(void) {
 	char out[kIpv4TextMax];
@@ -227,6 +231,121 @@ void test_home_screen_sanitises_non_ascii(void) {
 	assertScreenFits(screen);
 }
 
+void test_format_clock_line_uses_the_shared_clock_helper(void) {
+	char line[kClockLineTextMax];
+	TEST_ASSERT_TRUE(formatClockLine(kTestEpoch, line, sizeof(line)));
+	TEST_ASSERT_EQUAL_STRING("Time 12:34:56", line);
+	TEST_ASSERT_TRUE(formatClockLine(kMinPlausibleEpoch, line, sizeof(line)));
+	TEST_ASSERT_EQUAL_STRING("Time 00:00:00", line);
+	TEST_ASSERT_EQUAL_UINT32(13, static_cast<uint32_t>(strlen(line)));
+}
+
+void test_format_clock_line_never_invents_a_time(void) {
+	char line[kClockLineTextMax];
+	TEST_ASSERT_FALSE(formatClockLine(0, line, sizeof(line)));
+	TEST_ASSERT_EQUAL_STRING("Time unknown", line);
+	TEST_ASSERT_FALSE(formatClockLine(kMinPlausibleEpoch - 1, line, sizeof(line)));
+	TEST_ASSERT_EQUAL_STRING("Time unknown", line);
+	TEST_ASSERT_FALSE(formatClockLine(kMaxPlausibleEpochExclusive, line, sizeof(line)));
+	TEST_ASSERT_EQUAL_STRING("Time unknown", line);
+}
+
+void test_format_clock_line_rejects_a_short_buffer(void) {
+	char line[kClockLineTextMax];
+	char small[kClockLineTextMax - 1];
+	TEST_ASSERT_FALSE(formatClockLine(kTestEpoch, small, sizeof(small)));
+	TEST_ASSERT_EQUAL_STRING("", small);
+	TEST_ASSERT_FALSE(formatClockLine(kTestEpoch, nullptr, kClockLineTextMax));
+	TEST_ASSERT_FALSE(formatClockLine(kTestEpoch, line, 0));
+}
+
+void test_home_screen_shows_the_clock_when_plausible(void) {
+	const DisplayScreen screen =
+		homeScreen(DisplayWifiState::Joined, "AA:BB:CC:DD:EE:01", "", kTestEpoch);
+	TEST_ASSERT_EQUAL_UINT8(6, screen.lineCount);
+	TEST_ASSERT_EQUAL_STRING("LifeLink tracker", screen.lines[0]);
+	TEST_ASSERT_EQUAL_STRING("WiFi: joined", screen.lines[1]);
+	TEST_ASSERT_EQUAL_STRING("Uplink: 4G modem", screen.lines[2]);
+	TEST_ASSERT_EQUAL_STRING("Device ID", screen.lines[3]);
+	TEST_ASSERT_EQUAL_STRING("AA:BB:CC:DD:EE:01", screen.lines[4]);
+	TEST_ASSERT_EQUAL_STRING("Time 12:34:56", screen.lines[5]);
+	assertScreenFits(screen);
+}
+
+void test_home_screen_omits_the_clock_without_a_plausible_epoch(void) {
+	const DisplayScreen noArg = homeScreen(DisplayWifiState::Joined, "AA:BB:CC:DD:EE:01", "");
+	TEST_ASSERT_EQUAL_UINT8(5, noArg.lineCount);
+	TEST_ASSERT_FALSE(screenContains(noArg, "Time"));
+
+	const DisplayScreen zero = homeScreen(DisplayWifiState::Joined, "AA:BB:CC:DD:EE:01", "", 0);
+	TEST_ASSERT_EQUAL_UINT8(5, zero.lineCount);
+	TEST_ASSERT_FALSE(screenContains(zero, "Time"));
+
+	const DisplayScreen stale =
+		homeScreen(DisplayWifiState::Joined, "AA:BB:CC:DD:EE:01", "", kMinPlausibleEpoch - 1);
+	TEST_ASSERT_EQUAL_UINT8(5, stale.lineCount);
+	TEST_ASSERT_FALSE(screenContains(stale, "Time"));
+
+	const DisplayScreen future =
+		homeScreen(DisplayWifiState::Joined, "AA:BB:CC:DD:EE:01", "", kMaxPlausibleEpochExclusive);
+	TEST_ASSERT_EQUAL_UINT8(5, future.lineCount);
+	TEST_ASSERT_FALSE(screenContains(future, "Time"));
+
+	assertScreenFits(noArg);
+	assertScreenFits(future);
+}
+
+void test_home_screen_clock_and_uuid_fill_the_panel(void) {
+	const DisplayScreen screen = homeScreen(DisplayWifiState::Joined, "AA:BB:CC:DD:EE:01",
+											"123e4567-e89b-12d3-a456-426614174000", kTestEpoch);
+	TEST_ASSERT_EQUAL_UINT32(static_cast<uint32_t>(kDisplayRows),
+							 static_cast<uint32_t>(screen.lineCount));
+	TEST_ASSERT_EQUAL_STRING("AA:BB:CC:DD:EE:01", screen.lines[4]);
+	TEST_ASSERT_EQUAL_STRING("UUID", screen.lines[5]);
+	TEST_ASSERT_EQUAL_STRING("Time 12:34:56", screen.lines[7]);
+	assertScreenFits(screen);
+}
+
+void test_incident_screen_shows_the_impact_time(void) {
+	const DisplayScreen screen = incidentScreen(kTestEpoch);
+	TEST_ASSERT_EQUAL_UINT8(3, screen.lineCount);
+	TEST_ASSERT_EQUAL_STRING("IMPACT ALERT", screen.lines[0]);
+	TEST_ASSERT_EQUAL_STRING("Time 12:34:56", screen.lines[1]);
+	TEST_ASSERT_EQUAL_STRING("Do not power off", screen.lines[2]);
+	// The frame is frozen through the post-alert window: no live state claims.
+	TEST_ASSERT_FALSE(screenContains(screen, "Alarm active"));
+	TEST_ASSERT_FALSE(screenContains(screen, "SOS"));
+	assertScreenFits(screen);
+}
+
+void test_incident_screen_reports_an_unknown_time(void) {
+	const DisplayScreen screen = incidentScreen(0);
+	TEST_ASSERT_EQUAL_UINT8(3, screen.lineCount);
+	TEST_ASSERT_EQUAL_STRING("IMPACT ALERT", screen.lines[0]);
+	TEST_ASSERT_EQUAL_STRING("Time unknown", screen.lines[1]);
+	assertScreenFits(screen);
+}
+
+void test_screens_never_render_secret_markers(void) {
+	const DisplayScreen screens[] = {
+		provisioningScreenForMac("AA:BB:CC:DD:EE:FF"),
+		joiningScreen("HomeNet", 1, 2, 3),
+		wifiOkScreen("HomeNet", "192.168.4.2"),
+		homeScreen(DisplayWifiState::Joined, "AA:BB:CC:DD:EE:01", "123e4567-e89b-12d3-a4",
+				   kTestEpoch),
+		incidentScreen(kTestEpoch),
+		incidentScreen(0),
+	};
+	const char* markers[] = {"tf_", "token", "Token", "TOKEN", "password", "Password", "pass"};
+	for (const DisplayScreen& screen : screens) {
+		for (uint8_t row = 0; row < screen.lineCount; row += 1) {
+			for (const char* marker : markers) {
+				TEST_ASSERT_NULL(strstr(screen.lines[row], marker));
+			}
+		}
+	}
+}
+
 void test_every_screen_fits_the_panel(void) {
 	char longText[64];
 	memset(longText, 'x', sizeof(longText) - 1);
@@ -236,6 +355,11 @@ void test_every_screen_fits_the_panel(void) {
 		joiningScreen(longText, 1, 2, 3),
 		wifiOkScreen(longText, "255.255.255.255"),
 		homeScreen(DisplayWifiState::Joined, longText, longText),
+		homeScreen(DisplayWifiState::Joined, longText, longText, kTestEpoch),
+		homeScreen(DisplayWifiState::Joined, "AA:BB:CC:DD:EE:01", nullptr, kTestEpoch),
+		incidentScreen(kTestEpoch),
+		incidentScreen(0),
+		incidentScreen(kMaxPlausibleEpochExclusive - 1),
 	};
 	for (const DisplayScreen& screen : screens) assertScreenFits(screen);
 }
@@ -260,6 +384,15 @@ int main(int, char**) {
 	RUN_TEST(test_home_screen_shows_state_and_device_id);
 	RUN_TEST(test_home_screen_adds_uuid_only_when_present);
 	RUN_TEST(test_home_screen_sanitises_non_ascii);
+	RUN_TEST(test_format_clock_line_uses_the_shared_clock_helper);
+	RUN_TEST(test_format_clock_line_never_invents_a_time);
+	RUN_TEST(test_format_clock_line_rejects_a_short_buffer);
+	RUN_TEST(test_home_screen_shows_the_clock_when_plausible);
+	RUN_TEST(test_home_screen_omits_the_clock_without_a_plausible_epoch);
+	RUN_TEST(test_home_screen_clock_and_uuid_fill_the_panel);
+	RUN_TEST(test_incident_screen_shows_the_impact_time);
+	RUN_TEST(test_incident_screen_reports_an_unknown_time);
+	RUN_TEST(test_screens_never_render_secret_markers);
 	RUN_TEST(test_every_screen_fits_the_panel);
 	return UNITY_END();
 }

@@ -1,5 +1,5 @@
 /*
-  LifeLink tracker firmware — ESP32 DevKit V1 (30-pin).
+  LifeLink tracker firmware ? ESP32 DevKit V1 (30-pin).
 
   Flow:
 	IMU + vibration + GPS -> ImpactFilter -> CrashSafety countdown
@@ -17,12 +17,18 @@
 	be verified on the actual hardware
   - the API base URL and provisioning token are not compiled in
 
+  The DS3231 at 0x68 keeps the impact time across power loss. The MPU-6050 is
+  strapped to 0x69 (AD0 to 3.3V) so both share the panel's 21/22 bus.
+
   Provision over USB serial (115200):
 	SET_ID AA:BB:CC:DD:EE:01
 	SET_TOKEN llk_...
 	SET_PHONE1 +639171234567
 	SET_PHONE2 +639181234567
 	STATUS
+	TIME
+	SET_TIME 1704067200
+  TIME prints the RTC and GPS clocks; SET_TIME takes a UTC Unix epoch.
 */
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
@@ -37,6 +43,7 @@
 #include <esp_task_wdt.h>
 #include <esp_wifi.h>
 #include <math.h>
+#include <stdlib.h>
 
 #include "config.h"
 #include "config_apply.h"
@@ -47,6 +54,7 @@
 #include "modem.h"
 #include "power.h"
 #include "provisioning.h"
+#include "rtc.h"
 #include "safety.h"
 #include "status.h"
 
@@ -108,6 +116,7 @@ void feedWatchdog() {
 
 TinyGPSPlus gps;
 Adafruit_MPU6050 mpu;
+fw::RtcClock g_rtc;
 Preferences prefs;
 HardwareSerial gpsSerial(1);
 HardwareSerial modemSerial(2);
@@ -120,6 +129,9 @@ fw::FaultManager g_faults;
 fw::Debouncer g_cancelDebouncer(50, false);
 fw::MinInterval g_heartbeatTimer(30 * 1000);
 fw::MinInterval g_commandTimer(5 * 1000);
+// The GPS -> RTC correction is a maintenance task, not a safety task: once an
+// hour is enough to bound drift, and the write never runs during an alert.
+fw::MinInterval g_rtcSyncTimer(60UL * 60UL * 1000UL);
 
 String g_deviceId;
 String g_deviceToken;
@@ -215,6 +227,50 @@ uint32_t gpsEpochSeconds() {
 	return days * 86400UL + static_cast<uint32_t>(hour * 3600 + minute * 60 + second);
 }
 
+/**
+ * Wall-clock time for an incident: the battery-backed RTC first, the GPS fix
+ * second, 0 when neither knows the time. Callers use it at transitions and for
+ * the display; it is never read from the 20 ms sample loop.
+ */
+uint32_t bestEpochSeconds() {
+	const uint32_t rtcEpoch = g_rtc.nowEpoch();
+	if (rtcEpoch > 0) return rtcEpoch;
+	return gpsEpochSeconds();
+}
+
+/**
+ * Bounded GPS -> RTC correction. The DS3231 drifts slowly, so an hourly check
+ * is enough; a write happens only when the clock was lost, is unset, or is more
+ * than five seconds away from GPS. It is skipped outside Idle so this
+ * maintenance write never lands inside the countdown or the SOS retry. No loop
+ * waits.
+ */
+void serviceRtcSync(uint32_t now) {
+	if (!g_rtc.present()) return;
+	if (g_safety.state() != fw::AlertState::Idle) return;
+	if (!g_rtcSyncTimer.ready(now)) return;
+
+	const uint32_t gpsEpoch = gpsEpochSeconds();
+	if (!fw::isPlausibleEpoch(gpsEpoch)) return;  // no fix yet; check again next pass
+
+	const uint32_t rtcEpoch = g_rtc.nowEpoch();
+	const uint32_t drift = rtcEpoch > gpsEpoch ? rtcEpoch - gpsEpoch : gpsEpoch - rtcEpoch;
+	const bool needsSync = g_rtc.lostPower() || rtcEpoch == 0 || drift > 5;
+
+	// Mark even when no write is needed: the next comparison is an hour away,
+	// which keeps the shared bus free for the IMU and the panel.
+	g_rtcSyncTimer.mark(now);
+	if (!needsSync) return;
+	if (!g_rtc.setEpoch(gpsEpoch)) return;
+
+	char clock[fw::kClockHmsTextMax];
+	if (!fw::formatClockHms(gpsEpoch, clock, sizeof(clock))) {
+		Serial.printf("[RTC] synced from GPS epoch=%lu\n", static_cast<unsigned long>(gpsEpoch));
+		return;
+	}
+	Serial.printf("[RTC] synced from GPS to %s UTC\n", clock);
+}
+
 void pushSample(uint32_t t, float accelG, float tiltDeg) {
 	if (g_sampleCount < kSampleCapacity) {
 		g_samples[g_sampleCount++] = {t, accelG, tiltDeg};
@@ -227,7 +283,7 @@ void pushSample(uint32_t t, float accelG, float tiltDeg) {
 }
 
 // ---------------------------------------------------------------------------
-// Modem (A7670E) — AT transport
+// Modem (A7670E) ? AT transport
 // ---------------------------------------------------------------------------
 
 void modemDrain() {
@@ -1584,7 +1640,10 @@ void serviceDisplay(uint32_t now) {
 		return;
 	}
 
-	g_display.show(fw::homeScreen(g_homeWifiState, g_deviceId.c_str(), g_deviceUuid.c_str()), now);
+	g_display.show(
+		fw::homeScreen(g_homeWifiState, g_deviceId.c_str(), g_deviceUuid.c_str(),
+					   bestEpochSeconds()),
+		now);
 }
 
 void clearStoredWifiCredentials() {
@@ -1997,6 +2056,40 @@ void handleSerialProvisioning() {
 							  g_deviceToken.isEmpty() ? "missing" : "set",
 							  static_cast<unsigned long>(g_configRev),
 							  static_cast<int>(g_safety.state()));
+			} else if (line == "TIME") {
+				const uint32_t rtcEpoch = g_rtc.nowEpoch();
+				const uint32_t gpsEpoch = gpsEpochSeconds();
+				char rtcClock[fw::kClockHmsTextMax] = "--:--:--";
+				char gpsClock[fw::kClockHmsTextMax] = "--:--:--";
+				if (!fw::formatClockHms(rtcEpoch, rtcClock, sizeof(rtcClock))) {
+					snprintf(rtcClock, sizeof(rtcClock), "--:--:--");
+				}
+				if (!fw::formatClockHms(gpsEpoch, gpsClock, sizeof(gpsClock))) {
+					snprintf(gpsClock, sizeof(gpsClock), "--:--:--");
+				}
+				const char* source = rtcEpoch > 0 ? "rtc" : (gpsEpoch > 0 ? "gps" : "none");
+				Serial.printf("[TIME] rtc=%lu (%s) gps=%lu (%s) source=%s present=%s "
+							  "lost_power=%s\n",
+							  static_cast<unsigned long>(rtcEpoch), rtcClock,
+							  static_cast<unsigned long>(gpsEpoch), gpsClock, source,
+							  g_rtc.present() ? "yes" : "no",
+							  g_rtc.lostPower() ? "yes" : "no");
+			} else if (line.startsWith("SET_TIME ")) {
+				const String value = line.substring(9);
+				char* end = nullptr;
+				const unsigned long parsed = strtoul(value.c_str(), &end, 10);
+				if (end == value.c_str() || *end != '\0' ||
+					!fw::isPlausibleEpoch(static_cast<uint32_t>(parsed))) {
+					Serial.println("[TIME] SET_TIME rejected: expected a Unix epoch for 2024-2099");
+				} else if (!g_rtc.setEpoch(static_cast<uint32_t>(parsed))) {
+					Serial.println("[TIME] SET_TIME failed: no DS3231 at 0x68");
+				} else {
+					char clock[fw::kClockHmsTextMax];
+					if (!fw::formatClockHms(static_cast<uint32_t>(parsed), clock, sizeof(clock))) {
+						snprintf(clock, sizeof(clock), "--:--:--");
+					}
+					Serial.printf("[TIME] DS3231 set to %s UTC\n", clock);
+				}
 			} else if (line == "CONFIG") {
 				JsonDocument doc;
 				JsonObject object = doc.to<JsonObject>();
@@ -2080,7 +2173,8 @@ void setup() {
 	Serial.println();
 	Serial.println("[FIRMWARE] LifeLink " FW_VERSION);
 	Serial.println(
-		"[WIRING] MPU+OLED 21/22, SW-420 27, cancel 33, GPS 16/17, modem 18/19, buzzer 25");
+		"[WIRING] MPU 0x69+DS3231 0x68+OLED 0x3C 21/22, SW-420 27, cancel 33, GPS 16/17, modem "
+		"18/19, buzzer 25");
 	// Start the watchdog before the boot work. The modem PWRKEY sequence is the
 	// longest step at about 11 s, so a setup that hangs also reboots.
 	beginWatchdog();
@@ -2104,16 +2198,29 @@ void setup() {
 	analogReadResolution(12);
 
 	Wire.begin(hw::kI2cSda, hw::kI2cScl);
-	g_mpuOk = mpu.begin();
+	// The DS3231 owns 0x68. Initialise it before the MPU probe so a missing
+	// clock is reported once, then the tracker continues on GPS time.
+	if (g_rtc.begin()) {
+		Serial.println("[RTC] DS3231 ready at 0x68");
+		if (g_rtc.lostPower()) {
+			Serial.println("[RTC] lost power - set the time with SET_TIME <epoch> or wait for GPS");
+		}
+	} else {
+		Serial.println("[RTC] no DS3231 - continuing without it");
+	}
+
+	// The DS3231 owns 0x68, so the MPU-6050 is strapped to 0x69 by tying AD0 to
+	// 3.3V. No pin changes: both stay on the shared 21/22 bus.
+	g_mpuOk = mpu.begin(0x69);
 	if (!g_mpuOk) {
 		g_faults.raise(fw::Fault::Imu);
-		Serial.println("[IMU] MPU-6050 not found");
+		Serial.println("[IMU] MPU-6050 not found at 0x69");
 	} else {
 		// 15 g threshold plus headroom; the 8 g range would clip a severe impact.
 		mpu.setAccelerometerRange(MPU6050_RANGE_16_G);
 		mpu.setGyroRange(MPU6050_RANGE_500_DEG);
 		mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
-		Serial.println("[IMU] MPU-6050 ready");
+		Serial.println("[IMU] MPU-6050 ready at 0x69");
 	}
 
 	// The panel is optional. A missing panel or a failed init leaves the
@@ -2156,6 +2263,8 @@ void loop() {
 	applyPendingConfig();
 
 	const uint32_t now = millis();
+	serviceRtcSync(now);
+
 	if (g_sampleCount == 0 || (now - g_lastImuMs) >= 20) {
 		g_lastImuMs = now;
 
@@ -2185,7 +2294,7 @@ void loop() {
 
 		if (decision == fw::ImpactDecision::Confirm) {
 			g_incidentId = newIncidentId();
-			g_detectedAt = gpsEpochSeconds();
+			g_detectedAt = bestEpochSeconds();
 			g_sentAt = 0;
 			g_peakAccel = g_filter.lastPeakAccelG();
 			g_peakTilt = g_filter.lastPeakTiltDeg();
@@ -2197,6 +2306,15 @@ void loop() {
 						  g_peakTilt, g_vibrationCount);
 			g_safety.startCountdown(now, g_config);
 			g_buzzer.setPattern(fw::BuzzerPattern::Countdown, now);
+			if (g_display.present()) {
+				// One bounded frame (about 25 ms at 400 kHz) records the impact
+				// time for the driver. showNow() ignores the home screen's
+				// redraw gap, so the frame is not dropped when the clock changed
+				// just before the impact. It sits outside serviceDisplay, which
+				// is Idle-only, and is the only display I2C in the alert path:
+				// no delay and no retry.
+				g_display.showNow(fw::incidentScreen(g_detectedAt), now);
+			}
 			sendIncident("SUSPECTED", false);
 			// A driver cancel in the same pass may follow with sendCancel().
 			feedWatchdog();
@@ -2223,9 +2341,9 @@ void loop() {
 			// happens to leave the modem, and not the sample that noticed the
 			// expiry after a blocking modem phase. dispatchSentAt back-dates the
 			// observation to the deadline. This transition fires once, so every
-			// retry reports the original value. 0 means the GPS clock was not
-			// set; the payload then omits sent_at.
-			g_sentAt = fw::dispatchSentAt(gpsEpochSeconds(), now, g_safety.countdownEndMs());
+			// retry reports the original value. 0 means neither the RTC nor the
+			// GPS clock was set; the payload then omits sent_at.
+			g_sentAt = fw::dispatchSentAt(bestEpochSeconds(), now, g_safety.countdownEndMs());
 			g_buzzer.setPattern(fw::BuzzerPattern::Alerting, now);
 		}
 
