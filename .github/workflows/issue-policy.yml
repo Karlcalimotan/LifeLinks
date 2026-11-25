@@ -31,7 +31,10 @@ jobs:
           node-version: 22
       - name: Test the issue policy
         run: node --test scripts/issue-policy.test.mjs
-      - name: Require a linked issue
+      - name: Suggest a linked issue
+        # Advisory on develop/staging: a missing issue is reported but does not
+        # block a merge. Main is gated by owner approval, not by this check.
+        continue-on-error: true
         env:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_BODY: ${{ github.event.pull_request.body }}

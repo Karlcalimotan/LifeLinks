@@ -256,11 +256,12 @@ async function SettingsForm({
 								name="impactThresholdG"
 								type="number"
 								min={1.5}
-								max={5}
+								max={16}
 								step={0.1}
 								defaultValue={settings.impactThresholdG}
 								disabled={!editable}
 							/>
+							<p className="text-meta leading-snug text-fog-500">{t("impactThresholdHint")}</p>
 						</Field>
 						<Field>
 							<Label htmlFor="tiltThresholdDeg">{t("tiltThreshold")}</Label>
@@ -374,8 +375,8 @@ async function SettingsForm({
 						</p>
 					) : null}
 				</CardContent>
-				<div className="border-t border-ink-700/70 p-5">
-					<Button type="submit" disabled={!editable}>
+				<div className="sticky bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-10 border-t border-ink-700/70 bg-ink-800 p-4 sm:static sm:p-5">
+					<Button type="submit" disabled={!editable} className="h-11 w-full sm:h-10 sm:w-auto">
 						{t("saveSettings")}
 					</Button>
 				</div>
@@ -494,30 +495,51 @@ async function MembersSection({
 					<CardDescription>{t("permissionsHint")}</CardDescription>
 				</CardHeader>
 				<CardContent>
-					<Table className="min-w-[520px]">
-						<TableHeader>
-							<TableRow>
-								<TableHead>{t("permission")}</TableHead>
-								{PERMISSION_ROLE_ORDER.map((role) => (
-									<TableHead key={role}>{roleNames(roleLabelKey(role))}</TableHead>
-								))}
-							</TableRow>
-						</TableHeader>
-						<TableBody>
-							{matrix.map((row) => (
-								<TableRow key={row.key}>
-									<TableCell className="text-fog-300">{permissionLabels[row.key]}</TableCell>
+					<ul className="flex flex-col divide-y divide-ink-700/70 lg:hidden">
+						{matrix.map((row) => (
+							<li key={row.key} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
+								<span className="text-fog-300">{permissionLabels[row.key]}</span>
+								<ul className="grid grid-cols-3 gap-2">
 									{PERMISSION_ROLE_ORDER.map((role) => (
-										<TableCell key={role}>
+										<li key={role} className="flex min-w-0 flex-col gap-1">
+											<span className="text-meta text-fog-500">
+												{roleNames(roleLabelKey(role))}
+											</span>
 											<Badge tone={row.roles[role] ? "success" : "muted"}>
 												{row.roles[role] ? t("allowed") : t("notAllowed")}
 											</Badge>
-										</TableCell>
+										</li>
+									))}
+								</ul>
+							</li>
+						))}
+					</ul>
+					<div className="hidden lg:block">
+						<Table className="min-w-[520px]">
+							<TableHeader>
+								<TableRow>
+									<TableHead>{t("permission")}</TableHead>
+									{PERMISSION_ROLE_ORDER.map((role) => (
+										<TableHead key={role}>{roleNames(roleLabelKey(role))}</TableHead>
 									))}
 								</TableRow>
-							))}
-						</TableBody>
-					</Table>
+							</TableHeader>
+							<TableBody>
+								{matrix.map((row) => (
+									<TableRow key={row.key}>
+										<TableCell className="text-fog-300">{permissionLabels[row.key]}</TableCell>
+										{PERMISSION_ROLE_ORDER.map((role) => (
+											<TableCell key={role}>
+												<Badge tone={row.roles[role] ? "success" : "muted"}>
+													{row.roles[role] ? t("allowed") : t("notAllowed")}
+												</Badge>
+											</TableCell>
+										))}
+									</TableRow>
+								))}
+							</TableBody>
+						</Table>
+					</div>
 				</CardContent>
 			</Card>
 		</div>
@@ -567,13 +589,13 @@ async function AuditSection({
 							maxLength={80}
 						/>
 					</Field>
-					<Button type="submit" variant="outline" size="sm">
+					<Button type="submit" variant="outline" size="sm" className="h-10 sm:h-8">
 						{t("auditFilterApply")}
 					</Button>
 					{query.action ? (
 						<Link
 							href="/settings?tab=audit"
-							className="inline-flex h-8 items-center text-meta text-fog-400 hover:text-signal-300 hover:underline"
+							className="inline-flex h-10 items-center text-meta text-fog-400 hover:text-signal-300 hover:underline sm:h-8"
 						>
 							{t("auditClearFilter")}
 						</Link>
@@ -588,49 +610,89 @@ async function AuditSection({
 						body={query.action ? t("auditClearHint") : undefined}
 					/>
 				) : (
-					<Table className="min-w-[720px]">
-						<TableHeader>
-							<TableRow>
-								<TableHead>{t("time")}</TableHead>
-								<TableHead>{t("actor")}</TableHead>
-								<TableHead>{t("action")}</TableHead>
-								<TableHead>{t("target")}</TableHead>
-							</TableRow>
-						</TableHeader>
-						<TableBody>
+					<>
+						<ul className="flex flex-col divide-y divide-ink-700/70 lg:hidden">
 							{entries.map((entry) => (
-								<TableRow key={entry.id}>
-									<TableCell className="whitespace-nowrap text-meta text-fog-500">
-										{formatDateTime(entry.createdAt, locale)}
-									</TableCell>
-									<TableCell>
+								<li key={entry.id} className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0">
+									<div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+										<span className="break-all font-mono text-meta text-fog-300">
+											{entry.action}
+										</span>
+										<span className="text-meta text-fog-500">
+											<span className="sr-only">{t("time")}: </span>
+											{formatDateTime(entry.createdAt, locale)}
+										</span>
+									</div>
+									<p className="break-words text-meta text-fog-100">
+										<span className="sr-only">{t("actor")}: </span>
 										{entry.actor ? (
 											<>
-												<span className="block text-fog-100">{entry.actor.name}</span>
-												<span className="block font-mono text-meta text-fog-500">
+												<span className="block">{entry.actor.name}</span>
+												<span className="block break-all font-mono text-fog-500">
 													{entry.actor.email}
 												</span>
 											</>
 										) : (
-											<span className="text-meta text-fog-500">
+											<span className="text-fog-500">
 												{entry.actorId ? t("removedUser") : t("systemActor")}
 											</span>
 										)}
-									</TableCell>
-									<TableCell className="font-mono text-meta text-fog-300">{entry.action}</TableCell>
-									<TableCell className="font-mono text-meta text-fog-500">
-										{entry.target ? (
-											<span className="block max-w-40 truncate" title={entry.target}>
-												{entry.target}
-											</span>
-										) : (
-											"—"
-										)}
-									</TableCell>
-								</TableRow>
+									</p>
+									<p className="break-all font-mono text-meta text-fog-500">
+										<span className="sr-only">{t("target")}: </span>
+										{entry.target ?? "—"}
+									</p>
+								</li>
 							))}
-						</TableBody>
-					</Table>
+						</ul>
+						<div className="hidden lg:block">
+							<Table className="min-w-[720px]">
+								<TableHeader>
+									<TableRow>
+										<TableHead>{t("time")}</TableHead>
+										<TableHead>{t("actor")}</TableHead>
+										<TableHead>{t("action")}</TableHead>
+										<TableHead>{t("target")}</TableHead>
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{entries.map((entry) => (
+										<TableRow key={entry.id}>
+											<TableCell className="whitespace-nowrap text-meta text-fog-500">
+												{formatDateTime(entry.createdAt, locale)}
+											</TableCell>
+											<TableCell>
+												{entry.actor ? (
+													<>
+														<span className="block text-fog-100">{entry.actor.name}</span>
+														<span className="block font-mono text-meta text-fog-500">
+															{entry.actor.email}
+														</span>
+													</>
+												) : (
+													<span className="text-meta text-fog-500">
+														{entry.actorId ? t("removedUser") : t("systemActor")}
+													</span>
+												)}
+											</TableCell>
+											<TableCell className="font-mono text-meta text-fog-300">
+												{entry.action}
+											</TableCell>
+											<TableCell className="font-mono text-meta text-fog-500">
+												{entry.target ? (
+													<span className="block max-w-40 truncate" title={entry.target}>
+														{entry.target}
+													</span>
+												) : (
+													"—"
+												)}
+											</TableCell>
+										</TableRow>
+									))}
+								</TableBody>
+							</Table>
+						</div>
+					</>
 				)}
 
 				{paging.pageCount > 1 ? (
@@ -645,7 +707,7 @@ async function AuditSection({
 										action: query.action,
 										page: paging.page - 1,
 									})}
-									className="inline-flex h-8 items-center rounded-panel border border-ink-600 px-3 text-meta text-fog-300 hover:bg-ink-700/60"
+									className="inline-flex h-10 items-center rounded-panel border border-ink-600 px-3 text-meta text-fog-300 hover:bg-ink-700/60 sm:h-8"
 								>
 									{t("previous")}
 								</Link>
@@ -656,7 +718,7 @@ async function AuditSection({
 										action: query.action,
 										page: paging.page + 1,
 									})}
-									className="inline-flex h-8 items-center rounded-panel border border-ink-600 px-3 text-meta text-fog-300 hover:bg-ink-700/60"
+									className="inline-flex h-10 items-center rounded-panel border border-ink-600 px-3 text-meta text-fog-300 hover:bg-ink-700/60 sm:h-8"
 								>
 									{t("next")}
 								</Link>
@@ -745,7 +807,7 @@ async function HealthSection({ orgId, locale }: { orgId: string; locale: string 
 					<h3 id="health-trackers" className="mb-3 text-emphasis font-medium text-fog-100">
 						{t("healthTrackers")}
 					</h3>
-					<Table className="min-w-[480px]">
+					<Table>
 						<TableHeader>
 							<TableRow>
 								<TableHead>{t("status")}</TableHead>
@@ -778,7 +840,7 @@ async function HealthSection({ orgId, locale }: { orgId: string; locale: string 
 					<h3 id="health-operations" className="mb-3 text-emphasis font-medium text-fog-100">
 						{t("healthOperations")}
 					</h3>
-					<Table className="min-w-[480px]">
+					<Table>
 						<TableHeader>
 							<TableRow>
 								<TableHead>{t("healthItem")}</TableHead>

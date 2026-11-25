@@ -17,6 +17,7 @@
 		"copy": "Kopyahin",
 		"copied": "Nakopya",
 		"close": "Close",
+		"language": "Wika",
 		"skipToContent": "Lumaktaw sa pangunahing nilalaman"
 	},
 	"pwa": {
@@ -100,12 +101,21 @@
 		"settings": "Mga Setting",
 		"signOut": "Mag-sign out",
 		"menu": "Menu",
+		"more": "Higit pa",
+		"account": "Account",
+		"primary": "Pangunahing nabigasyon",
 		"notifications": "Mga Abiso"
 	},
 	"roles": {
 		"user": "May-ari ng sasakyan",
 		"responder": "CDRRMO / Pulis",
 		"admin": "Admin"
+	},
+	"theme": {
+		"label": "Itsura",
+		"light": "Maliwanag",
+		"dark": "Madilim",
+		"system": "Sistema"
 	},
 	"auth": {
 		"signIn": "Mag-sign in",
@@ -148,6 +158,7 @@
 		"viewAll": "Tingnan lahat",
 		"attention": "Kailangan ng atensyon",
 		"allClear": "Maayos ang lahat",
+		"kpiDefinitions": "Ano ang ibig sabihin ng mga numerong ito",
 		"kpiOpenIncidents": "Bukas na insidente",
 		"kpiOpenHint": "Suspected, confirmed o acknowledged",
 		"kpiAwaitingAck": "Naghihintay ng acknowledgement",
@@ -227,7 +238,12 @@
 		"errorTransition": "Nagbago ang insidente bago tumakbo ang aksyon. Buksan ito para makita ang kasalukuyang katayuan.",
 		"errorAckNotDispatched": "Nasa cancel window pa ang tracker. Hintayin na mag-dispatch ang alerto bago ito kilalanin.",
 		"errorCommandConflict": "May command pang hinihintay ang tracker. Hintayin ang sagot nito bago magpadala ng ibang command.",
-		"errorNotFound": "Wala na ang insidenteng iyon."
+		"errorNotFound": "Wala na ang insidenteng iyon.",
+		"thresholdTitle": "Threshold ng impact alert",
+		"thresholdBody": "Nag-queue ng alert ang device kapag umabot o lumampas sa impact na ito, at nakukuha nito ang pagbabago sa susunod na config poll.",
+		"thresholdSaved": "Na-save ang impact threshold. Makukuha ito ng mga tracker sa susunod na config poll.",
+		"thresholdInvalid": "Maglagay ng value sa pagitan ng 1.5 at 16 g.",
+		"thresholdForbidden": "Mga admin lang ang makakapagpalit ng alert threshold."
 	},
 	"analytics": {
 		"title": "Analytics ng tugon",
@@ -889,6 +905,7 @@
 		"emails": "Email addresses",
 		"emailsHint": "One per line. The server queues an email alert.",
 		"impactThreshold": "Impact threshold (g)",
+		"impactThresholdHint": "Mag-alert kapag umabot sa impact na ito. 15 g ang default para sa malubhang aksidente; 1.5–16 g ang pinapayagang hanay.",
 		"tiltThreshold": "Tilt threshold (degrees)",
 		"cancelWindow": "Cancel window (seconds)",
 		"heartbeatInterval": "Heartbeat interval (seconds)",

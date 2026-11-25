@@ -152,7 +152,7 @@ describe("updateDeviceConfigAction", () => {
 	it("returns field-level codes for out-of-envelope and fractional input without writing", async () => {
 		const state = await updateDeviceConfigAction(
 			initial,
-			configForm({ impactThresholdG: "9", confirmWindowMs: "200.5" }),
+			configForm({ impactThresholdG: "17", confirmWindowMs: "200.5" }),
 		);
 
 		expect(state).toEqual({

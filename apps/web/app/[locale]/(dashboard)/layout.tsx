@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/layout/app-shell";
 import { roleLabelKey } from "@/lib/auth/roles";
 import { requireUser } from "@/lib/auth/session";
+import { readThemePreference } from "@/lib/theme-server";
 import { getTranslations } from "next-intl/server";
 
 export default async function DashboardLayout({
@@ -15,6 +16,8 @@ export default async function DashboardLayout({
 	const t = await getTranslations({ locale, namespace: "nav" });
 	const roles = await getTranslations({ locale, namespace: "roles" });
 	const common = await getTranslations({ locale, namespace: "common" });
+	const theme = await getTranslations({ locale, namespace: "theme" });
+	const themePreference = await readThemePreference();
 
 	const labels = {
 		dashboard: t("dashboard"),
@@ -37,6 +40,16 @@ export default async function DashboardLayout({
 			navLabels={labels}
 			signOutLabel={t("signOut")}
 			skipLabel={common("skipToContent")}
+			themePreference={themePreference}
+			themeLabels={{
+				label: theme("label"),
+				light: theme("light"),
+				dark: theme("dark"),
+				system: theme("system"),
+			}}
+			accountLabel={t("account")}
+			languageLabel={common("language")}
+			closeLabel={common("close")}
 		>
 			{children}
 		</AppShell>

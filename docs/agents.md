@@ -17,17 +17,17 @@ The definitions live in `.opencode/agents/`. OpenCode discovers them from the
 project. If a newly added agent does not appear, run `opencode reload` or restart
 the background service.
 
-## Issue-first
+## Task records
 
-1. Before any bug fix, update or feature, create a GitHub issue from
-   `.github/ISSUE_TEMPLATE/task.md` or `bug.md`.
-2. Put the objective, scope, acceptance criteria and test plan in the issue.
-3. Link it in the PR body with `Closes #N`, `Fixes #N`, `Refs #N` or
-   `Part of #N`.
-4. The `Issue policy` check enforces this. Bot PRs and PRs labelled `release` or
-   `promotion` are exempt.
+Issue-first is recommended, not required, for feature, `develop` and `staging`
+work. Use an issue for multi-day or cross-team work; a clear PR description is
+enough for a small change. The `Issue policy` check is advisory on `develop` and
+`staging` and does not block a merge. Main-bound release PRs require the owner's
+approval and release notes; they do not require a separate issue.
 
-The issue is the durable task record. A conversation is not a task record.
+Run `pnpm overlap:check` before starting to avoid duplicate work. Do not take
+over an issue assigned to someone else; coordinate on J-Akiru5's issue or PR
+instead of creating a competing one.
 
 ## Overlap check
 
@@ -74,13 +74,16 @@ while his is open.
 - It re-fetches the PR immediately before merging and refuses if the base or
   head commit changed; it verifies the base again after merging. A missing
   branch-protection check list fails closed.
-- `develop` and `staging` require zero approvals so the integrator can promote
-  them after checks. `main` requires one approval and is human-only.
-- `Issue policy` runs from the base branch with `pull_request_target` and does
-  not execute PR code. Add it to required checks after the workflow is on the
-  base branch.
+- `develop` and `staging` require zero approvals so Karl or the integrator can
+  merge them after checks. Karl may also push directly for small changes.
+  `main` requires one owner approval and is never merged by an agent.
+- `Issue policy` runs from the base branch and does not execute PR code. It is
+  advisory on `develop` and `staging`; main is gated by owner approval.
 - Never use `--admin`, `--auto`, force-push or branch deletion to get around a
   refusal.
+- GitHub branch protection is the enforcement layer. If it still requires a PR
+  on `develop`/`staging`, Karl uses a PR or the owner relaxes that setting; these
+  docs do not override GitHub settings.
 
 ## Example prompts
 

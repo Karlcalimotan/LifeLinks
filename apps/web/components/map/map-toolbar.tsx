@@ -55,7 +55,7 @@ export function MapToolbar({ query, labels }: { query: MapQuery; labels: MapTool
 							href={buildMapHref(query, { filter, vehicle: null })}
 							aria-current={active ? "true" : undefined}
 							className={[
-								"inline-flex h-8 items-center rounded-control border px-2.5 text-meta font-medium transition-colors",
+								"inline-flex h-10 items-center rounded-control border px-3 text-meta font-medium transition-colors sm:h-9 sm:px-2.5",
 								active
 									? "border-ink-600 bg-ink-700 text-fog-50"
 									: "border-ink-700 text-fog-400 hover:border-ink-600 hover:text-fog-100",

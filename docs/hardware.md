@@ -16,7 +16,8 @@ GPIO 1/3 stay free for the USB monitor.
 - **MPU-6050**: mount rigidly to the vehicle chassis, not to a loose trim panel.
   The sketch reads acceleration magnitude and tilt relative to gravity. The
   gyro is available but the first version confirms on acceleration + tilt +
-  vibration, not on integration.
+  vibration, not on integration. The accelerometer runs its ±16 g range so the
+  default 15 g impact threshold is measurable without clipping.
 - **SW-420**: the common module's DO is LOW when vibration is detected. Verify
   the polarity on your module with a meter; change the comparison in
   `main.ino` if your board is inverted.

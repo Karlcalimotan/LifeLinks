@@ -14,7 +14,7 @@ export function PageHeader({
 	return (
 		<div className={cn("mb-6 flex flex-wrap items-end justify-between gap-4", className)}>
 			<div className="min-w-0">
-				<h1 className="font-display text-title font-semibold leading-none tracking-tight text-fog-50">
+				<h1 className="break-words font-display text-title font-semibold leading-none tracking-tight text-fog-50">
 					{title}
 				</h1>
 				{subtitle ? (

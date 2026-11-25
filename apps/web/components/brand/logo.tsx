@@ -22,12 +22,12 @@ export function LogoMark({
 			<path
 				d="M14 20v24h10l5-19 6 25 5-12h10"
 				fill="none"
-				stroke="var(--color-ink-950)"
+				stroke="var(--color-on-accent)"
 				strokeWidth="5.5"
 				strokeLinecap="round"
 				strokeLinejoin="round"
 			/>
-			<rect x="46" y="34" width="8" height="8" rx="1" fill="var(--color-fog-50)" />
+			<rect x="46" y="34" width="8" height="8" rx="1" fill="var(--color-brand-beacon)" />
 		</svg>
 	);
 }
