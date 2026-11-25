@@ -34,6 +34,14 @@ const AUDIT_LABEL_KEYS: Record<string, string> = {
 	"incident.resolved": "timelineResolved",
 	"incident.false_alarm": "timelineFalseAlarm",
 	"incident.cancelled": "timelineCancelled",
+	"incident.cancel_requested": "timelineCancelRequested",
+	"incident.false_alarm_requested": "timelineFalseAlarmRequested",
+	"incident.cancel_unconfirmed": "timelineCancelUnconfirmed",
+	"incident.cancel_ack_ignored": "timelineCancelIgnored",
+	"incident.ack_requested": "timelineAckRequested",
+	"incident.ack_unconfirmed": "timelineAckUnconfirmed",
+	"incident.ack_ignored": "timelineAckIgnored",
+	"incident.resolved_unconfirmed": "timelineResolvedUnconfirmed",
 };
 
 /** Message key for an audit action; unknown actions fall back to a neutral label. */

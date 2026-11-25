@@ -96,6 +96,10 @@ export const incidentSchema = z.object({
 	device_id: z.string().min(1).max(64),
 	incident_id: z.string().min(1).max(64),
 	detected_at: z.number().int(),
+	// The moment the countdown expired and the alert started, captured once by
+	// the tracker and repeated unchanged on every retry. 0 or absent means the
+	// device clock was never set; the route must not invent a value.
+	sent_at: z.number().int().min(0).optional(),
 	peak_accel_g: z.number().min(0).max(50),
 	tilt_deg: z.number().min(0).max(180),
 	vibration_count: z.number().int().min(0).max(10_000).default(0),
@@ -113,6 +117,9 @@ export const commandAckSchema = z.object({
 	command_id: z.string().min(1).max(64),
 	status: z.enum(["ACKED", "FAILED"]),
 	detail: z.string().max(500).optional(),
+	// The contract names the ACK state `result`; the firmware sends it as
+	// `detail`. Accept both and prefer `detail` when a device sends both.
+	result: z.string().max(500).optional(),
 });
 
 export type HeartbeatInput = z.infer<typeof heartbeatRequestSchema>;

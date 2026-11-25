@@ -1,7 +1,10 @@
+import { ConfigPushStatus } from "@/components/devices/config-push-status";
 import { ConfirmSubmit } from "@/components/devices/confirm-submit";
+import { DeviceConfigForm } from "@/components/devices/device-config-form";
 import { EditDeviceForm } from "@/components/devices/edit-device-form";
-import { RotateTokenButton } from "@/components/devices/rotate-token-button";
+import { ProvisioningPanel } from "@/components/devices/provisioning-panel";
 import { ApprovalBadge, DeviceStatusBadge } from "@/components/domain/badges";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState, PageHeader } from "@/components/ui/page-header";
@@ -22,9 +25,11 @@ import {
 } from "@/lib/actions/devices";
 import { canAdminister, requireRole } from "@/lib/auth/session";
 import { deviceConnectionState, gpsAgeSeconds } from "@/lib/device/status";
-import { buildFirmwareConfig } from "@/lib/firmware/config";
+import type { DeviceCommandKind } from "@/lib/device/validation";
+import { CONFIG_FIELDS } from "@/lib/firmware/config";
+import { configPushState, configRevFromPayload } from "@/lib/firmware/device-config";
 import prisma from "@/lib/prisma";
-import { getOrgSettings, settingsToFirmwareValues } from "@/lib/settings/org";
+import { getDeviceConfig } from "@/lib/settings/device-config";
 import { formatDateTime, formatRelative } from "@/lib/utils";
 import { Radio, Satellite, Terminal } from "lucide-react";
 import { getTranslations } from "next-intl/server";
@@ -32,11 +37,11 @@ import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-const COMMANDS: ReadonlyArray<{ kind: string; label: string; confirmKey?: "confirmDisarm" }> = [
+// Crash detection is always on. There is no arm or disarm control, and the
+// validation allowlist rejects both command kinds if they are posted directly.
+const COMMANDS: ReadonlyArray<{ kind: DeviceCommandKind; label: string }> = [
 	{ kind: "LOCATE", label: "Locate now" },
 	{ kind: "TEST_ALERT", label: "Test alert" },
-	{ kind: "ARM", label: "Arm" },
-	{ kind: "DISARM", label: "Disarm", confirmKey: "confirmDisarm" },
 ];
 
 export default async function DeviceDetailPage({
@@ -57,13 +62,36 @@ export default async function DeviceDetailPage({
 	const t = await getTranslations({ locale, namespace: "devices" });
 	const common = await getTranslations({ locale, namespace: "common" });
 
-	const [device, vehicles] = await Promise.all([
+	const [device, vehicles, lastConfigPush] = await Promise.all([
 		prisma.trackerDevice.findFirst({
 			where: { id, orgId: current.org.id },
-			include: {
-				vehicle: true,
-				commands: { orderBy: { createdAt: "desc" }, take: 10 },
-				events: { orderBy: { createdAt: "desc" }, take: 20 },
+			// Explicit fields only. `tokenHash` is never part of an admin page
+			// payload; the plaintext token exists only in the rotate action result.
+			select: {
+				id: true,
+				label: true,
+				mac: true,
+				vehicleId: true,
+				approvalStatus: true,
+				lastSeenAt: true,
+				lastFixAt: true,
+				batteryV: true,
+				rssiDbm: true,
+				satellites: true,
+				configRev: true,
+				firmwareVersion: true,
+				hwVariant: true,
+				vehicle: { select: { id: true, plateNo: true, make: true, model: true } },
+				commands: {
+					select: { id: true, kind: true, status: true, createdAt: true },
+					orderBy: { createdAt: "desc" },
+					take: 10,
+				},
+				events: {
+					select: { id: true, type: true, createdAt: true },
+					orderBy: { createdAt: "desc" },
+					take: 20,
+				},
 			},
 		}),
 		prisma.vehicle.findMany({
@@ -71,11 +99,18 @@ export default async function DeviceDetailPage({
 			orderBy: { plateNo: "asc" },
 			select: { id: true, plateNo: true, make: true, model: true },
 		}),
+		prisma.deviceCommand.findFirst({
+			where: { deviceId: id, kind: "SET_CONFIG", device: { orgId: current.org.id } },
+			orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+			select: { payload: true },
+		}),
 	]);
 	if (!device) notFound();
 
-	const settings = await getOrgSettings(current.org.id);
-	const config = buildFirmwareConfig(settingsToFirmwareValues(settings));
+	const deviceConfig = await getDeviceConfig(current.org.id, device.id);
+	const overrides = deviceConfig.overrides;
+	const pushedRev = configRevFromPayload(lastConfigPush?.payload);
+	const pushState = configPushState(device.configRev, deviceConfig.config.rev, pushedRev);
 	const state = deviceConnectionState(device.lastSeenAt);
 
 	return (
@@ -98,7 +133,9 @@ export default async function DeviceDetailPage({
 				<p className="mb-4 rounded border border-alarm-500/30 bg-alarm-500/10 px-3 py-2 text-xs text-alarm-300">
 					{error === "forbidden"
 						? "Your role cannot send commands."
-						: "Command could not be queued."}
+						: error === "bad_command"
+							? "That command is not supported. Crash detection is always on."
+							: "Command could not be queued."}
 				</p>
 			) : null}
 			{approved === "1" ? (
@@ -155,6 +192,16 @@ export default async function DeviceDetailPage({
 						</div>
 					</CardContent>
 				</Card>
+			) : null}
+
+			{canAdminister(current.role) ? (
+				<ProvisioningPanel
+					deviceId={device.id}
+					label={device.label}
+					mac={device.mac}
+					lastSeenAt={device.lastSeenAt}
+					locale={locale}
+				/>
 			) : null}
 
 			<Card className="mb-6">
@@ -227,15 +274,15 @@ export default async function DeviceDetailPage({
 				</Card>
 
 				<Card>
-					<CardHeader className="flex-row items-center justify-between">
-						<CardTitle>{t("tokenTitle")}</CardTitle>
-						<RotateTokenButton deviceId={device.id} label={device.label} locale={locale} />
+					<CardHeader>
+						<CardTitle>{t("firmware")}</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<p className="text-xs leading-relaxed text-fog-500">{t("tokenDescription")}</p>
-						<p className="mt-3 text-meta text-fog-500">
-							Firmware {device.firmwareVersion ?? "unknown"} / variant{" "}
-							{device.hwVariant ?? "unknown"}
+						<p className="font-mono text-body text-fog-100">
+							{device.firmwareVersion ?? t("unknown")}
+						</p>
+						<p className="mt-1 text-meta text-fog-500">
+							{t("variant")}: {device.hwVariant ?? t("unknown")}
 						</p>
 					</CardContent>
 				</Card>
@@ -254,26 +301,18 @@ export default async function DeviceDetailPage({
 										<input type="hidden" name="locale" value={locale} />
 										<input type="hidden" name="deviceId" value={device.id} />
 										<input type="hidden" name="kind" value={entry.kind} />
-										{entry.confirmKey ? (
-											<ConfirmSubmit
-												variant="danger"
-												message={t(entry.confirmKey)}
-												confirmLabel={t("disarm")}
-												cancelLabel={common("cancel")}
-											>
-												{t("disarm")}
-											</ConfirmSubmit>
-										) : (
-											<Button type="submit" size="sm" variant="secondary">
-												{entry.label}
-											</Button>
-										)}
+										<Button type="submit" size="sm" variant="secondary">
+											{entry.label}
+										</Button>
 									</form>
 								))}
 							</div>
 						) : (
 							<p className="text-xs text-fog-500">Your role cannot send commands.</p>
 						)}
+						<p className="text-meta text-fog-500">
+							Crash detection is always on. A tracker cannot be armed or disarmed.
+						</p>
 
 						{device.commands.length === 0 ? (
 							<EmptyState title="No commands yet" />
@@ -306,28 +345,56 @@ export default async function DeviceDetailPage({
 
 				<Card>
 					<CardHeader>
-						<CardTitle>Device configuration</CardTitle>
+						<CardTitle>{t("configTitle")}</CardTitle>
 					</CardHeader>
-					<CardContent>
-						<div className="grid grid-cols-2 gap-2 text-xs">
-							{Object.entries(config)
-								.filter(([key]) => key !== "version" && key !== "rev")
-								.map(([key, value]) => (
+					<CardContent className="flex flex-col gap-3">
+						<ConfigPushStatus
+							locale={locale}
+							state={pushState}
+							deviceRev={device.configRev}
+							configRev={deviceConfig.config.rev}
+						/>
+						<div className="grid grid-cols-1 gap-2 text-xs sm:grid-cols-2">
+							{CONFIG_FIELDS.map((field) => {
+								const overridden = overrides[field.key] != null;
+								return (
 									<div
-										key={key}
-										className="flex items-center justify-between rounded border border-ink-700 bg-ink-950/40 px-3 py-2"
+										key={field.key}
+										className="rounded border border-ink-700 bg-ink-950/40 px-3 py-2"
 									>
-										<span className="text-fog-500">{key}</span>
-										<span className="font-mono text-fog-100">{String(value)}</span>
+										<div className="flex items-center justify-between gap-2">
+											<span className="font-mono text-fog-500">{field.firmwareKey}</span>
+											<Badge tone={overridden ? "warning" : "muted"}>
+												{overridden ? t("configOverride") : t("configInherited")}
+											</Badge>
+										</div>
+										<p className="mt-1 font-mono text-fog-100">
+											{String(deviceConfig.values[field.key])}
+										</p>
 									</div>
-								))}
+								);
+							})}
 						</div>
-						<p className="mt-3 text-meta text-fog-500">
-							Config rev {config.rev} / version {config.version}
+						<p className="text-meta text-fog-500">
+							Config rev {deviceConfig.config.rev} / version {deviceConfig.config.version}
 						</p>
 					</CardContent>
 				</Card>
 			</div>
+
+			<Card className="mt-6">
+				<CardHeader>
+					<CardTitle>{t("configFormTitle")}</CardTitle>
+				</CardHeader>
+				<CardContent>
+					<DeviceConfigForm
+						deviceId={device.id}
+						locale={locale}
+						orgValues={deviceConfig.orgValues}
+						overrides={overrides}
+					/>
+				</CardContent>
+			</Card>
 
 			<Card className="mt-6">
 				<CardHeader>

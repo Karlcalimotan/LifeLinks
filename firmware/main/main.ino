@@ -5,6 +5,9 @@
 	IMU + vibration + GPS -> ImpactFilter -> CrashSafety countdown
 	  cancel button within the window  -> SMS/incident cancelled
 	  window expires                   -> SMS to configured phones + HTTP incident
+	  ACK_INCIDENT for this incident   -> alarm stops and the tracker returns to idle
+	Alerting is latched: it never stops on a timer. After ten minutes the buzzer
+	drops to a slower reminder pattern and the LED stays solid.
 	Heartbeat and command polling run on a non-blocking interval.
 
   This sketch is deliberately explicit about what is verified and what still
@@ -31,11 +34,13 @@
 #include <WebServer.h>
 #include <WiFi.h>
 #include <Wire.h>
+#include <esp_task_wdt.h>
 #include <esp_wifi.h>
 #include <math.h>
 
 #include "config.h"
 #include "config_apply.h"
+#include "display.h"
 #include "filters.h"
 #include "gps.h"
 #include "hardware.h"
@@ -50,12 +55,56 @@
 #endif
 
 #ifndef FW_VERSION
-#define FW_VERSION "0.2.0"
+#define FW_VERSION "0.3.0"
 #endif
 
 #ifndef LIFELINK_API_BASE
 #define LIFELINK_API_BASE "https://lifelink.example.com"
 #endif
+
+// Hardware watchdog. The sketch subscribes the loop task explicitly; ESP-IDF
+// startup already watches idle0, which does not cover this sketch's loop.
+//
+// Timeout budget, from the blocking A7670E transport:
+//   - the longest single AT wait is 30 s (AT+HTTPACTION);
+//   - one complete modemHttpRequest() can spend at most 87 s across its steps;
+//   - a heartbeat or LOCATE adds the 3 s AT+CSQ signal query, so a bounded
+//     modem phase is about 90 s.
+// 120 s leaves 30 s of margin over that phase. The longest boot step is the
+// ~11 s modem PWRKEY sequence, below the same timeout. If any modem step grows,
+// raise this constant in the same change.
+static const uint32_t kWatchdogTimeoutS = 120;
+static_assert(kWatchdogTimeoutS * 1000UL > 90000UL,
+			  "watchdog timeout must exceed one worst-case modem phase");
+
+bool g_watchdogActive = false;
+
+void beginWatchdog() {
+	const esp_err_t initialized = esp_task_wdt_init(kWatchdogTimeoutS, true);
+	if (initialized != ESP_OK) {
+		Serial.printf(
+			"[WDT] esp_task_wdt_init failed (%d); continuing without a configured task watchdog\n",
+			static_cast<int>(initialized));
+		return;
+	}
+	const esp_err_t subscribed = esp_task_wdt_add(nullptr);
+	if (subscribed != ESP_OK) {
+		Serial.printf("[WDT] watchdog initialized at %lus but esp_task_wdt_add failed (%d); "
+					  "loop task not watched\n",
+					  static_cast<unsigned long>(kWatchdogTimeoutS), static_cast<int>(subscribed));
+		return;
+	}
+	g_watchdogActive = true;
+	Serial.printf("[WDT] task watchdog %lus, panic on, loop task subscribed\n",
+				  static_cast<unsigned long>(kWatchdogTimeoutS));
+}
+
+// Call only after a bounded phase has returned. A feed inside a wait would hide
+// exactly the hang this watchdog exists to catch.
+void feedWatchdog() {
+	if (!g_watchdogActive) return;
+	esp_task_wdt_reset();
+}
 
 TinyGPSPlus gps;
 Adafruit_MPU6050 mpu;
@@ -74,12 +123,22 @@ fw::MinInterval g_commandTimer(5 * 1000);
 
 String g_deviceId;
 String g_deviceToken;
+// Optional, read-only: no flow writes this key yet, so the home screen omits
+// the UUID line unless one already exists.
+String g_deviceUuid;
 uint32_t g_configRev = 0;
 String g_pendingConfig;
 uint32_t g_pendingRev = 0;
 bool g_configPending = false;
-bool g_armed = true;
 bool g_mpuOk = false;
+
+// Optional status panel. It is never part of the safety path; see display.h.
+fw::StatusDisplay g_display;
+fw::DisplayWifiState g_homeWifiState = fw::DisplayWifiState::Setup;
+String g_activeWifiSsid;
+String g_wifiOkSsid;
+char g_wifiOkIp[fw::kIpv4TextMax] = {0};
+uint32_t g_wifiOkUntilMs = 0;
 
 fw::AlertState g_lastState = fw::AlertState::Idle;
 uint32_t g_cancelledAt = 0;
@@ -90,6 +149,11 @@ bool g_allClearPending = false;
 
 String g_incidentId;
 uint32_t g_detectedAt = 0;
+// The moment the countdown expired and the emergency alert started, derived
+// from the countdown deadline rather than from the observation time. Captured
+// once per incident, from the same GPS clock as g_detectedAt, and never
+// replaced by a retry: the console measures transmission time from this value.
+uint32_t g_sentAt = 0;
 float g_peakAccel = 0.0f;
 float g_peakTilt = 0.0f;
 int g_vibrationCount = 0;
@@ -514,6 +578,7 @@ uint32_t g_storedWifiStartedMs = 0;
 uint32_t g_storedWifiRetryAtMs = 0;
 
 fw::BootResetSequence g_bootReset;
+fw::BootResetSequence g_factoryReset;
 bool g_provisioned = false;	 // NVS marker written only after a proven join
 
 void collectScannedNetworks(int found);
@@ -1037,6 +1102,7 @@ void failPortalJoin(const char* detail, const char* message) {
 	g_portalJoinDetail = detail;
 	g_portalJoinMessage = message != nullptr ? message : portalJoinFailureMessage(detail);
 	g_portalJoinState = PortalJoinState::Failed;
+	g_homeWifiState = fw::DisplayWifiState::Setup;
 	g_portalPendingPass = "";
 	// Keep a first-time token in RAM so a retry does not force it to be retyped,
 	// but never let it shadow an already-stored token: a blank field then means
@@ -1073,8 +1139,19 @@ void succeedPortalJoin() {
 	g_portalStopAtMs = millis() + kPortalCloseDelayMs;
 	g_portalPendingPass = "";
 	g_portalPendingToken = "";
+
+	// The success screen outlives the portal's 2 s close delay by a second, so
+	// the operator sees the SSID and IP for about 3 s even after the radio is
+	// switched off. The home screen then reports "WiFi: joined", which means
+	// joined to the network, not online.
+	const IPAddress ip = WiFi.localIP();
+	fw::formatIpv4(ip[0], ip[1], ip[2], ip[3], g_wifiOkIp, sizeof(g_wifiOkIp));
+	g_wifiOkSsid = g_portalPendingSsid;
+	g_wifiOkUntilMs = millis() + fw::kDisplayWifiOkHoldMs;
+	g_homeWifiState = fw::DisplayWifiState::Joined;
+
 	Serial.printf("[WIFI] joined \"%s\" at %s - provisioning saved; closing portal\n",
-				  g_portalPendingSsid.c_str(), WiFi.localIP().toString().c_str());
+				  g_portalPendingSsid.c_str(), ip.toString().c_str());
 }
 
 void startPortalJoin(const String& ssid, const String& pass, const String& deviceId,
@@ -1295,6 +1372,7 @@ void handlePortalNotFound() {
 void startProvisioningPortal() {
 	if (g_portalActive) return;
 
+	g_homeWifiState = fw::DisplayWifiState::Setup;
 	g_storedWifiCheckActive = false;
 	g_storedWifiState = StoredWifiState::Done;
 
@@ -1356,6 +1434,8 @@ void startProvisioningPortal() {
 void startStoredWifiAttempt(uint32_t now) {
 	const String ssid = prefs.getString("wifi_ssid", "");
 	const String pass = prefs.getString("wifi_pass", "");
+	g_activeWifiSsid = ssid;
+	g_homeWifiState = fw::DisplayWifiState::Joining;
 	g_storedWifiAttempts += 1;
 	g_storedWifiStartedMs = now;
 	g_storedWifiState = StoredWifiState::Joining;
@@ -1378,6 +1458,7 @@ void serviceStoredWifiCheck(uint32_t now) {
 		if (WiFi.status() == WL_CONNECTED && hasIp) {
 			Serial.printf("[WIFI] stored network reachable at %s; radio off\n",
 						  ip.toString().c_str());
+			g_homeWifiState = fw::DisplayWifiState::Joined;
 			WiFi.disconnect(false, false);
 			WiFi.setAutoReconnect(false);
 			WiFi.mode(WIFI_OFF);
@@ -1432,6 +1513,9 @@ void serviceWifiCommissioning(uint32_t now) {
 			return;
 		}
 		if ((now - g_portalStartedMs) >= fw::kPortalMaxLifetimeMs) {
+			// No verified save in the window: the home screen must say "setup",
+			// not "connected", even if a stored network exists.
+			g_homeWifiState = fw::DisplayWifiState::Setup;
 			stopProvisioningPortal("lifetime elapsed");
 			return;
 		}
@@ -1457,6 +1541,52 @@ void setupWifiCommissioning() {
 	startStoredWifiAttempt(millis());
 }
 
+// ---------------------------------------------------------------------------
+// Status display (SSD1306 at 0x3C on the shared 21/22 bus)
+// ---------------------------------------------------------------------------
+//
+// The panel is optional and is not part of the safety path. It shows the
+// commissioning state and a home summary; it never shows the device token and
+// never claims the unit is "online", because WiFi is commissioning-only and
+// telemetry stays on the A7670E.
+//
+// The update is bounded: the driver redraws only when the text changed, at
+// most once per kDisplayMinDrawGapMs, and this function returns before any I2C
+// traffic while the alert state machine is not Idle. No delays here.
+
+void serviceDisplay(uint32_t now) {
+	if (!g_display.present()) return;
+	if (g_safety.state() != fw::AlertState::Idle) return;
+
+	if (g_wifiOkUntilMs != 0) {
+		if (static_cast<int32_t>(now - g_wifiOkUntilMs) < 0) {
+			g_display.show(fw::wifiOkScreen(g_wifiOkSsid.c_str(), g_wifiOkIp), now);
+			return;
+		}
+		g_wifiOkUntilMs = 0;
+	}
+
+	if (g_portalActive) {
+		if (g_portalJoinState == PortalJoinState::Testing) {
+			g_display.show(fw::joiningScreen(g_portalPendingSsid.c_str(),
+											 now / fw::kDisplayProgressStepMs, 0, 0),
+						   now);
+		} else {
+			g_display.show(fw::provisioningScreen(g_portalApName.c_str()), now);
+		}
+		return;
+	}
+
+	if (g_storedWifiCheckActive && g_storedWifiState == StoredWifiState::Joining) {
+		g_display.show(fw::joiningScreen(g_activeWifiSsid.c_str(), now / fw::kDisplayProgressStepMs,
+										 g_storedWifiAttempts, fw::kMaxJoinFailures),
+					   now);
+		return;
+	}
+
+	g_display.show(fw::homeScreen(g_homeWifiState, g_deviceId.c_str(), g_deviceUuid.c_str()), now);
+}
+
 void clearStoredWifiCredentials() {
 	prefs.remove("wifi_ssid");
 	prefs.remove("wifi_pass");
@@ -1465,39 +1595,56 @@ void clearStoredWifiCredentials() {
 void clearStoredIdentity() {
 	prefs.remove("device_id");
 	prefs.remove("device_token");
+	prefs.remove("device_uuid");
 	prefs.remove("provisioned");
 	g_deviceId = chipMac();
 	g_deviceToken = "";
+	g_deviceUuid = "";
 	g_provisioned = false;
 }
 
 void serviceBootReset(uint32_t now, bool alertActive) {
-	if (!g_bootReset.active() && !g_bootReset.restartPending()) return;
+	if (!g_bootReset.active() && !g_bootReset.restartPending() && !g_factoryReset.active() &&
+		!g_factoryReset.restartPending()) {
+		return;
+	}
 	if (alertActive) {
 		// A pending restart must not interrupt an alert. The NVS clear (if it
 		// already happened) stays; the portal reopens on the next boot.
 		g_bootReset.abort();
+		g_factoryReset.abort();
 		Serial.println("[RESET] boot reset cancelled: alert is active");
 		return;
 	}
-	if (g_bootReset.restartPending()) {
-		Serial.println("[RESET] restarting");
-		delay(150);
-		ESP.restart();
-	}
 
-	const bool pressed = digitalRead(hw::kCancelButton) == LOW;
-	const fw::BootResetAction action = g_bootReset.update(now, pressed);
-	if (action == fw::BootResetAction::ClearWifi) {
-		clearStoredWifiCredentials();
-		Serial.println("[RESET] WiFi cleared, identity kept; release to restart");
-	} else if (action == fw::BootResetAction::ClearAll) {
+	const bool wifiPressed = digitalRead(hw::kWifiResetButton) == LOW;
+	const bool factoryPressed = digitalRead(hw::kFactoryResetButton) == LOW;
+
+	// Factory wins if both are held: it is the destructive gesture.
+	const fw::BootResetAction factoryAction = g_factoryReset.update(now, factoryPressed);
+	if (factoryAction == fw::BootResetAction::ClearAll) {
 		clearStoredWifiCredentials();
 		clearStoredIdentity();
 		Serial.println("[RESET] WiFi, identity and provisioning cleared");
+	} else {
+		const fw::BootResetAction wifiAction = g_bootReset.update(now, wifiPressed);
+		if (wifiAction == fw::BootResetAction::ClearWifi) {
+			clearStoredWifiCredentials();
+			Serial.println("[RESET] WiFi cleared, identity kept; release to restart");
+		} else if (wifiAction == fw::BootResetAction::ClearAll) {
+			clearStoredWifiCredentials();
+			clearStoredIdentity();
+			Serial.println("[RESET] WiFi, identity and provisioning cleared");
+		}
 	}
-	if (g_bootReset.restartPending()) {
-		delay(100);
+
+	// Do not restart the WiFi gesture while the factory button is still held;
+	// that would interrupt the 10 s factory hold.
+	const bool factoryDone = g_factoryReset.restartPending();
+	const bool wifiDone = g_bootReset.restartPending() && !factoryPressed;
+	if (factoryDone || wifiDone) {
+		Serial.println("[RESET] restarting");
+		delay(150);
 		ESP.restart();
 	}
 }
@@ -1577,6 +1724,9 @@ bool sendIncident(const char* status, bool cancelled) {
 	doc["device_id"] = g_deviceId;
 	doc["incident_id"] = g_incidentId;
 	doc["detected_at"] = g_detectedAt;
+	// Only a dispatched incident has a send time, and only when the GPS clock
+	// was set. A suspected report before the countdown omits the field.
+	if (g_sentAt > 0) doc["sent_at"] = g_sentAt;
 	doc["peak_accel_g"] = g_peakAccel;
 	doc["tilt_deg"] = g_peakTilt;
 	doc["vibration_count"] = g_vibrationCount;
@@ -1676,6 +1826,9 @@ void sendCommandAck(const String& commandId, const char* status, const char* det
 
 void handleCommands(JsonArray commands) {
 	for (JsonObject command : commands) {
+		// The previous command's acknowledgement is a bounded modem request;
+		// reaching this line proves it returned. A hung handler never feeds.
+		feedWatchdog();
 		const String id = command["id"] | "";
 		const String kind = command["kind"] | "";
 		if (id.isEmpty()) continue;
@@ -1686,13 +1839,18 @@ void handleCommands(JsonArray commands) {
 		if (kind == "LOCATE") {
 			const String body = heartbeatPayload(0, 0, false, 0, 0, false);
 			modemHttpRequest("POST", "/api/device/ingest", body, nullptr);
+			// The acknowledgement below is a second request in this command.
+			feedWatchdog();
 		} else if (kind == "TEST_ALERT") {
 			g_buzzer.setPattern(fw::BuzzerPattern::Alerting, millis());
 			g_testAlertUntil = millis() + 3000;
-		} else if (kind == "ARM") {
-			g_armed = true;
-		} else if (kind == "DISARM") {
-			g_armed = false;
+		} else if (kind == "ARM" || kind == "DISARM") {
+			// Crash detection is always on, so these commands are answered but
+			// deliberately change no state. The ACK tells the console the command
+			// was received and not applied.
+			Serial.println("[CMD] arm/disarm unsupported; detection stays on");
+			sendCommandAck(id, "ACKED", "unsupported");
+			continue;
 		} else if (kind == "SET_CONFIG") {
 			// The config object is applied from the same poll response.
 		} else if (kind == "CANCEL_ALERT") {
@@ -1712,6 +1870,24 @@ void handleCommands(JsonArray commands) {
 			} else {
 				Serial.println("[CMD] CANCEL_ALERT too late");
 				sendCommandAck(id, "ACKED", "too_late");
+			}
+			continue;
+		} else if (kind == "ACK_INCIDENT") {
+			// The portal acknowledges the dispatch alarm with the device client
+			// incident id (llk-...), not the server ImpactEvent id. A different
+			// or missing id changes nothing: the alarm keeps running.
+			const String incidentId = command["payload"]["incident_id"] | "";
+			const fw::IncidentAck result =
+				g_safety.acknowledgeIncident(incidentId.c_str(), g_incidentId.c_str());
+			if (result == fw::IncidentAck::Acknowledged) {
+				Serial.println("[CMD] ACK_INCIDENT accepted");
+				g_buzzer.setPattern(fw::BuzzerPattern::Off, millis());
+				g_incidentId = "";
+				g_lastState = fw::AlertState::Idle;
+				sendCommandAck(id, "ACKED", "acknowledged");
+			} else {
+				Serial.println("[CMD] ACK_INCIDENT for an unknown incident");
+				sendCommandAck(id, "ACKED", "unknown_incident");
 			}
 			continue;
 		}
@@ -1770,6 +1946,29 @@ bool readIgnition() {
 	return analogRead(hw::kIgnitionAdc) > 1800;
 }
 
+#ifdef LIFELINK_BENCH_WDT
+/**
+ * Bench-only proof for the watchdog. The loop task blocks without resetting
+ * the watchdog, so
+ * the task watchdog must panic and reboot the board. It is compiled only in
+ * env:esp32dev-bench and the caller refuses it unless the tracker is Idle.
+ *
+ * The window is 60 s longer than the timeout. If this function returns, the
+ * watchdog did not fire and the build or configuration must be investigated.
+ */
+void runWatchdogBenchTest() {
+	const uint32_t windowMs = (kWatchdogTimeoutS + 60UL) * 1000UL;
+	const uint32_t deadlineMs = millis() + windowMs;
+	Serial.printf("[TEST] TEST_WDT: no feed for %lu s; expect a panic and a reboot\n",
+				  static_cast<unsigned long>(windowMs / 1000UL));
+	Serial.flush();
+	while (static_cast<int32_t>(deadlineMs - millis()) > 0) {
+		delay(100);
+	}
+	Serial.println("[TEST] TEST_WDT: no reset observed; check the watchdog configuration");
+}
+#endif
+
 void handleSerialProvisioning() {
 	static String line;
 	while (Serial.available()) {
@@ -1827,6 +2026,27 @@ void handleSerialProvisioning() {
 					fw::MinInterval(static_cast<uint32_t>(g_config.heartbeatIntervalS * 1000.0f));
 				g_heartbeatTimer.mark(millis());
 				Serial.println("[CFG] reset to factory defaults");
+			} else if (line == "TEST_WDT") {
+#ifdef LIFELINK_BENCH_WDT
+				Serial.println("[TEST] TEST_WDT is a bench proof: it blocks until the watchdog "
+							   "resets the board.");
+				Serial.println("[TEST] send TEST_WDT CONFIRM while Idle; never during an alert");
+#else
+				Serial.println("[TEST] TEST_WDT is a bench-only command and is not built into "
+							   "this firmware; use env:esp32dev-bench");
+#endif
+			} else if (line == "TEST_WDT CONFIRM") {
+#ifdef LIFELINK_BENCH_WDT
+				if (g_safety.state() != fw::AlertState::Idle || !g_incidentId.isEmpty() ||
+					g_testAlertUntil != 0) {
+					Serial.println("[TEST] TEST_WDT refused: the tracker is not Idle");
+				} else {
+					runWatchdogBenchTest();
+				}
+#else
+				Serial.println("[TEST] TEST_WDT is a bench-only command and is not built into "
+							   "this firmware; use env:esp32dev-bench");
+#endif
 			} else if (line == "REBOOT") {
 				ESP.restart();
 			}
@@ -1841,22 +2061,44 @@ void handleSerialProvisioning() {
 // Setup / loop
 // ---------------------------------------------------------------------------
 
+void updateStatusLed(uint32_t now) {
+	const fw::AlertState state = g_safety.state();
+	bool on = false;
+	if (state == fw::AlertState::Alerting) {
+		on = true;	// solid until acknowledged
+	} else if (state == fw::AlertState::Countdown) {
+		on = ((now % 300) < 150);
+	} else if (state == fw::AlertState::Idle) {
+		on = ((now % 2000) < 60);
+	}
+	digitalWrite(hw::kStatusLed, on ? HIGH : LOW);
+}
+
 void setup() {
 	Serial.begin(115200);
 	delay(250);
 	Serial.println();
 	Serial.println("[FIRMWARE] LifeLink " FW_VERSION);
-	Serial.println("[WIRING] MPU 21/22, SW-420 32, cancel 33, GPS 26/27, modem 16/17, buzzer 25");
+	Serial.println(
+		"[WIRING] MPU+OLED 21/22, SW-420 27, cancel 33, GPS 16/17, modem 18/19, buzzer 25");
+	// Start the watchdog before the boot work. The modem PWRKEY sequence is the
+	// longest step at about 11 s, so a setup that hangs also reboots.
+	beginWatchdog();
 
 	prefs.begin("lifelink", false);
 	g_deviceId = prefs.getString("device_id", chipMac());
 	g_deviceToken = prefs.getString("device_token", "");
+	g_deviceUuid = prefs.getString("device_uuid", "");
 	loadConfig();
 
 	pinMode(hw::kBuzzer, OUTPUT);
+	pinMode(hw::kStatusLed, OUTPUT);
+	digitalWrite(hw::kStatusLed, LOW);
 	digitalWrite(hw::kBuzzer, hw::kBuzzerActiveHigh ? LOW : HIGH);
 	pinMode(hw::kVibrationSensor, INPUT);
 	pinMode(hw::kCancelButton, INPUT_PULLUP);
+	pinMode(hw::kWifiResetButton, INPUT_PULLUP);
+	pinMode(hw::kFactoryResetButton, INPUT_PULLUP);
 	pinMode(hw::kBatteryAdc, INPUT);
 	pinMode(hw::kIgnitionAdc, INPUT);
 	analogReadResolution(12);
@@ -1873,6 +2115,14 @@ void setup() {
 		Serial.println("[IMU] MPU-6050 ready");
 	}
 
+	// The panel is optional. A missing panel or a failed init leaves the
+	// tracker running with no display, exactly as before.
+	if (g_display.begin()) {
+		Serial.println("[OLED] SSD1306 ready at 0x3C");
+	} else {
+		Serial.println("[OLED] no SSD1306 at 0x3C - continuing without a display");
+	}
+
 	gpsSerial.begin(hw::kGpsBaud, SERIAL_8N1, hw::kGpsRx, hw::kGpsTx);
 	modemSerial.begin(hw::kModemBaud, SERIAL_8N1, hw::kModemRx, hw::kModemTx);
 	modemPowerOn();
@@ -1887,13 +2137,19 @@ void setup() {
 		Serial.println("[SETUP] No token. Use the WiFi setup portal or send SET_TOKEN llk_...");
 		Serial.println("[SETUP] Then: SET_PHONE1 +63... and SET_PLATE ABC1234");
 	}
-	Serial.println("[RESET] Hold cancel (GPIO 33) 5 s to clear WiFi, 10 s to clear everything");
+	Serial.println(
+		"[RESET] WiFi button (GPIO 13) 5 s clears WiFi; factory button (GPIO 14) 10 s clears "
+		"everything");
 	g_bootReset.begin(millis());
+	g_factoryReset.beginFactory(millis());
 	setupWifiCommissioning();
 	Serial.println("[READY] LifeLink tracker online");
 }
 
 void loop() {
+	// A new iteration started, so the previous one returned. Every feed below
+	// marks a completed bounded phase; none sits inside a wait.
+	feedWatchdog();
 	handleSerialProvisioning();
 	readGps();
 	applyPendingConfig();
@@ -1904,7 +2160,7 @@ void loop() {
 
 		float accelG = 0.0f;
 		float tiltDeg = 0.0f;
-		bool vibration = digitalRead(hw::kVibrationSensor) == LOW;
+		bool vibration = digitalRead(hw::kVibrationSensor) == HIGH;	 // active HIGH on this module
 
 		if (g_mpuOk) {
 			sensors_event_t acceleration;
@@ -1929,6 +2185,7 @@ void loop() {
 		if (decision == fw::ImpactDecision::Confirm) {
 			g_incidentId = newIncidentId();
 			g_detectedAt = gpsEpochSeconds();
+			g_sentAt = 0;
 			g_peakAccel = g_filter.lastPeakAccelG();
 			g_peakTilt = g_filter.lastPeakTiltDeg();
 			g_vibrationCount = g_filter.lastVibrationCount();
@@ -1940,6 +2197,8 @@ void loop() {
 			g_safety.startCountdown(now, g_config);
 			g_buzzer.setPattern(fw::BuzzerPattern::Countdown, now);
 			sendIncident("SUSPECTED", false);
+			// A driver cancel in the same pass may follow with sendCancel().
+			feedWatchdog();
 		} else if (decision == fw::ImpactDecision::Reject) {
 			Serial.println("[IMPACT] rejected as a false positive");
 		}
@@ -1951,24 +2210,40 @@ void loop() {
 		if (state == fw::AlertState::Cancelled && g_lastState != fw::AlertState::Cancelled) {
 			Serial.println("[IMPACT] cancelled by driver");
 			sendCancel();
+			// The all-clear SMS may follow in this pass after a remote cancel.
+			feedWatchdog();
 			g_buzzer.setPattern(fw::BuzzerPattern::Cancelled, now);
 			g_cancelledAt = now;
 		}
 
 		if (state == fw::AlertState::Alerting && g_lastState != fw::AlertState::Alerting) {
 			g_alertStartedAt = now;
+			// The dispatch time is the countdown expiry, not the retry that
+			// happens to leave the modem, and not the sample that noticed the
+			// expiry after a blocking modem phase. dispatchSentAt back-dates the
+			// observation to the deadline. This transition fires once, so every
+			// retry reports the original value. 0 means the GPS clock was not
+			// set; the payload then omits sent_at.
+			g_sentAt = fw::dispatchSentAt(gpsEpochSeconds(), now, g_safety.countdownEndMs());
 			g_buzzer.setPattern(fw::BuzzerPattern::Alerting, now);
 		}
 
 		if (state == fw::AlertState::Alerting && g_safety.shouldRetry(now)) {
 			sendSmsAlerts();
+			// Two SMS are bounded at 54 s and the incident POST at 87 s. The
+			// feed sits between them, not inside either wait, so an SOS that
+			// hangs still trips the watchdog.
+			feedWatchdog();
 			sendIncident("CONFIRMED", false);
 			g_safety.markAlertSent(now);
 		}
 
-		if (state == fw::AlertState::Alerting && (now - g_alertStartedAt) > 10UL * 60UL * 1000UL) {
-			Serial.println("[SOS] retry window elapsed; keeping the incident open");
-			g_safety.stopAlerting();
+		// Alerting is latched until ACK_INCIDENT, so the alarm has no timed
+		// exit. After ten minutes it falls back to a slower reminder pattern
+		// instead of going silent.
+		if (state == fw::AlertState::Alerting) {
+			const fw::BuzzerPattern pattern = fw::alertingPattern(now - g_alertStartedAt);
+			if (g_buzzer.pattern() != pattern) g_buzzer.setPattern(pattern, now);
 		}
 
 		if (state == fw::AlertState::Cancelled && (now - g_cancelledAt) > 5000UL) {
@@ -1988,6 +2263,7 @@ void loop() {
 		if (g_allClearPending && state != fw::AlertState::Alerting) {
 			g_allClearPending = false;
 			sendAllClearSms();
+			feedWatchdog();
 		}
 
 		g_lastState = state;
@@ -1995,11 +2271,19 @@ void loop() {
 		// the alert state machine leaves Idle, so a long cancel press during a
 		// countdown can never reboot the tracker.
 		serviceBootReset(now, state != fw::AlertState::Idle);
+		updateStatusLed(now);
 	}
 
+	// The impact/alert pass above can include two SMS and an incident POST; it
+	// is complete here.
+	feedWatchdog();
+
 	// WiFi is serviced after the impact/alert pass so the safety-critical sample
-	// is always taken before any portal work.
+	// is always taken before any portal work. The setup portal has no inner
+	// loop: it is one bounded pass of this function, and a request that hangs
+	// never reaches the feed below.
 	serviceWifiCommissioning(millis());
+	feedWatchdog();
 
 	if (g_testAlertUntil > 0 && now > g_testAlertUntil) {
 		g_buzzer.setPattern(fw::BuzzerPattern::Off, now);
@@ -2009,6 +2293,12 @@ void loop() {
 	const bool buzzerOn = g_buzzer.isOn(now);
 	digitalWrite(hw::kBuzzer, buzzerOn == hw::kBuzzerActiveHigh ? HIGH : LOW);
 
+	// The display is serviced after the buzzer and before the modem block. It
+	// returns immediately while the alert state is not Idle and bounds its own
+	// frame rate, so it cannot delay the alert path, a modem timeout or the
+	// command poll.
+	serviceDisplay(millis());
+
 	if (!g_deviceToken.isEmpty()) {
 		if (g_heartbeatTimer.ready(now)) {
 			g_heartbeatTimer.mark(now);
@@ -2016,11 +2306,16 @@ void loop() {
 			const String body = heartbeatPayload(
 				0, 0, false, gps.speed.isValid() ? gps.speed.kmph() : 0, batteryV, readIgnition());
 			modemHttpRequest("POST", "/api/device/ingest", body, nullptr);
+			// One heartbeat is bounded at 90 s (signal query plus POST).
+			feedWatchdog();
 		}
 
 		if (g_commandTimer.ready(now)) {
 			g_commandTimer.mark(now);
 			pollCommands();
+			// pollCommands feeds per command, so the poll GET and the last ACK
+			// are each bounded below the timeout.
+			feedWatchdog();
 		}
 	}
 

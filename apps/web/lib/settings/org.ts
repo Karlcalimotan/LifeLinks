@@ -17,7 +17,6 @@ export interface ResolvedOrgSettings {
 	incidentRetentionDays: number;
 	alertPhones: string[];
 	alertEmails: string[];
-	parkedImpactAlerts: boolean;
 }
 
 export interface OrgSettingsFallback {
@@ -38,7 +37,6 @@ export function defaultSettings(orgId: string): ResolvedOrgSettings {
 		incidentRetentionDays: 365,
 		alertPhones: [],
 		alertEmails: [],
-		parkedImpactAlerts: false,
 	};
 }
 
@@ -65,7 +63,6 @@ async function loadOrgSettings(orgId: string): Promise<ResolvedOrgSettings> {
 		incidentRetentionDays: row.incidentRetentionDays,
 		alertPhones: asStringArray(row.alertPhones),
 		alertEmails: asStringArray(row.alertEmails),
-		parkedImpactAlerts: row.parkedImpactAlerts,
 	};
 }
 

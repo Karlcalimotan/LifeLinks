@@ -1,3 +1,5 @@
+import { InstallPromptProvider } from "@/components/pwa/install-prompt";
+import { ServiceWorkerRuntime } from "@/components/pwa/service-worker-runtime";
 import { type Locale, locales } from "@/i18n/routing";
 import { APP_NAME, APP_TAGLINE } from "@/lib/constants";
 import { resolveSiteUrl } from "@/lib/site-url";
@@ -34,8 +36,20 @@ export const metadata: Metadata = {
 		template: `%s | ${APP_NAME}`,
 	},
 	description: APP_TAGLINE,
+	applicationName: APP_NAME,
+	appleWebApp: {
+		capable: true,
+		title: APP_NAME,
+		// Opaque status bar: content stays below it, so the header and the
+		// update banner do not need safe-area padding.
+		statusBarStyle: "black",
+	},
 	icons: {
-		icon: "/favicon.svg",
+		icon: [
+			{ url: "/favicon.svg", type: "image/svg+xml" },
+			{ url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+		],
+		apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
 	},
 };
 
@@ -70,20 +84,23 @@ export default async function LocaleLayout({
 				className={`${barlow.variable} ${barlowCondensed.variable} ${jetbrainsMono.variable} font-sans`}
 			>
 				<NextIntlClientProvider messages={messages}>
-					{children}
-					<Toaster
-						theme="dark"
-						position="top-right"
-						toastOptions={{
-							style: {
-								background: "var(--color-ink-800)",
-								border: "1px solid var(--color-ink-600)",
-								color: "var(--color-fog-100)",
-								borderRadius: "var(--radius-panel)",
-								fontFamily: "var(--font-barlow), sans-serif",
-							},
-						}}
-					/>
+					<InstallPromptProvider>
+						{children}
+						<ServiceWorkerRuntime />
+						<Toaster
+							theme="dark"
+							position="top-right"
+							toastOptions={{
+								style: {
+									background: "var(--color-ink-800)",
+									border: "1px solid var(--color-ink-600)",
+									color: "var(--color-fog-100)",
+									borderRadius: "var(--radius-panel)",
+									fontFamily: "var(--font-barlow), sans-serif",
+								},
+							}}
+						/>
+					</InstallPromptProvider>
 				</NextIntlClientProvider>
 				<span className="sr-only">{t("tagline")}</span>
 			</body>

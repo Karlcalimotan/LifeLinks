@@ -16,14 +16,17 @@ main/
   gps.h               fix quality (Arduino-free)
   power.h             ADC scaling and power bands (Arduino-free)
   provisioning.h      WiFi AP name, form/NVS rules, boot reset (Arduino-free)
+  display.h           optional SSD1306 driver (I2C 0x3C)
+  display_format.h    screen text, IPv4, state labels (Arduino-free)
   status.h            buzzer patterns (Arduino-free)
   modem.h             SOS SMS body (Arduino-free)
   hardware.h          hw:: aliases over pins.h
 test/
   test_config/        envelope and defaults
+  test_display/       screen text, IPv4, state labels, refresh gate, panel width
   test_filters/       pothole, crash, rollover, door slam, debounce
   test_provisioning/  AP name, form/NVS limits, boot reset gesture
-  test_safety/        countdown, cancel, retry, faults, power, GPS, SMS
+  test_safety/        countdown, cancel, retry, latch/ack, faults, power, GPS, SMS
 ```
 
 The PlatformIO project root is `firmware/`, not the repository root. Run the
@@ -45,6 +48,25 @@ pio device monitor -b 115200
 The default environment is `esp32dev`. The partition table is `min_spiffs.csv`,
 which leaves room for a future signed OTA slot.
 
+## Incident timing
+
+The incident payload carries two device times, both GPS UTC epoch seconds from
+the tracker's fix:
+
+- `detected_at` is the impact detection. It is `0` when the clock was not set,
+  and the console falls back to its receipt time for the row.
+- `sent_at` is the countdown expiry, the moment the emergency alert starts. It
+  is derived from the countdown deadline, not from the loop pass that notices
+  the expiry, so a blocking modem phase cannot add its delay. The value is
+  captured once per incident; every retry reports the original. Without a GPS
+  fix the payload omits it instead of sending a fabricated time.
+
+The console measures transmission time from this alert start to the receipt of
+the first `CONFIRMED` report (`ImpactEvent.confirmedReceivedAt`), and the SMS
+attempts run before the incident HTTP post, so they are included in the
+interval. The thesis measurement therefore needs a GPS fix at dispatch. Without
+one there is no `sent_at` and the console shows no delay.
+
 ## Native tests
 
 ```bash
@@ -55,6 +77,71 @@ The sketch needs the ESP32 core and is excluded from the native build; the tests
 include the headers directly. The `native` environment needs a host C/C++
 compiler (gcc/g++ on Linux, MinGW-w64 on Windows). `scripts/verify.sh` adds the
 ESP32 build, static analysis and the clang-format check.
+
+## Hardware watchdog
+
+The Arduino `loop()` task is subscribed to the ESP32 task watchdog
+(`esp_task_wdt`) with a **120 s** timeout and panic enabled. A loop that stops
+progressing panics and reboots the board instead of staying hung.
+
+The timeout is sized from the blocking A7670E transport, which is the longest
+bounded work in the sketch:
+
+| Bound | Time |
+| --- | --- |
+| longest single AT wait (`AT+HTTPACTION`) | 30 s |
+| one complete `modemHttpRequest()` (every step at its timeout) | 87 s |
+| heartbeat or `LOCATE` (3 s `AT+CSQ` plus the POST) | 90 s |
+| watchdog timeout | 120 s, 30 s above the largest phase |
+
+The GPS read drains the UART without waiting, so it adds no bounded wait. The
+watchdog starts near the top of `setup()`, before NVS and modem bring-up, so a
+hung boot also reboots. The longest boot step is the ~11 s modem PWRKEY
+sequence, still well below the timeout.
+
+Feeds mark the end of a bounded phase, never a point inside a wait:
+
+- the start of `loop()`, which proves the previous iteration returned;
+- after the impact/alert pass, including a driver cancel or all-clear SMS;
+- between the two SMS and the incident POST in the alert path;
+- after one setup-portal or stored-WiFi pass;
+- after the heartbeat and after the command poll, and per command, because
+  each acknowledgement is a separate request.
+
+A real hang stops the next feed, so the panic fires within 120 s.
+
+A watchdog reset is a full reboot. It ends a latched `Alerting` alarm exactly
+like a power loss: the unit boots to `Idle`, and the portal must resolve the
+incident.
+
+### Bench step (human, not automated)
+
+The check never runs automatically and must not run during an alert. Build the
+bench environment, the only build that compiles the blocking command:
+
+```bash
+pio run -d firmware -e esp32dev-bench -t upload   # human owner only
+pio device monitor -b 115200
+```
+
+Build immediately before the bench flash. The `.pio` build directory can hold a
+`firmware.bin` from an earlier source revision; do not flash a cached copy. The
+`-t upload` target above rebuilds first.
+
+With the tracker `Idle` and no active incident:
+
+1. Send `TEST_WDT`. The device prints the warning and asks for confirmation; it
+   does not block.
+2. Send `TEST_WDT CONFIRM`. The loop stops resetting the watchdog.
+3. After about 120 s the serial log shows the task watchdog panic
+   (`Task watchdog got triggered`) and the board reboots to the normal boot
+   banner.
+4. The default `esp32dev` build refuses the command with
+   `[TEST] TEST_WDT is not built into this firmware`.
+
+Do not treat this as verified until it runs on a real unit. The bench
+environment is not part of the CI matrix, so rebuild it when the serial handler
+or the watchdog code changes.
 
 ## Provisioning
 
@@ -104,21 +191,22 @@ NVS namespace `lifelink`:
 | `wifi_pass` | WPA/WPA2 passphrase, empty for an open network |
 | `device_id` | dashboard device id (the unit MAC by default) |
 | `device_token` | dashboard device token |
+| `device_uuid` | optional UUID; nothing writes it today, shown only when present |
 | `provisioned` | marker written only after a verified portal save |
 
-### Boot reset (GPIO 33)
+### Boot reset (GPIO 13 / GPIO 14)
 
-The existing cancel button is also the commissioning reset. It accepts a new
-hold only during the first 60 seconds after boot (a hold that started inside the
-window may finish after it):
+Two dedicated boot-time buttons replace the old cancel-button gesture. They
+accept a new hold only during the first 60 seconds after boot (a hold that
+started inside the window may finish after it):
 
 - power on with the button **released**; the listener arms 5 s after boot and
   requires a 50 ms debounce;
 - a button held from power-on (stuck) never arms, so a shorted button cannot
   erase anything;
 - hold 5 s: clears WiFi only and reboots on release, keeping the identity;
-- hold 10 s: clears WiFi, `device_id`, `device_token` and `provisioned`, then
-  reboots.
+- hold 10 s: clears WiFi, `device_id`, `device_token`, `device_uuid` and
+  `provisioned`, then reboots.
 
 The reset is disabled permanently if the alert state machine leaves `Idle`, so
 a long press during a countdown or SOS cannot reboot the tracker. A 5 s hold is
@@ -149,6 +237,141 @@ leaving the Device Token field blank.
 
 The server command poll also sends `alert_phones`; the firmware caches the first
 two numbers in NVS so the SMS path keeps working if the backend is unreachable.
+
+## Status display (SSD1306)
+
+The production firmware drives an optional 128x64 SSD1306 panel on the shared
+I2C bus. It is a commissioning and bench aid, not a safety indicator.
+
+| Signal | Connection |
+| --- | --- |
+| VCC | 3V3 (the panel is a 3.3 V part; do not use the 5 V rail) |
+| GND | GND |
+| SDA | GPIO 21, shared with the MPU-6050 |
+| SCL | GPIO 22, shared with the MPU-6050 |
+| RES | not connected; the driver initialises with `reset=false` |
+| Address | `0x3C` |
+
+The driver is fixed at `0x3C` and 128x64. A module strapped to `0x3D`, or a
+different panel size, needs `fw::kDisplayAddress`/`kDisplayWidth`/`kDisplayHeight`
+in `main/display.h` changed and a rebuild. Do not power the panel from 5 V.
+
+### Screens
+
+| Screen | When | Content |
+| --- | --- | --- |
+| `PROVISIONING` | the setup AP is open | `WiFi setup`, `Join network:`, the `LifeLink-XXXX` AP name, `Open 192.168.4.1` |
+| `JOINING` | a stored-network check or a portal join is in progress | the SSID, `Working` with progress dots, and `Try n of 3` for the stored check |
+| `WIFI OK` | about 3 s after a verified portal save | `WiFi OK - saved`, the SSID, the IP, `Uplink: 4G modem` |
+| Home | every other time | `WiFi: setup` / `WiFi: joining` / `WiFi: joined`, the device ID (`g_deviceId`), an optional UUID, `Uplink: 4G modem` |
+
+**"Joined" means joined to WiFi, not online.** The WiFi radio is
+commissioning-only: telemetry, commands and SOS stay on the A7670E. The home and
+success screens say `Uplink: 4G modem` so the display cannot be read as a
+network-status indicator. The home screen keeps the last proven result; the
+radio is switched off after commissioning, so `WiFi: joined` is a
+commissioning result, not a live association.
+
+The device token is never displayed. `display_format.h` has no token input at
+all; the home screen receives only the WiFi state, `g_deviceId`, and an optional
+UUID.
+
+The UUID line is shown only when one already exists. The firmware reads the
+optional NVS key `device_uuid` and never derives or invents one. Nothing writes
+that key today, so the line is normally absent. A UUID longer than 21 characters
+is truncated on the panel; the full value stays in NVS.
+
+Screen text is sanitised to printable ASCII: control bytes and anything above
+0x7E render as `?`, so a UTF-8 SSID cannot produce a broken glyph or split a
+multi-byte sequence.
+
+The build pins Adafruit SSD1306 2.5.17, Adafruit GFX 1.13.0 and Adafruit BusIO
+1.17.4 in `platformio.ini`. They are not used by the native test environment.
+
+### Non-blocking behaviour
+
+- `begin()` probes `0x3C` once. A missing panel, or a failed init, disables the
+  display and the tracker runs exactly as before. The serial log says
+  `[OLED] no SSD1306 at 0x3C - continuing without a display`.
+- The driver redraws only when the rendered text changes, at most once per
+  250 ms. A full 1024-byte frame at 400 kHz takes about 25 ms.
+- The caller skips the display entirely while the alert state is not `Idle`, so
+  no I2C traffic can sit inside a countdown, an alert or an acknowledgement.
+- The display is serviced after the buzzer is written and before the blocking
+  modem block. There are no `delay()` calls in the display path.
+- The library switches the bus to 400 kHz for its own transfers and restores
+  100 kHz afterwards, so the MPU-6050 stays at 100 kHz. Both rates come from the
+  driver's constructor (`kDisplayI2cClockHz`, `kDisplayIdleClockHz`). If a long
+  bus or a slow module proves unreliable, lower `kDisplayI2cClockHz` and expect
+  a longer flush (about 100 ms at 100 kHz).
+
+The pure layout and refresh gate live in `main/display_format.h` and are
+covered by `test/test_display`, so the screen text, IPv4 formatting, AP name,
+state labels and redraw rule are testable without a panel. Hardware checks are
+in [`../docs/hardware.md`](../docs/hardware.md); they are not a bench claim.
+
+### Bench checks (human)
+
+The full list is in [`../docs/hardware.md`](../docs/hardware.md), items 18-24.
+The minimum is: boot with the panel connected and confirm the home screen; boot
+with it unplugged and confirm the firmware still joins and reports; run a portal
+join and confirm `JOINING`, then `WIFI OK`, then home; trigger an alert and
+confirm the display does not update during the alert. None of this is a bench
+claim until it runs on a real unit.
+
+## Acknowledgement latch (`ACK_INCIDENT`)
+
+A dispatched incident is latched. The device stays in `Alerting` until the
+portal acknowledges that incident; there is no timed silence.
+
+Command from the server:
+
+```json
+{
+  "kind": "ACK_INCIDENT",
+  "payload": { "incident_id": "llk-1a2b3c4d-00001234" }
+}
+```
+
+- `payload.incident_id` is the **device client incident id** (`llk-...`, the
+  value the device generated and sent as `incident_id`). It is compared with the
+  device's own active id, not with the server `ImpactEvent.id`.
+- Matching id while `Alerting`: the buzzer stops, the ACK carries
+  `{ "detail": "acknowledged" }`, the active incident is cleared, and the device
+  returns to `Idle`.
+- Different or missing id, a countdown that has not expired, or no active
+  incident: the ACK carries `{ "detail": "unknown_incident" }` and the current
+  state is unchanged. An acknowledgement can never suppress a countdown.
+- `CANCEL_ALERT` is unchanged and still works for the false-alarm path.
+- The LED is solid for the whole of `Alerting`. The buzzer uses a long beep
+  (2 s on / 1 s off) for the first 10 minutes, then a slower reminder
+  (1 s on / 5 s off). It never goes silent on a timer.
+- SMS and HTTP retries continue on the configured `sos_retry_s` interval until
+  the acknowledgement arrives. Budget for that when a unit is left alerting.
+
+The pure decision lives in `main/safety.h` (`acknowledgeIncident`,
+`incidentIdsMatch`) and `main/status.h` (`alertingPattern`) and is covered by
+`test_safety`.
+
+### Bench steps (human, issue #54)
+
+Do not treat these as done until they run on a real unit with a test SIM.
+
+1. Trigger a synthetic impact and let the countdown expire.
+2. Confirm the LED is solid, the buzzer is the 2 s / 1 s long beep, and the
+   incident appears on the portal.
+3. Wait past 10 minutes. Confirm the buzzer changes to 1 s / 5 s, never goes
+   silent, and `STATUS` still reports `Alerting`.
+4. Send `ACK_INCIDENT` with the `llk-...` id from the portal. Confirm the buzzer
+   stops, the LED goes off, the ACK detail is `acknowledged`, and the portal
+   records the acknowledgement.
+5. Send a second `ACK_INCIDENT` with a wrong or empty id while alerting. Confirm
+   `unknown_incident` and that the alarm continues.
+6. Send `CANCEL_ALERT` and confirm the existing cancel and all-clear path still
+   works.
+7. Power-cycle during `Alerting`. The unit boots to `Idle`; the alarm does not
+   resume and the portal must resolve the incident manually. Record that
+   behavior as the accepted power-loss limit.
 
 ## Configuration sync
 
@@ -198,8 +421,12 @@ the integration, not as a formality.
 
 - The buzzer starts at confirmation, before the SMS.
 - The cancel button is debounced and only accepted during the countdown.
-- The SOS retries until the retry window elapses; the incident stays open.
-- Safe mode never suppresses the SOS.
+- `Alerting` is latched until `ACK_INCIDENT` for the active incident; there is
+  no timed silence. After 10 minutes the buzzer slows to a reminder pattern and
+  the LED stays solid.
+- `CANCEL_ALERT` and the driver-cancel path are unchanged.
+- Safe mode is not implemented. If reset escalation is added later, it must never
+  suppress the SOS.
 - A stale GPS fix is sent with its age.
 - See [`../docs/safety.md`](../docs/safety.md) for the full model and the bench
   checklist.
@@ -207,10 +434,13 @@ the integration, not as a formality.
 ## Known limitations
 
 - **No persistent event queue.** A dropped cancel or incident is retried by the
-  alert path, but it is not replayed after a reboot. The dashboard can still
-  resolve the incident manually.
+  alert path, but it is not replayed after a reboot. A reboot or power loss also
+  ends the latched alarm; the unit boots to `Idle` and the portal must resolve
+  the incident manually.
+- **SMS cost while latched.** The retry ladder runs until the acknowledgement
+  arrives, so an unacknowledged unit keeps sending on the configured interval.
 - **The AT transport is blocking.** A slow network can delay the loop. The
-  watchdog and the retry ladder bound the damage, but a non-blocking state
+  120 s watchdog and the retry ladder bound the damage, but a non-blocking state
   machine is the next step. A blocking heartbeat can also delay a portal
   response, but the join itself continues in the WiFi stack.
 - **The filter is tuned on the bench, not on a large road dataset.** The
@@ -224,3 +454,10 @@ the integration, not as a formality.
   but anyone in radio range can load it while it is open. The 10-minute
   lifetime and physical control of the unit are the mitigations; a per-unit AP
   password is future work.
+- **The status display is not a safety indicator.** It is frozen while the alert
+  state is not `Idle`, and the firmware never reads it back. A panel that fails
+  after boot can add a bounded I2C wait to the loop; the alert state machine and
+  the modem path do not depend on it.
+- **The display shares the I2C bus with the IMU.** A wiring fault on the panel
+  can affect the MPU-6050 too. The panel is optional: boot with it disconnected
+  to isolate an I2C problem.

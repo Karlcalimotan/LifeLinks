@@ -1,3 +1,14 @@
+function incidentReturnBase(locale: string, incidentId: string, returnTo: string): string {
+	if (returnTo === "dashboard") return `/${locale}/dashboard`;
+	if (returnTo.startsWith("/incidents")) return `/${locale}${returnTo}`;
+	return `/${locale}/incidents/${incidentId}`;
+}
+
+function appendQuery(path: string, key: string, value: string): string {
+	const separator = path.includes("?") ? "&" : "?";
+	return `${path}${separator}${key}=${value}`;
+}
+
 /**
  * Where a successful incident transition sends the operator. Shared contract
  * with the incidents workspace: `dashboard` for the acknowledgement form,
@@ -5,9 +16,29 @@
  */
 export function incidentSuccessPath(locale: string, incidentId: string, returnTo: string): string {
 	if (returnTo === "dashboard") return `/${locale}/dashboard?updated=acknowledged`;
-	if (returnTo.startsWith("/incidents")) {
-		const separator = returnTo.includes("?") ? "&" : "?";
-		return `/${locale}${returnTo}${separator}updated=1`;
-	}
-	return `/${locale}/incidents/${incidentId}?updated=1`;
+	return appendQuery(incidentReturnBase(locale, incidentId, returnTo), "updated", "1");
+}
+
+/**
+ * Where a queued stand-down request sends the operator. The incident has not
+ * changed yet, so the page must not claim it was updated.
+ */
+export function incidentCancelRequestPath(
+	locale: string,
+	incidentId: string,
+	returnTo: string,
+): string {
+	return appendQuery(incidentReturnBase(locale, incidentId, returnTo), "cancel", "requested");
+}
+
+/**
+ * Where a queued bureau acknowledgement sends the operator. The incident keeps
+ * its status until the tracker answers, so this is not an "updated" path.
+ */
+export function incidentAckRequestPath(
+	locale: string,
+	incidentId: string,
+	returnTo: string,
+): string {
+	return appendQuery(incidentReturnBase(locale, incidentId, returnTo), "ack", "requested");
 }

@@ -24,6 +24,7 @@ import {
 import { Link } from "@/i18n/routing";
 import { canAdminister, requireRole } from "@/lib/auth/session";
 import { DEVICE_OFFLINE_AFTER_MIN } from "@/lib/constants";
+import { ADMIN_DEVICE_LIST_SELECT, toAdminDeviceListItem } from "@/lib/device/admin-payload";
 import { firmwareUpdateAvailable, latestKnownFirmware } from "@/lib/device/firmware";
 import {
 	DEVICE_PAGE_SIZE,
@@ -92,7 +93,7 @@ export default async function DevicesPage({
 	const offlineBefore = new Date(Date.now() - DEVICE_OFFLINE_AFTER_MIN * 60_000);
 
 	const [
-		devices,
+		deviceRows,
 		vehicles,
 		orgTotal,
 		approvedCount,
@@ -107,7 +108,7 @@ export default async function DevicesPage({
 			orderBy: deviceOrderBy(effectiveQuery),
 			skip: (page - 1) * DEVICE_PAGE_SIZE,
 			take: DEVICE_PAGE_SIZE,
-			include: { vehicle: true },
+			select: ADMIN_DEVICE_LIST_SELECT,
 		}),
 		prisma.vehicle.findMany({
 			where: { orgId: current.org.id },
@@ -130,6 +131,7 @@ export default async function DevicesPage({
 			select: { id: true },
 		}),
 	]);
+	const devices = deviceRows.map(toAdminDeviceListItem);
 
 	const sortHref = (field: SortField) =>
 		buildDevicesHref(effectiveQuery, {

@@ -14,6 +14,10 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import type { VehicleOwnerOption } from "@/components/vehicles/add-vehicle-form";
+import { ArchiveVehicle } from "@/components/vehicles/archive-vehicle";
+import { EditVehicleForm } from "@/components/vehicles/edit-vehicle-form";
+import { EmergencyContacts } from "@/components/vehicles/emergency-contacts";
 import { MaintenanceControl } from "@/components/vehicles/maintenance-control";
 import { VehicleOverview } from "@/components/vehicles/vehicle-overview";
 import { VehicleTabs } from "@/components/vehicles/vehicle-tabs";
@@ -25,6 +29,7 @@ import { isValidCoordinate, mapLink } from "@/lib/geo";
 import prisma from "@/lib/prisma";
 import { formatDateTime } from "@/lib/utils";
 import { type VehicleTab, parseVehicleTab } from "@/lib/vehicles/detail";
+import { VEHICLE_DETAIL_SELECT } from "@/lib/vehicles/payload";
 import { ExternalLink } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 import { notFound } from "next/navigation";
@@ -49,6 +54,7 @@ export default async function VehicleDetailPage({
 	const raw = await searchParams;
 	const tab = parseVehicleTab(raw.tab);
 	const updated = first(raw.updated) === "1";
+	const archived = first(raw.archived) === "1";
 	const error = first(raw.error);
 
 	const current = await requireUser();
@@ -57,7 +63,7 @@ export default async function VehicleDetailPage({
 
 	const vehicle = await prisma.vehicle.findFirst({
 		where: { id, ...vehicleScope(current.role, current.org.id, current.user.id) },
-		include: { devices: { orderBy: { createdAt: "asc" }, take: 1 } },
+		select: VEHICLE_DETAIL_SELECT,
 	});
 	if (!vehicle) notFound();
 
@@ -84,6 +90,26 @@ export default async function VehicleDetailPage({
 					include: { _count: { select: { alerts: true } } },
 				})
 			: [];
+
+	const canEditVehicle = current.role === "ADMIN" || current.role === "USER";
+	const contacts =
+		tab === "settings" && canEditVehicle
+			? await prisma.emergencyContact.findMany({
+					where: { orgId: current.org.id, vehicleId: vehicle.id },
+					orderBy: [{ active: "desc" }, { createdAt: "asc" }],
+					select: { id: true, name: true, phone: true, email: true, active: true },
+				})
+			: [];
+	const owners: VehicleOwnerOption[] | undefined =
+		tab === "settings" && current.role === "ADMIN"
+			? (
+					await prisma.membership.findMany({
+						where: { orgId: current.org.id, revokedAt: null },
+						orderBy: { user: { name: "asc" } },
+						select: { user: { select: { id: true, name: true, email: true } } },
+					})
+				).map((membership) => membership.user)
+			: undefined;
 
 	const tabLabels: Record<VehicleTab, string> = {
 		overview: t("tabOverview"),
@@ -118,6 +144,14 @@ export default async function VehicleDetailPage({
 					className="mb-4 rounded-panel border border-clear-400/30 bg-clear-400/10 px-3 py-2 text-meta text-clear-300"
 				>
 					{t("maintenanceUpdated")}
+				</p>
+			) : null}
+			{tab === "settings" && archived ? (
+				<p
+					aria-live="polite"
+					className="mb-4 rounded-panel border border-clear-400/30 bg-clear-400/10 px-3 py-2 text-meta text-clear-300"
+				>
+					{t("contactArchived")}
 				</p>
 			) : null}
 			{tab === "settings" && error ? (
@@ -244,13 +278,29 @@ export default async function VehicleDetailPage({
 			) : null}
 
 			{tab === "settings" ? (
-				<MaintenanceControl
-					locale={locale}
-					vehicleId={vehicle.id}
-					plateNo={vehicle.plateNo}
-					status={vehicle.status}
-					editable={canAdminister(current.role)}
-				/>
+				<div className="flex flex-col gap-6">
+					{canEditVehicle ? (
+						<EditVehicleForm locale={locale} vehicle={vehicle} owners={owners} />
+					) : null}
+					{canEditVehicle ? (
+						<EmergencyContacts locale={locale} vehicleId={vehicle.id} contacts={contacts} />
+					) : null}
+					<MaintenanceControl
+						locale={locale}
+						vehicleId={vehicle.id}
+						plateNo={vehicle.plateNo}
+						status={vehicle.status}
+						editable={canAdminister(current.role)}
+					/>
+					{canEditVehicle ? (
+						<ArchiveVehicle
+							locale={locale}
+							vehicleId={vehicle.id}
+							plateNo={vehicle.plateNo}
+							status={vehicle.status}
+						/>
+					) : null}
+				</div>
 			) : null}
 		</>
 	);

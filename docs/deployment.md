@@ -235,6 +235,103 @@ Do not test the policy by deploying. Use `deployment-check.mjs` and static
 configuration inspection. Do not run `vercel build` unless a local build is
 needed for another reason; `pnpm build` is the normal local check.
 
+## Scheduled retention cleanup
+
+`GET /api/cron/retention` enforces the per-organisation
+`telemetryRetentionDays` and `incidentRetentionDays` settings from Settings.
+The schedule is declared in both `vercel.json` files:
+
+```json
+"crons": [
+  { "path": "/api/cron/retention", "schedule": "15 18 * * *" }
+]
+```
+
+The expression is UTC: 18:15 UTC, which is 02:15 the next day in Asia/Manila.
+It runs once daily. On the Hobby plan Vercel may start it anywhere in the
+18:00 UTC hour, so treat it as a nightly window rather than an exact minute.
+Vercel cron jobs run only on the production deployment; a preview on `staging`
+does not run the schedule.
+
+### Secret
+
+The route requires `Authorization: Bearer <CRON_SECRET>`. When
+`CRON_SECRET` is not set (or is blank) the route returns `503` and does no
+database work: a missing secret disables the job safely instead of deleting
+without authentication. A wrong or missing header returns `401`.
+
+Vercel sends the project's `CRON_SECRET` as the `Authorization` header on
+scheduled invocations once the variable exists in the project settings. Set it
+for the Production environment and redeploy: a deployment keeps the
+`CRON_SECRET` value it was built with, so editing the variable alone does not
+change the value an existing deployment reads or the header Vercel sends to it.
+
+### Manual run and dry run
+
+```bash
+# Count what would be deleted; no row is removed.
+curl -s -H "Authorization: Bearer $CRON_SECRET" \
+  "https://<production-host>/api/cron/retention?dryRun=1"
+
+# Real cleanup.
+curl -s -H "Authorization: Bearer $CRON_SECRET" \
+  "https://<production-host>/api/cron/retention"
+```
+
+The JSON response reports, per organisation, the two cutoffs, how many
+telemetry samples, incidents and alert deliveries were deleted (or would be
+deleted), the batch counts and whether the run was truncated. It never returns
+row contents, coordinates, phone numbers or the secret. A dry run writes the
+same audit row as a real run with `dryRun: true` and writes nothing else.
+
+### What is deleted
+
+- `TelemetrySample` rows whose `recordedAt` is older than now minus
+  `telemetryRetentionDays`, scoped to the organisation that owns the device.
+- `ImpactEvent` rows whose `createdAt` is older than now minus
+  `incidentRetentionDays`, scoped to the organisation.
+- `AlertDelivery` rows for those incidents. They are deleted explicitly first
+  in the same batch transaction as the incident, even though the foreign key
+  also cascades. `DeviceCommand` rows are kept; their optional
+  `impactEventId` becomes null by the existing `SET NULL` rule.
+- Nothing newer than a cutoff is touched. A stored period that is not a
+  positive number is skipped rather than treated as "delete everything".
+
+The work is bounded: at most 5,000 rows per delete batch and 20 batches per
+organisation and table per invocation. If the cap is reached the response and
+audit metadata say `truncated: true`; the next daily run continues. The route
+is safe to call repeatedly and does not use a lock, so two overlapping runs
+may report counts that differ from what each one actually removed.
+
+### Audit
+
+Each run writes one `AuditLog` row per organisation with settings: action
+`retention.cleanup`, `target` set to the organisation id, and metadata
+containing the two cutoffs, the configured day counts, the deleted counts, the
+batch counts, `dryRun` and `truncated`. The row contains configuration and
+counts only, never personal data.
+
+An organisation without an `OrgSettings` row is not processed, even though the
+application defaults would apply elsewhere. Create its settings row (opening
+and saving Settings does this) before relying on retention for it.
+
+### Owner action
+
+1. Set `CRON_SECRET` in the Vercel project's Production environment. Use a
+   random value with header-safe characters only; leading or trailing spaces
+   make every invocation return `401`.
+2. Redeploy `main` so the deployment reads the new value and Vercel registers
+   the `crons` entry from `vercel.json`.
+3. After the first scheduled window, check the Cron Jobs logs for a `200` and
+   the `retention.cleanup` audit rows for that organisation.
+4. Rotate the secret by updating the variable, redeploying and confirming the
+   first invocation returns `200`, as described in the Vercel cron
+   documentation.
+
+A `401` means the deployment and the header disagree, or `CRON_SECRET` is not
+set for Production. A `503` means the route could not read a secret at all and
+deleted nothing. Neither case deletes data.
+
 ## Emergency change
 
 1. Branch from `main`, not `develop`.

@@ -24,7 +24,8 @@
 			"playwright-report",
 			"stack/template",
 			"firmware/.pio",
-			"apps/web/next-env.d.ts"
+			"apps/web/next-env.d.ts",
+			"reports/a11y"
 		]
 	},
 	"javascript": {

@@ -1,6 +1,11 @@
 import { createHash } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { hash } from "bcryptjs";
+import {
+	type FirmwareConfigValues,
+	buildFirmwareConfig,
+	configRevision,
+} from "../lib/firmware/config";
 import { assertSeedTarget } from "../lib/seed/guard";
 
 const prisma = new PrismaClient();
@@ -11,6 +16,21 @@ const DAY = 24 * HOUR;
 
 /** Every timestamp below is relative to the seed run so screenshots stay current. */
 const ago = (ms: number) => new Date(now.getTime() - ms);
+
+/**
+ * The demo organisation runs the default firmware configuration. The revision
+ * is computed with the same helper the app uses, so a seeded tracker can show
+ * the confirmed state without a fabricated number.
+ */
+const DEMO_ORG_CONFIG: FirmwareConfigValues = {
+	impactThresholdG: 2.5,
+	tiltThresholdDeg: 60,
+	confirmWindowMs: 200,
+	cancelWindowS: 15,
+	heartbeatIntervalS: 30,
+	sosRetryS: 60,
+};
+const DEMO_CONFIG_REV = configRevision(DEMO_ORG_CONFIG);
 
 function hashToken(token: string): string {
 	return createHash("sha256").update(token).digest("hex");
@@ -235,7 +255,10 @@ const TRACKERS: TrackerSeed[] = [
 		rssiDbm: -96,
 		satellites: 4,
 		ignition: false,
-		configRev: 2,
+		// The Hilux echoes the revision of the demo org config, so its detail
+		// page shows the confirmed state. The other trackers keep small
+		// historical revisions to show the not-yet-confirmed state.
+		configRev: DEMO_CONFIG_REV,
 		createdAt: ago(380 * DAY),
 	},
 	{
@@ -1230,16 +1253,6 @@ const COMMANDS: CommandSeed[] = [
 		payload: { reason: "dispatch requested a position check" },
 	},
 	{
-		key: "navara-arm",
-		device: "navara",
-		kind: "ARM",
-		status: "ACKED",
-		createdAt: ago(2 * DAY),
-		expiresAt: ago(2 * DAY - 10 * MINUTE),
-		ackedAt: ago(2 * DAY - 40 * 1000),
-		payload: {},
-	},
-	{
 		key: "navara-test",
 		device: "navara",
 		kind: "TEST_ALERT",
@@ -1267,7 +1280,9 @@ const COMMANDS: CommandSeed[] = [
 		createdAt: ago(3 * DAY),
 		expiresAt: ago(3 * DAY - 10 * MINUTE),
 		ackedAt: ago(3 * DAY - 1 * MINUTE),
-		payload: { rev: 2 },
+		// The same object the app builds, so the seeded ACK and the echoed
+		// configRev describe a real applied configuration.
+		payload: buildFirmwareConfig(DEMO_ORG_CONFIG),
 	},
 	{
 		key: "dmax-locate",
@@ -1276,16 +1291,6 @@ const COMMANDS: CommandSeed[] = [
 		status: "EXPIRED",
 		createdAt: ago(1 * DAY),
 		expiresAt: ago(1 * DAY - 10 * MINUTE),
-		ackedAt: null,
-		payload: {},
-	},
-	{
-		key: "l300-arm",
-		device: "l300",
-		kind: "ARM",
-		status: "FAILED",
-		createdAt: ago(2 * DAY),
-		expiresAt: ago(2 * DAY - 10 * MINUTE),
 		ackedAt: null,
 		payload: {},
 	},
@@ -1392,16 +1397,25 @@ function evidenceFor(incident: IncidentSeed) {
 async function main() {
 	assertDemoTarget();
 
-	const [adminHash, ownerHash, responderHash] = await Promise.all([
+	const [adminHash, ownerHash, responderHash, platformHash] = await Promise.all([
 		hash("Admin123!", 12),
 		hash("Owner123!", 12),
 		hash("Responder123!", 12),
+		hash("Platform123!", 12),
 	]);
 
 	const org = await prisma.organization.upsert({
 		where: { slug: "demo" },
 		create: { name: "LifeLink Demo Fleet", slug: "demo" },
-		update: { name: "LifeLink Demo Fleet" },
+		// A demo re-run clears a suspension left by someone trying the platform
+		// console, so the documented sign-in works again.
+		update: {
+			name: "LifeLink Demo Fleet",
+			status: "ACTIVE",
+			suspendedAt: null,
+			suspendedReason: null,
+			suspendedBy: null,
+		},
 	});
 
 	const [admin, owner, responder] = await Promise.all([
@@ -1434,6 +1448,25 @@ async function main() {
 		}),
 	]);
 
+	// A platform operator is a separate account with no tenant membership by
+	// default. The demo seed is the only place a demo platform credential is
+	// written; production operators are created explicitly (SECURITY.md).
+	const platform = await prisma.user.upsert({
+		where: { email: "platform@lifelink.local" },
+		create: {
+			email: "platform@lifelink.local",
+			name: "LifeLink Platform Administrator",
+			passwordHash: platformHash,
+		},
+		update: { name: "LifeLink Platform Administrator", passwordHash: platformHash },
+	});
+	await prisma.membership.deleteMany({ where: { userId: platform.id } });
+	await prisma.platformAdmin.upsert({
+		where: { userId: platform.id },
+		create: { userId: platform.id, createdBy: admin.id },
+		update: {},
+	});
+
 	const memberships = [
 		{ userId: admin.id, role: "ADMIN" as const },
 		{ userId: owner.id, role: "USER" as const },
@@ -1443,7 +1476,9 @@ async function main() {
 		await prisma.membership.upsert({
 			where: { orgId_userId: { orgId: org.id, userId: membership.userId } },
 			create: { orgId: org.id, ...membership },
-			update: { role: membership.role },
+			// The demo seed restores a revoked demo account so the documented
+			// sign-in still works after someone tries the revoke flow.
+			update: { role: membership.role, revokedAt: null, invitedBy: null },
 		});
 	}
 
@@ -1451,19 +1486,14 @@ async function main() {
 		where: { orgId: org.id },
 		create: {
 			orgId: org.id,
-			impactThresholdG: 2.5,
-			tiltThresholdDeg: 60,
-			confirmWindowMs: 200,
-			cancelWindowS: 15,
-			heartbeatIntervalS: 30,
-			sosRetryS: 60,
+			...DEMO_ORG_CONFIG,
 			telemetryRetentionDays: 30,
 			incidentRetentionDays: 365,
 			alertPhones: [ALERT_PHONE_DISPATCH, ALERT_PHONE_SAFETY],
 			alertEmails: [ALERT_EMAIL_DISPATCH, ALERT_EMAIL_SAFETY],
-			parkedImpactAlerts: false,
 		},
 		update: {
+			...DEMO_ORG_CONFIG,
 			alertPhones: [ALERT_PHONE_DISPATCH, ALERT_PHONE_SAFETY],
 			alertEmails: [ALERT_EMAIL_DISPATCH, ALERT_EMAIL_SAFETY],
 		},
@@ -1742,6 +1772,10 @@ async function main() {
 	console.log("Admin:         admin@lifelink.local / Admin123!");
 	console.log("Vehicle owner: owner@lifelink.local / Owner123!");
 	console.log("Responder:     responder@lifelink.local / Responder123!");
+	console.log("Platform:      platform@lifelink.local / Platform123!");
+	console.log(
+		"Platform gate: set PLATFORM_ADMIN_ENABLED=true and PLATFORM_ADMIN_ALLOW_WITHOUT_MFA=true for local use.",
+	);
 	console.log("Device tokens:");
 	for (const tracker of TRACKERS) {
 		console.log(`  ${tracker.label}: ${tracker.token}`);

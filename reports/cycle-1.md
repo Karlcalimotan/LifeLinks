@@ -112,6 +112,42 @@ Found and fixed in the follow-up:
 The browser tool generates raw Lighthouse JSON per run; it is not committed.
 This section is the durable summary.
 
+## Repeatable axe gate
+
+Date: 2026-11-23. Branch `chore/axe-gate` from `develop@105eb2e`. Command:
+`pnpm a11y` (`node scripts/a11y.mjs`) against the local dev app at
+`http://localhost:3000`, signed in as the demo admin, desktop 1440x900,
+axe-core 4.14.1.
+
+| Route | Critical | Serious | Moderate | Minor | Result |
+| --- | --- | --- | --- | --- | --- |
+| login | 0 | 0 | 2 | 0 | clean |
+| dashboard | 0 | 0 | 1 | 0 | clean |
+| incidents | 0 | 0 | 1 | 0 | clean |
+| map | 0 | 0 | 1 | 0 | clean |
+| analytics | 0 | 0 | 1 | 0 | clean |
+| settings | 0 | 0 | 1 | 0 | clean |
+| trackers | 0 | 0 | 1 | 0 | clean |
+| vehicles | 0 | 0 | 1 | 0 | clean |
+| notifications | 0 | 0 | 1 | 0 | clean |
+
+All nine routes were measured; none is unmeasured. The gate exits `0`: there are
+no serious or critical violations. The dashboard incident-trend chart's
+horizontal scroller now has keyboard access (`bar-chart.tsx` uses a focusable
+`<section>`), closing the previous `scrollable-region-focusable` finding. The
+ten moderate violations are missing landmarks (`region`, plus
+`landmark-one-main` on login); the login page accounts for most of the affected
+nodes. They are listed in `reports/a11y/latest.md`.
+
+The full JSON evidence is `reports/a11y/latest.json`. An unreachable app exits
+`2` and writes **NOT RUN**; the gate never reports a skipped check as a pass.
+The command is not wired into CI (`.github/` is out of scope), so it is the
+repeatable local evidence, not a merge gate.
+
+The Lighthouse accessibility 1.0 result above is unchanged. Lighthouse's
+accessibility category and a full axe run use different rule sets; this run
+reports a best-practice rule that the Lighthouse run did not.
+
 ## Scores
 
 | Dimension | Before | After |
@@ -136,9 +172,11 @@ This section is the durable summary.
 3. T5 threshold is still a platform constant, not an org setting.
 4. Firmware OTA is a display marker only.
 5. The realistic seed is committed but not applied to the remote demo database.
-6. Lighthouse accessibility, best practices and SEO are 1.0 on the eleven
-   audited routes. A repeatable axe/CI gate and a performance benchmark are
-   still missing.
+6. The repeatable axe gate exists (`pnpm a11y`) and reports zero serious or
+   critical violations on 9/9 routes; ten moderate landmark findings remain.
+   Lighthouse accessibility, best practices and SEO remain 1.0 on the eleven
+   audited routes. A performance benchmark and a decision on wiring axe into CI
+   are still missing.
 7. Two schematic map implementations exist; consolidate before they diverge.
 8. The staging preview URL could not be verified from this environment.
 
@@ -147,6 +185,5 @@ This section is the durable summary.
 1. Implement the alert sender and retry path (T7).
 2. Decide the T5 threshold location and migrate if approved.
 3. Apply the realistic seed after owner approval.
-4. Add an axe check to CI and a performance benchmark; Lighthouse
-   accessibility, best practices and SEO are 1.0 on the eleven audited routes.
+4. Decide whether the axe gate joins CI. Add a performance benchmark.
 5. Consolidate the map components and add a heading from telemetry.

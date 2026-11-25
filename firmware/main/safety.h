@@ -4,6 +4,8 @@
   - A confirmed impact starts a visible countdown.
   - The driver can cancel inside the window.
   - If the window expires, the device alerts, and keeps retrying until acked.
+  - Alerting is latched: it has no timed exit. Only an acknowledgement for the
+	active incident, a driver cancel before dispatch, or power loss ends it.
   - Safe mode must never suppress an alert. Unlike an actuator, where refusing to
 	act is the safe direction, refusing to alert after a crash is the dangerous
 	direction.
@@ -11,6 +13,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <string.h>
 
 #include "config.h"
 
@@ -23,6 +26,46 @@ enum class AlertState {
 	Cancelled,
 	PostAlert,
 };
+
+/**
+ * Result of an ACK_INCIDENT command. The device only ever clears an alarm it is
+ * actually raising, and only for the incident it raised it for.
+ */
+enum class IncidentAck : uint8_t {
+	Acknowledged,
+	UnknownIncident,
+};
+
+inline bool incidentIdsMatch(const char* commandIncidentId, const char* activeIncidentId) {
+	if (commandIncidentId == nullptr || commandIncidentId[0] == '\0') return false;
+	if (activeIncidentId == nullptr || activeIncidentId[0] == '\0') return false;
+	return strcmp(commandIncidentId, activeIncidentId) == 0;
+}
+
+/**
+ * Send time for the dispatch, back-dated to the countdown expiry.
+ *
+ * The impact pass can observe the expiry late: a blocking modem call runs after
+ * the state update, so the sample that first sees Alerting may be seconds past
+ * the deadline. The observed epoch is corrected by that measured lateness, so
+ * the report carries the moment the countdown ended rather than the moment the
+ * loop noticed it.
+ *
+ * `observedEpoch` 0 means the GPS clock is not set and stays 0, which makes the
+ * payload omit sent_at. A lateness above kMaxExpiryCorrectionMs, or a deadline
+ * still in the future, is a clock anomaly: the observation time is kept instead
+ * of applying an implausible correction.
+ */
+constexpr uint32_t kMaxExpiryCorrectionMs = 5UL * 60UL * 1000UL;
+
+inline uint32_t dispatchSentAt(uint32_t observedEpoch, uint32_t observedMs, uint32_t expiryMs) {
+	if (observedEpoch == 0) return 0;
+	const uint32_t lateMs = observedMs - expiryMs;
+	if (lateMs == 0 || lateMs > kMaxExpiryCorrectionMs) return observedEpoch;
+	const uint32_t lateS = lateMs / 1000;
+	if (lateS >= observedEpoch) return observedEpoch;
+	return observedEpoch - lateS;
+}
 
 class CrashSafety {
   public:
@@ -81,7 +124,29 @@ class CrashSafety {
 		return false;
 	}
 
-	void stopAlerting() { state_ = AlertState::PostAlert; }
+	/**
+	 * Acknowledge the active dispatch alarm (ACK_INCIDENT).
+	 *
+	 * Only an Alerting incident can be acknowledged, and only by the exact
+	 * client incident id the device generated. A missing or different id, an
+	 * acknowledgement that arrives during the countdown, or one that arrives
+	 * when nothing is alerting changes nothing and is reported as unknown.
+	 * A countdown is never ended remotely here: it still ends with the driver's
+	 * button, the timer, or CANCEL_ALERT.
+	 *
+	 * There is deliberately no timed exit from Alerting. The alarm runs until
+	 * this call succeeds, the driver cancels before dispatch, or the unit loses
+	 * power.
+	 */
+	IncidentAck acknowledgeIncident(const char* commandIncidentId, const char* activeIncidentId) {
+		if (state_ != AlertState::Alerting) return IncidentAck::UnknownIncident;
+		if (!incidentIdsMatch(commandIncidentId, activeIncidentId)) {
+			return IncidentAck::UnknownIncident;
+		}
+		state_ = AlertState::Idle;
+		lastSentMs_ = 0;
+		return IncidentAck::Acknowledged;
+	}
 
 	void reset() { state_ = AlertState::Idle; }
 

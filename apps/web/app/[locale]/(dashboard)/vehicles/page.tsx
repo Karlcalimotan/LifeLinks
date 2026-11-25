@@ -9,6 +9,7 @@ import {
 	TableHeader,
 	TableRow,
 } from "@/components/ui/table";
+import { AddVehicleForm, type VehicleOwnerOption } from "@/components/vehicles/add-vehicle-form";
 import { Link } from "@/i18n/routing";
 import { vehicleScope } from "@/lib/auth/roles";
 import { requireUser } from "@/lib/auth/session";
@@ -16,6 +17,7 @@ import { deviceConnectionState } from "@/lib/device/status";
 import { metadataForPage } from "@/lib/page-metadata";
 import prisma from "@/lib/prisma";
 import { formatRelative } from "@/lib/utils";
+import { VEHICLE_LIST_SELECT } from "@/lib/vehicles/payload";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
@@ -38,11 +40,20 @@ export default async function VehiclesPage({ params }: { params: Promise<{ local
 	const vehicles = await prisma.vehicle.findMany({
 		where: vehicleScope(current.role, current.org.id, current.user.id),
 		orderBy: { plateNo: "asc" },
-		include: {
-			devices: true,
-			_count: { select: { impacts: true, trips: true } },
-		},
+		select: VEHICLE_LIST_SELECT,
 	});
+
+	const canAddVehicle = current.role === "ADMIN" || current.role === "USER";
+	const owners: VehicleOwnerOption[] | undefined =
+		current.role === "ADMIN"
+			? (
+					await prisma.membership.findMany({
+						where: { orgId: current.org.id, revokedAt: null },
+						orderBy: { user: { name: "asc" } },
+						select: { user: { select: { id: true, name: true, email: true } } },
+					})
+				).map((membership) => membership.user)
+			: undefined;
 
 	return (
 		<>
@@ -50,6 +61,16 @@ export default async function VehiclesPage({ params }: { params: Promise<{ local
 				title={current.role === "USER" ? t("ownerTitle") : t("title")}
 				subtitle={current.role === "USER" ? t("ownerSubtitle") : t("subtitle")}
 			/>
+			{canAddVehicle ? (
+				<details className="mb-5 rounded-panel border border-ink-700 bg-ink-900/40">
+					<summary className="cursor-pointer px-4 py-3 text-meta font-medium text-fog-100">
+						{t("addVehicle")}
+					</summary>
+					<div className="border-t border-ink-700 p-4">
+						<AddVehicleForm locale={locale} owners={owners} />
+					</div>
+				</details>
+			) : null}
 			<Card>
 				<CardContent className="pt-5">
 					{vehicles.length === 0 ? (

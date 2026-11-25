@@ -22,6 +22,7 @@ import { buildMapHref, hasActiveMapFilters, parseMapQuery } from "@/lib/map/quer
 import { metadataForPage } from "@/lib/page-metadata";
 import prisma from "@/lib/prisma";
 import { formatDateTime, formatRelative } from "@/lib/utils";
+import { MAP_VEHICLE_SELECT } from "@/lib/vehicles/payload";
 import { Maximize2, TriangleAlert } from "lucide-react";
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
@@ -56,7 +57,7 @@ export default async function MapPage({
 		prisma.vehicle.findMany({
 			where: scope,
 			orderBy: { plateNo: "asc" },
-			include: { devices: true },
+			select: MAP_VEHICLE_SELECT,
 		}),
 		prisma.impactEvent.findMany({
 			where: {

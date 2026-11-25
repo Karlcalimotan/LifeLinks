@@ -6,6 +6,140 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-25
+
+### Added
+
+- Firmware: optional SSD1306 status display with provisioning, joining, WiFi OK
+  and home screens. The home screen shows the WiFi state (`setup` / `joining` /
+  `joined`), the device ID and an optional UUID, never the device token. WiFi is
+  commissioning-only and telemetry stays on the 4G modem (#108).
+- Firmware: dedicated WiFi and factory reset buttons on GPIO 13/14, aligned pin
+  map and provisioning tests (#107).
+- Tracker detail: an admin WiFi setup panel with the AP name derived from the
+  MAC, the current setup state, the GPIO 13/14 reset instructions and a
+  rotate-and-show token action (#43).
+- A repeatable axe accessibility gate (`pnpm a11y`) with JSON and Markdown
+  evidence; the dashboard chart scroller is keyboard accessible (#46).
+- Operator false alarm and cancel after dispatch now queue a `CANCEL_ALERT`
+  command carrying the device client incident id (`llk-...`). The incident
+  detail shows "Cancel requested, waiting for tracker", retries when the
+  command expires, and the stored command row keeps the server
+  `impactEventId` (#9).
+- Per-tracker firmware configuration overrides for the six server-driven
+  fields, with shared envelope validation, a `SET_CONFIG` push, before/after
+  audit and a pending/confirmed state driven by the device's echoed
+  `config_rev` (#44).
+- Bureau acknowledgement for dispatched incidents: `ACK_INCIDENT` carries the
+  device client incident id and the command row keeps the server
+  `impactEventId`, `ackRequestedAt` records the request, and the incident
+  becomes `ACKNOWLEDGED` only when the tracker confirms. The detail shows
+  "Alarm latched, waiting for tracker", reports `unknown_incident`, retries an
+  expired command, and a latched device incident must be acknowledged before
+  it can be resolved (#105).
+- Member invitations and soft revocation: an admin mints a 32-byte, single-use,
+  seven-day invitation stored only as a SHA-256 hash and gets a copyable
+  `/{locale}/invite/{token}` link (no email sender exists, and the panel says
+  so), the accept page creates or attaches the user, creates the membership and
+  audits the join, a revoked membership is blocked on the next request, and a
+  re-invite clears stale permission overrides, returns the member to role
+  defaults and invalidates older links (#11).
+- A per-member permission overlay (`MembershipPermission`) resolved as explicit
+  override ?? role default, enforced by the incident acknowledge/resolve and
+  device-configuration actions. Admin always keeps every permission (#11).
+- Platform administration (`/platform`) with a `PlatformAdmin` row separate
+  from tenant memberships and roles, a separate platform session cookie, and an
+  environment gate that stays closed until MFA exists or
+  `PLATFORM_ADMIN_ALLOW_WITHOUT_MFA=true` is explicitly set for development.
+  The development flag is refused in production. The organization list has a
+  status/search filter and pagination, and both sessions are cleared on tenant
+  sign-out (#12).
+- Organization suspension: `Organization.status`, `suspendedAt`,
+  `suspendedReason` and `suspendedBy`. A suspended organization is rejected at
+  login and resolves to no session on the next request, so existing cookies stop
+  working. Suspend and reinstate require a 5 to 500 character reason and the
+  operator's current password, and each writes a
+  `platform.org_suspended` / `platform.org_reinstated` audit row with actor,
+  organization, reason and before/after status (#12).
+- Explicit admin payload field lists for the platform organization list, tenant
+  member list, tracker list/detail, vehicle list/detail, incident detail and
+  live map, so no `tokenHash`, `passwordHash`, `p256dh`, `auth`, `endpoint` or
+  raw device token is selected into a list or detail payload (#12).
+- The tracker records `sent_at` once, when the countdown expires and the
+  emergency alert starts, back-dated from the countdown deadline to GPS UTC.
+  `ImpactEvent.sentAt` stores it only when the device clock passes the same
+  plausibility check as `detected_at`, and a retry never replaces it.
+  `ImpactEvent.confirmedReceivedAt` anchors the console receipt of the first
+  `CONFIRMED` report, so the incident detail shows "Tracker sent at HH:MM:SS"
+  with the alert-start to receipt delay (0 to 3600 seconds) rather than the
+  earlier `createdAt` of the suspected row (#130).
+- Vehicle owners can register a vehicle and its emergency contacts from the
+  console. `EmergencyContact.vehicleId` attaches a contact to one vehicle (null
+  stays the admin-only organisation fallback), an owner may write only their
+  own vehicle and its contacts while an admin may write the whole organisation,
+  and every create, edit and archive writes an audit row with before/after
+  values. A vehicle with incidents or a tracker is archived as `RETIRED`, never
+  hard-deleted.
+- Alert routing prefers the vehicle's active contacts: the incident route merges
+  them ahead of the organisation phones and emails, dedupes and caps each
+  channel at ten, and the command poll sends up to two vehicle contacts as the
+  tracker's `alert_phones`, falling back to the organisation list (#127).
+- Installable PWA: `/manifest.webmanifest` with a locale-neutral `/` start URL
+  and scope, 192/512/maskable/Apple PNG icons rendered from the brand mark, a
+  global service worker registration that also covers the login page, install
+  prompts for Android and desktop plus iOS Add to Home Screen instructions, and
+  a waiting-worker update banner that posts `SKIP_WAITING` only on request
+  (#133).
+- A bilingual offline shell at `/offline.html`. The worker caches only public
+  build assets, the offline page, the manifest, the public icons and the brand
+  marks; API responses, RSC payloads, HTML documents, authenticated pages and
+  cross-origin requests stay network-only. Push and notification-click
+  behaviour is unchanged (#133).
+- Telemetry and incident retention are now enforced by a daily
+  `GET /api/cron/retention` job. It requires `Authorization: Bearer
+  $CRON_SECRET`, fails closed with `503` when the secret is not configured,
+  deletes rows older than each organisation's configured periods in bounded
+  batches, supports `?dryRun=1` for counts without deletion, and writes one
+  `retention.cleanup` audit row per organisation with the cutoffs and counts.
+  The privacy notice now describes the automatic deletion (#129).
+
+### Changed
+
+- A device-backed `SUSPECTED` incident can no longer be acknowledged locally;
+  the bureau waits for dispatch. A legacy local `ACKNOWLEDGED` is reopened when
+  the tracker reports `CONFIRMED`, and an ADMIN-only recovery path can resolve
+  a dispatched incident after its acknowledgement expired, failed, or came back
+  `unknown_incident`/`unconfirmed` (including a reboot or power loss), with an
+  audit row and honest copy that the alarm may still sound. The recovery
+  requires a server-checked typed `RESOLVE`, and an `ACK_INCIDENT` and
+  `CANCEL_ALERT` cannot be pending for the same incident at once (#105).
+- A revoked membership is rejected by `getCurrentUser` and ignored by the login
+  lookup, so revocation takes effect immediately rather than at cookie expiry;
+  revoking also removes the member's push subscriptions (#11).
+- The settings members section now lists status, invites, revokes and
+  re-invites instead of saying invitations are unavailable (#11).
+- `CANCEL_ALERT` acknowledgements decide the incident: only `cancelled` sets
+  `FALSE_ALARM`. `too_late`, `unknown_incident`, a missing detail, an expired
+  command or a failed command keep the status and record the reason. A
+  `CANCELLED` incident and an incident with a recorded resolution are not
+  overwritten, and legacy local false-alarm/cancel transitions are refused for
+  live incidents so the tracker is not bypassed (#9).
+- Crash detection is always on. The tracker page no longer offers Arm or
+  Disarm, the admin command allowlist rejects both kinds, and the firmware
+  acknowledges `ARM`/`DISARM` as `unsupported` without changing safety state.
+  The unused `g_armed` flag is removed (#137).
+- Settings no longer shows a parked-impact toggle. `OrgSettings.parkedImpactAlerts`
+  stays as a reserved column: it is not read, not exposed and not part of the
+  firmware configuration envelope (#137).
+
+### Fixed
+
+- The service worker now evaluates on registration. `sw.js` and `sw-url.js`
+  both declared `safeNotificationUrl` in the classic worker global scope, so
+  the worker failed to start and both push and the PWA offline shell were
+  disabled. The URL guard is now an IIFE and the worker binds a local alias
+  (#147).
+
 ## [0.3.0] - 2026-11-23
 
 ### Added

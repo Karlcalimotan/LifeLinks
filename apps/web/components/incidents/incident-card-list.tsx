@@ -25,14 +25,14 @@ export async function IncidentCardList({
 	incidents,
 	acknowledgedAt,
 	now,
-	canManage,
+	canAcknowledge,
 	returnTo,
 }: {
 	locale: string;
 	incidents: readonly IncidentCardItem[];
 	acknowledgedAt: ReadonlyMap<string, Date>;
 	now: Date;
-	canManage: boolean;
+	canAcknowledge: boolean;
 	returnTo: string;
 }) {
 	const t = await getTranslations({ locale, namespace: "incidents" });
@@ -43,8 +43,7 @@ export async function IncidentCardList({
 				const delivered = incident.alerts.filter(
 					(alert) => alert.status === "SENT" || alert.status === "ACKNOWLEDGED",
 				).length;
-				const canAcknowledge =
-					canManage && (incident.status === "CONFIRMED" || incident.status === "SUSPECTED");
+				const canAcknowledgeIncident = canAcknowledge && incident.status === "CONFIRMED";
 				const detected = formatDateTime(incident.detectedAt, locale);
 
 				return (
@@ -106,7 +105,7 @@ export async function IncidentCardList({
 						</dl>
 
 						<div className="flex flex-wrap items-center gap-2">
-							{canAcknowledge ? (
+							{canAcknowledgeIncident ? (
 								<form action={acknowledgeIncidentAction}>
 									<input type="hidden" name="locale" value={locale} />
 									<input type="hidden" name="incidentId" value={incident.id} />

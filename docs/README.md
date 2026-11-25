@@ -2,6 +2,8 @@
 
 | Document | What it covers |
 | --- | --- |
+| [user-guide.md](user-guide.md) | Driver, responder and administrator tasks, vehicles and contacts, retention, phone install, privacy, troubleshooting and a printable quick card |
+| [pwa.md](pwa.md) | Installable console, offline shell, cache policy and update flow |
 | [architecture.md](architecture.md) | Layers, data model, auth, device contract, extension points |
 | [design.md](design.md) | Night Highway Dispatch palette, type, logo, layout and accessibility |
 | [wiring.md](wiring.md) | Canonical pin map, power chain, pre-power checklist |
@@ -14,6 +16,7 @@
 | [agents.md](agents.md) | Multi-agent roles, worktrees, issue-first and merge policy |
 | [runbook.md](runbook.md) | Build, flash, provisioning, health checks, troubleshooting |
 | [current-state.md](current-state.md) | Setup baseline and gaps before the work phases |
+| [thesis-corrections.md](thesis-corrections.md) | Thesis v3.1 corrections against the v0.5.0 batch, with section-level replacement text |
 | [adr/](adr/) | Architecture decisions and the template |
 | [../stack/README.md](../stack/README.md) | Scaffold and generators |
 

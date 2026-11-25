@@ -1,3 +1,6 @@
+import { InstallCard } from "@/components/pwa/install-prompt";
+import { InviteMemberForm } from "@/components/settings/invite-member-form";
+import { MemberRowActions } from "@/components/settings/member-row-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,10 +16,12 @@ import {
 } from "@/components/ui/table";
 import { Link } from "@/i18n/routing";
 import { updateSettingsAction } from "@/lib/actions/settings";
+import { isMembershipActive } from "@/lib/auth/membership";
 import { canAdminister, requireRole, roleLabelKey } from "@/lib/auth/session";
 import { DEVICE_OFFLINE_AFTER_MIN, DEVICE_WEAK_AFTER_MIN } from "@/lib/constants";
 import { metadataForPage } from "@/lib/page-metadata";
 import prisma from "@/lib/prisma";
+import { MEMBER_LIST_SELECT } from "@/lib/settings/member-payload";
 import { type ResolvedOrgSettings, getOrgSettings } from "@/lib/settings/org";
 import {
 	PERMISSION_ROLE_ORDER,
@@ -64,11 +69,27 @@ export default async function SettingsPage({
 	const { locale } = await params;
 	const raw = await searchParams;
 	const saved = raw.saved === "1";
+	const revoked = raw.revoked === "1";
 	const error = typeof raw.error === "string" ? raw.error : "";
 	const tab = parseSettingsTab(raw.tab);
 	const auditQuery = parseAuditQuery(raw);
 	const current = await requireRole("ADMIN");
 	const t = await getTranslations({ locale, namespace: "settings" });
+
+	const errorMessage =
+		error === "forbidden"
+			? t("adminOnly")
+			: error === "self"
+				? t("memberErrorSelf")
+				: error === "last_admin"
+					? t("memberErrorLastAdmin")
+					: error === "already"
+						? t("memberErrorAlready")
+						: error === "notfound"
+							? t("memberErrorNotFound")
+							: error
+								? t("errorInvalid")
+								: null;
 
 	const showForm = isSettingsFormTab(tab);
 	const [org, settings] = showForm
@@ -97,9 +118,14 @@ export default async function SettingsPage({
 					{t("saved")}
 				</p>
 			) : null}
-			{error ? (
+			{revoked ? (
+				<p className="mb-4 rounded-panel border border-clear-400/30 bg-clear-400/10 px-3 py-2 text-meta text-clear-300">
+					{t("memberRevokedNotice")}
+				</p>
+			) : null}
+			{errorMessage ? (
 				<p className="mb-4 rounded-panel border border-alarm-400/30 bg-alarm-400/10 px-3 py-2 text-meta text-alarm-300">
-					{error === "forbidden" ? t("adminOnly") : t("errorInvalid")}
+					{errorMessage}
 				</p>
 			) : null}
 
@@ -131,6 +157,9 @@ export default async function SettingsPage({
 				</nav>
 
 				<div className="min-w-0 flex-1">
+					<div className="mb-6">
+						<InstallCard />
+					</div>
 					{showForm && settings ? (
 						<SettingsForm
 							tab={tab}
@@ -140,7 +169,9 @@ export default async function SettingsPage({
 							editable={editable}
 						/>
 					) : null}
-					{tab === "members" ? <MembersSection orgId={current.org.id} locale={locale} /> : null}
+					{tab === "members" ? (
+						<MembersSection orgId={current.org.id} locale={locale} actorUserId={current.user.id} />
+					) : null}
 					{tab === "audit" ? (
 						<AuditSection orgId={current.org.id} locale={locale} query={auditQuery} />
 					) : null}
@@ -330,16 +361,6 @@ async function SettingsForm({
 								disabled={!editable}
 							/>
 						</Field>
-						<label className="flex items-center gap-2 text-meta text-fog-500 sm:col-span-2">
-							<input
-								type="checkbox"
-								name="parkedImpactAlerts"
-								defaultChecked={settings.parkedImpactAlerts}
-								disabled={!editable}
-								className="size-4 rounded border-ink-600 bg-ink-950 accent-signal-500"
-							/>
-							{t("parkedImpactAlerts")}
-						</label>
 					</CardContent>
 				</Card>
 			</div>
@@ -363,14 +384,30 @@ async function SettingsForm({
 	);
 }
 
-async function MembersSection({ orgId, locale }: { orgId: string; locale: string }) {
+async function MembersSection({
+	orgId,
+	locale,
+	actorUserId,
+}: {
+	orgId: string;
+	locale: string;
+	actorUserId: string;
+}) {
 	const t = await getTranslations({ locale, namespace: "settings" });
 	const roleNames = await getTranslations({ locale, namespace: "roles" });
 	const members = await prisma.membership.findMany({
 		where: { orgId },
-		include: { user: true },
+		select: MEMBER_LIST_SELECT,
 		orderBy: { createdAt: "asc" },
 	});
+	const activeAdmins = members.filter(
+		(member) => member.role === "ADMIN" && isMembershipActive(member),
+	).length;
+	const ordered = [...members].sort(
+		(a, b) =>
+			Number(!isMembershipActive(a)) - Number(!isMembershipActive(b)) ||
+			a.createdAt.getTime() - b.createdAt.getTime(),
+	);
 	const matrix = permissionMatrix();
 	const permissionLabels: Record<PermissionKey, string> = {
 		incidents: t("permissionIncidents"),
@@ -381,6 +418,16 @@ async function MembersSection({ orgId, locale }: { orgId: string; locale: string
 		<div className="flex flex-col gap-6">
 			<Card>
 				<CardHeader>
+					<CardTitle>{t("inviteTitle")}</CardTitle>
+					<CardDescription>{t("inviteHint")}</CardDescription>
+				</CardHeader>
+				<CardContent>
+					<InviteMemberForm locale={locale} />
+				</CardContent>
+			</Card>
+
+			<Card>
+				<CardHeader>
 					<CardTitle>{t("members")}</CardTitle>
 					<CardDescription>{t("membersHint")}</CardDescription>
 				</CardHeader>
@@ -388,32 +435,53 @@ async function MembersSection({ orgId, locale }: { orgId: string; locale: string
 					{members.length === 0 ? (
 						<EmptyState title={t("membersEmpty")} />
 					) : (
-						<Table className="min-w-[560px]">
+						<Table className="min-w-[720px]">
 							<TableHeader>
 								<TableRow>
 									<TableHead>{t("name")}</TableHead>
 									<TableHead>{t("email")}</TableHead>
 									<TableHead>{t("role")}</TableHead>
+									<TableHead>{t("memberStatus")}</TableHead>
 									<TableHead>{t("memberSince")}</TableHead>
+									<TableHead>{t("memberActions")}</TableHead>
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{members.map((member) => (
-									<TableRow key={member.id}>
-										<TableCell className="font-medium text-fog-100">{member.user.name}</TableCell>
-										<TableCell className="font-mono text-meta text-fog-400">
-											{member.user.email}
-										</TableCell>
-										<TableCell>
-											<Badge tone={roleTones[member.role]}>
-												{roleNames(roleLabelKey(member.role))}
-											</Badge>
-										</TableCell>
-										<TableCell className="text-meta text-fog-500">
-											{formatDateTime(member.createdAt, locale)}
-										</TableCell>
-									</TableRow>
-								))}
+								{ordered.map((member) => {
+									const active = isMembershipActive(member);
+									return (
+										<TableRow key={member.id}>
+											<TableCell className="font-medium text-fog-100">{member.user.name}</TableCell>
+											<TableCell className="font-mono text-meta text-fog-400">
+												{member.user.email}
+											</TableCell>
+											<TableCell>
+												<Badge tone={roleTones[member.role]}>
+													{roleNames(roleLabelKey(member.role))}
+												</Badge>
+											</TableCell>
+											<TableCell>
+												<Badge tone={active ? "success" : "muted"}>
+													{active ? t("statusActive") : t("statusRevoked")}
+												</Badge>
+											</TableCell>
+											<TableCell className="text-meta text-fog-500">
+												{formatDateTime(member.createdAt, locale)}
+											</TableCell>
+											<TableCell>
+												<MemberRowActions
+													locale={locale}
+													membershipId={member.id}
+													name={member.user.name}
+													role={member.role}
+													revoked={!active}
+													isSelf={member.userId === actorUserId}
+													isLastAdmin={member.role === "ADMIN" && activeAdmins <= 1}
+												/>
+											</TableCell>
+										</TableRow>
+									);
+								})}
 							</TableBody>
 						</Table>
 					)}
@@ -423,6 +491,7 @@ async function MembersSection({ orgId, locale }: { orgId: string; locale: string
 			<Card>
 				<CardHeader>
 					<CardTitle>{t("permissionsTitle")}</CardTitle>
+					<CardDescription>{t("permissionsHint")}</CardDescription>
 				</CardHeader>
 				<CardContent>
 					<Table className="min-w-[520px]">

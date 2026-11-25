@@ -190,6 +190,14 @@ class BootResetSequence {
 		allCleared_ = false;
 		restartPending_ = false;
 		finished_ = false;
+		factoryOnly_ = false;
+	}
+
+	// A single-purpose 10 s factory button: no WiFi-only step and no restart at
+	// 5 s, so releasing before 10 s does nothing.
+	void beginFactory(uint32_t bootMs) {
+		begin(bootMs);
+		factoryOnly_ = true;
 	}
 
 	BootResetAction update(uint32_t nowMs, bool pressed) {
@@ -263,6 +271,14 @@ class BootResetSequence {
 
   private:
 	BootResetAction actionForHold(uint32_t heldMs) {
+		if (factoryOnly_) {
+			if (heldMs >= kFactoryResetHoldMs && !allCleared_) {
+				allCleared_ = true;
+				restartPending_ = true;
+				return BootResetAction::ClearAll;
+			}
+			return BootResetAction::None;
+		}
 		if (heldMs >= kFactoryResetHoldMs && !allCleared_) {
 			allCleared_ = true;
 			wifiCleared_ = true;
@@ -285,6 +301,7 @@ class BootResetSequence {
 	bool allCleared_ = false;
 	bool restartPending_ = false;
 	bool finished_ = false;
+	bool factoryOnly_ = false;
 };
 
 }  // namespace fw

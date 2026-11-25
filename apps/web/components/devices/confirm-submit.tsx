@@ -14,6 +14,7 @@ export function ConfirmSubmit({
 	confirmText,
 	cancelLabel,
 	disabled = false,
+	autoFocus = false,
 	children,
 	variant = "primary",
 	size = "sm",
@@ -23,6 +24,7 @@ export function ConfirmSubmit({
 	confirmText?: string;
 	cancelLabel?: string;
 	disabled?: boolean;
+	autoFocus?: boolean;
 	children: ReactNode;
 	variant?: ButtonProps["variant"];
 	size?: ButtonProps["size"];
@@ -41,6 +43,7 @@ export function ConfirmSubmit({
 				variant={variant}
 				size={size}
 				disabled={disabled}
+				autoFocus={autoFocus}
 				onClick={() => dialogRef.current?.showModal()}
 			>
 				{children}

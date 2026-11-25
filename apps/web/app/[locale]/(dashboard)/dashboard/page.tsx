@@ -3,6 +3,7 @@ import { AcknowledgeButton } from "@/components/dashboard/acknowledge-button";
 import { ElapsedTime } from "@/components/dashboard/elapsed-time";
 import { DeviceStatusBadge, IncidentStatusBadge, SeverityBadge } from "@/components/domain/badges";
 import { FleetMap, type FleetMapLegendItem, type FleetMapMarker } from "@/components/map/fleet-map";
+import { InstallBanner } from "@/components/pwa/install-prompt";
 import { Badge } from "@/components/ui/badge";
 import { buttonClasses } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +11,6 @@ import { EmptyState, PageHeader } from "@/components/ui/page-header";
 import { Link } from "@/i18n/routing";
 import { acknowledgeIncidentAction } from "@/lib/actions/incidents";
 import { formatDuration } from "@/lib/analytics/aggregate";
-import { canManageIncidents } from "@/lib/auth/roles";
 import { requireUser } from "@/lib/auth/session";
 import { DEVICE_OFFLINE_AFTER_MIN } from "@/lib/constants";
 import { loadDashboardData } from "@/lib/dashboard/data";
@@ -170,9 +170,13 @@ export default async function DashboardPage({
 				? { tone: "error" as const, text: t("errorForbidden") }
 				: error === "transition"
 					? { tone: "error" as const, text: t("errorTransition") }
-					: error === "notfound"
-						? { tone: "error" as const, text: t("errorNotFound") }
-						: null;
+					: error === "ack_not_dispatched"
+						? { tone: "error" as const, text: t("errorAckNotDispatched") }
+						: error === "command_conflict"
+							? { tone: "error" as const, text: t("errorCommandConflict") }
+							: error === "notfound"
+								? { tone: "error" as const, text: t("errorNotFound") }
+								: null;
 
 	const stateLabels: Record<FleetMarkerState, string> = {
 		incident: t("legendIncident"),
@@ -286,6 +290,7 @@ export default async function DashboardPage({
 
 	return (
 		<>
+			<InstallBanner />
 			<PageHeader
 				title={current.role === "USER" ? t("ownerTitle") : t("title")}
 				subtitle={current.role === "USER" ? t("ownerSubtitle") : t("subtitle")}
@@ -407,7 +412,8 @@ export default async function DashboardPage({
 												/>
 											</span>
 											<div className="flex items-center gap-2">
-												{canManageIncidents(current.role) ? (
+												{current.permissions["incident.acknowledge"] &&
+												incident.status === "CONFIRMED" ? (
 													<form action={acknowledgeIncidentAction}>
 														<input type="hidden" name="locale" value={locale} />
 														<input type="hidden" name="incidentId" value={incident.id} />

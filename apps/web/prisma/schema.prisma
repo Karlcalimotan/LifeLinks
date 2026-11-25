@@ -23,6 +23,13 @@ enum MemberRole {
   ADMIN
 }
 
+/// Tenant lifecycle. A SUSPENDED organization grants nothing: login is
+/// rejected and `getCurrentUser` resolves to null on the next request.
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+}
+
 enum VehicleStatus {
   ACTIVE
   MAINTENANCE
@@ -66,11 +73,16 @@ enum AlertStatus {
 
 enum CommandKind {
   LOCATE
+  /// Historical only. The console rejects these, and the firmware acknowledges
+  /// them as `unsupported` without changing any safety state. Crash detection
+  /// is always on.
   ARM
   DISARM
   TEST_ALERT
   SET_CONFIG
   ROTATE_TOKEN
+  CANCEL_ALERT
+  ACK_INCIDENT
 }
 
 enum CommandStatus {
@@ -104,17 +116,28 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  memberships   Membership[]
-  ownedVehicles Vehicle[]    @relation("VehicleOwner")
-  auditLogs     AuditLog[]   @relation("AuditActor")
+  memberships        Membership[]
+  ownedVehicles      Vehicle[]          @relation("VehicleOwner")
+  auditLogs          AuditLog[]         @relation("AuditActor")
+  pushSubscriptions  PushSubscription[]
+  invitationsCreated InvitationToken[]  @relation("InvitationCreator")
+  /// Global platform operator. Deliberately separate from `Membership` and
+  /// `MemberRole`: it grants `/platform` only, never tenant permissions.
+  platformAdmin      PlatformAdmin?
 }
 
 model Organization {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String             @id @default(cuid())
+  name            String
+  slug            String             @unique
+  status          OrganizationStatus @default(ACTIVE)
+  /// Set while suspended; cleared on reinstate. `suspendedBy` is the actor
+  /// user id (a plain string, so the audit breadcrumb survives user deletion).
+  suspendedAt     DateTime?
+  suspendedReason String?
+  suspendedBy     String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
 
   memberships       Membership[]
   vehicles          Vehicle[]
@@ -124,7 +147,28 @@ model Organization {
   emergencyContacts EmergencyContact[]
   geofences         Geofence[]
   settings          OrgSettings?
+  configOverrides   DeviceConfigOverride[]
   auditLogs         AuditLog[]
+  pushSubscriptions PushSubscription[]
+  invitationTokens  InvitationToken[]
+
+  @@index([status, createdAt])
+}
+
+/// Global platform operator. This is not a tenant role: it is keyed to a User
+/// and grants only the separate `/platform` console. A platform admin with no
+/// Membership has no tenant access at all. The table is intentionally global
+/// (not org-scoped) because the operator must see every organization; the
+/// migration enables RLS with a deny-all policy so only the owner/Prisma path
+/// can read it.
+model PlatformAdmin {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  createdAt DateTime @default(now())
+  /// User id of the operator who created this row, when known.
+  createdBy String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Membership {
@@ -132,13 +176,63 @@ model Membership {
   orgId     String
   userId    String
   role      MemberRole @default(USER)
+  /// User id of the admin whose invitation created or last renewed this
+  /// membership. A plain string, not a relation: it is an audit breadcrumb,
+  /// not a reference that has to survive the inviter's deletion.
+  invitedBy String?
+  /// Soft revocation. The row keeps its role and audit trail so an admin can
+  /// re-invite the person; every request path treats a revoked membership as
+  /// absent (`getCurrentUser` returns null).
+  revokedAt DateTime?
   createdAt DateTime   @default(now())
 
-  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org         Organization           @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissions MembershipPermission[]
 
   @@unique([orgId, userId])
   @@index([userId])
+  @@index([orgId, revokedAt])
+}
+
+/// Explicit per-member permission override. The role default applies when no
+/// row exists for the key; `lib/auth/permissions.ts` is the only resolver. The
+/// rows cascade with the membership, so a re-invite that returns to role
+/// defaults only has to delete them.
+model MembershipPermission {
+  id           String   @id @default(cuid())
+  membershipId String
+  key          String
+  allowed      Boolean
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@unique([membershipId, key])
+  @@index([membershipId])
+}
+
+/// Single-use, hashed invitation. The plaintext token exists only in the link
+/// shown to the admin who minted it; `tokenHash` is the SHA-256 of that token.
+/// `usedAt` is set when the invitation is accepted, or when a newer invitation
+/// for the same organization and email supersedes it.
+model InvitationToken {
+  id          String     @id @default(cuid())
+  orgId       String
+  email       String
+  role        MemberRole @default(USER)
+  tokenHash   String     @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdById String
+  createdAt   DateTime   @default(now())
+
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  createdBy User         @relation("InvitationCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([orgId, email])
+  @@index([orgId, createdAt])
 }
 
 model Vehicle {
@@ -157,11 +251,12 @@ model Vehicle {
   updatedAt   DateTime      @updatedAt
 
   org       Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  owner     User?           @relation("VehicleOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  devices   TrackerDevice[]
-  trips     Trip[]
-  impacts   ImpactEvent[]
-  geofences Geofence[]
+  owner             User?              @relation("VehicleOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  devices           TrackerDevice[]
+  trips             Trip[]
+  impacts           ImpactEvent[]
+  geofences         Geofence[]
+  emergencyContacts EmergencyContact[]
 
   @@unique([orgId, plateNo])
   @@index([orgId, status])
@@ -191,16 +286,40 @@ model TrackerDevice {
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
-  org      Organization       @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  vehicle  Vehicle?           @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
-  trips    Trip[]
-  samples  TelemetrySample[]
-  impacts  ImpactEvent[]
-  commands DeviceCommand[]
-  events   DeviceStateEvent[]
+  org            Organization          @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  vehicle        Vehicle?              @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  configOverride DeviceConfigOverride?
+  trips          Trip[]
+  samples        TelemetrySample[]
+  impacts        ImpactEvent[]
+  commands       DeviceCommand[]
+  events         DeviceStateEvent[]
 
   @@index([orgId, lastSeenAt])
   @@index([vehicleId])
+}
+
+/// Optional per-device overrides for the six server-driven firmware fields.
+/// A null column means "use the organisation default". The row is deleted when
+/// every field inherits again, so its presence always means at least one
+/// override exists.
+model DeviceConfigOverride {
+  id                 String   @id @default(cuid())
+  deviceId           String   @unique
+  orgId              String
+  impactThresholdG   Float?
+  tiltThresholdDeg   Float?
+  confirmWindowMs    Int?
+  cancelWindowS      Int?
+  heartbeatIntervalS Int?
+  sosRetryS          Int?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  device TrackerDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  org    Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
 }
 
 model Trip {
@@ -254,34 +373,39 @@ model TelemetrySample {
 }
 
 model ImpactEvent {
-  id               String       @id @default(cuid())
-  orgId            String
-  deviceId         String
-  vehicleId        String
-  tripId           String?
-  clientIncidentId String
-  detectedAt       DateTime
-  peakAccelG       Float
-  tiltDeg          Float
-  vibrationCount   Int          @default(0)
-  speedKph         Float?
-  lat              Float?
-  lng              Float?
-  gpsAgeS          Int?
-  status           ImpactStatus @default(CONFIRMED)
-  cancelDeadline   DateTime?
-  cancelledAt      DateTime?
-  resolvedAt       DateTime?
-  resolution       String?
-  evidence         Json?
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  id                  String       @id @default(cuid())
+  orgId               String
+  deviceId            String
+  vehicleId           String
+  tripId              String?
+  clientIncidentId    String
+  detectedAt          DateTime
+  sentAt              DateTime?
+  confirmedReceivedAt DateTime?
+  peakAccelG          Float
+  tiltDeg             Float
+  vibrationCount      Int          @default(0)
+  speedKph            Float?
+  lat                 Float?
+  lng                 Float?
+  gpsAgeS             Int?
+  status              ImpactStatus @default(CONFIRMED)
+  cancelDeadline      DateTime?
+  cancelledAt         DateTime?
+  cancelRequestedAt   DateTime?
+  ackRequestedAt      DateTime?
+  resolvedAt          DateTime?
+  resolution          String?
+  evidence            Json?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
 
-  org     Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  device  TrackerDevice   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
-  vehicle Vehicle         @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  trip    Trip?           @relation(fields: [tripId], references: [id], onDelete: SetNull)
-  alerts  AlertDelivery[]
+  org      Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  device   TrackerDevice   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  vehicle  Vehicle         @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  trip     Trip?           @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  alerts   AlertDelivery[]
+  commands DeviceCommand[]
 
   @@unique([deviceId, clientIncidentId])
   @@index([orgId, detectedAt])
@@ -307,18 +431,21 @@ model AlertDelivery {
 }
 
 model DeviceCommand {
-  id        String        @id @default(cuid())
-  deviceId  String
-  kind      CommandKind
-  payload   Json          @default("{}")
-  status    CommandStatus @default(PENDING)
-  createdAt DateTime      @default(now())
-  expiresAt DateTime?
-  ackedAt   DateTime?
+  id            String        @id @default(cuid())
+  deviceId      String
+  impactEventId String?
+  kind          CommandKind
+  payload       Json          @default("{}")
+  status        CommandStatus @default(PENDING)
+  createdAt     DateTime      @default(now())
+  expiresAt     DateTime?
+  ackedAt       DateTime?
 
   device TrackerDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  impact ImpactEvent?  @relation(fields: [impactEventId], references: [id], onDelete: SetNull)
 
   @@index([deviceId, status, createdAt])
+  @@index([impactEventId, kind, createdAt])
 }
 
 model DeviceStateEvent {
@@ -336,19 +463,34 @@ model DeviceStateEvent {
   @@index([type, createdAt])
 }
 
+/// A person who receives the queued SMS/email alerts. `vehicleId` attaches the
+/// contact to one vehicle; a null `vehicleId` is the organisation-level
+/// fallback that only an admin may create. Deleting a vehicle cascades its
+/// contacts, which is why the console archives a vehicle (status RETIRED)
+/// instead of deleting it once it has incidents or a tracker.
+///
+/// `@@unique([orgId, phone])` is kept deliberately: one phone is one person in
+/// an organisation, so the same number cannot be attached to two vehicles.
+/// A shared contact (a spouse with two cars) is represented by one row on the
+/// primary vehicle and the organisation phone list remains the fleet fallback.
+/// The contact form reports a duplicate phone instead of silently creating a
+/// second row.
 model EmergencyContact {
   id        String   @id @default(cuid())
   orgId     String
+  vehicleId String?
   name      String
   phone     String
   email     String?
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
 
-  org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  org     Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  vehicle Vehicle?     @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
 
   @@unique([orgId, phone])
   @@index([orgId, active])
+  @@index([orgId, vehicleId, active])
 }
 
 model Geofence {
@@ -381,6 +523,9 @@ model OrgSettings {
   incidentRetentionDays  Int     @default(365)
   alertPhones            Json    @default("[]")
   alertEmails            Json    @default("[]")
+  /// Reserved, not enforced. No code reads this column and Settings does not
+  /// expose it. Crash detection is always on, so parked impacts are treated
+  /// like any other impact. Kept to avoid a destructive migration.
   parkedImpactAlerts     Boolean @default(false)
 
   org Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
@@ -400,4 +545,27 @@ model AuditLog {
 
   @@index([orgId, createdAt])
   @@index([action, createdAt])
+}
+
+/// One browser Web Push subscription per endpoint. `endpoint` is a capability
+/// (the push service delivers only to it), so it is never logged. Rows are
+/// deleted on logout, by the owner, and when the push service reports the
+/// endpoint gone (404/410). `locale` picks the notification language.
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  orgId     String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  locale    String   @default("en")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org  Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, userId])
+  @@index([userId])
 }

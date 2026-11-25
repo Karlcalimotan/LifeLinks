@@ -9,6 +9,10 @@
   the app-level orgId filters are authoritative.
 - **Pages:** dashboard, devices (trackers), vehicles, incidents, settings, login
   and public legal pages. Tracker detail and incident detail exist.
+- **Always-on detection:** the tracker has no arm or disarm control. The console
+  offers Locate and Test alert, and the firmware acknowledges an ARM or DISARM
+  request as `unsupported` without changing safety state. The parked-impact
+  setting is not exposed or enforced.
 - **Device API:** `/api/device/ingest` (heartbeat + batched telemetry),
   `/api/device/incident`, `/api/device/incident/cancel`, `/api/device/command`,
   `/api/device/command/ack`, plus the signed firmware check. Device tokens are
@@ -22,6 +26,38 @@
 - **Verification:** `pnpm self-check` is the local gate; the web job runs lint,
   typecheck, Vitest, the RLS test against a disposable Postgres service and the
   production build. Firmware has its own `scripts/verify.sh` gate.
+
+## Accessibility evidence (2026-11-23)
+
+`pnpm a11y` (`node scripts/a11y.mjs`) is the repeatable axe check. It signs in
+with the demo admin, measures the login page before authentication and the
+console routes after it, and writes `reports/a11y/latest.json` plus a Markdown
+summary. It needs the app running (`E2E_BASE_URL`, default
+`http://localhost:3000`) and Playwright Chromium.
+
+Latest run: branch `chore/axe-gate` from `develop@105eb2e`, axe-core 4.14.1,
+desktop 1440x900.
+
+| Result | Count |
+| --- | --- |
+| Routes measured | 9 of 9 |
+| Critical violations | 0 |
+| Serious violations | 0 |
+| Moderate violations | 10 |
+| Minor violations | 0 |
+
+The result is a **pass for serious and critical violations**: 9/9 routes were
+measured, with zero serious or critical findings. The ten moderate violations
+are missing landmarks (`region`, `landmark-one-main`); the login page accounts
+for most of the affected nodes. The dashboard incident-trend chart's horizontal
+scroller now has keyboard access (`bar-chart.tsx` uses a focusable `<section>`),
+so the previous `scrollable-region-focusable` finding is closed. The gate exits
+`1` on a serious or critical violation, `2` when the app is unreachable or a
+route cannot be measured, and `0` when no serious or critical violation is
+found. An unreachable run is recorded as **NOT RUN**, never as a pass.
+
+The check is not part of CI; wiring it in is a separate policy decision
+(`.github/` is out of scope for this change).
 
 ## Firmware setup baseline (2026-11-22)
 
@@ -87,21 +123,22 @@ environment. The sketch needs the ESP32 core and is excluded from that build.
 
 These are inputs for the Phase 1 audit, not changes made by the setup:
 
-1. **Watchdog is not enabled.** No `esp_task_wdt` use; a hung modem call is not
-   recovered by a reset.
+1. **Watchdog is enabled, bench proof pending.** The `loop()` task is
+   subscribed to `esp_task_wdt` with a 120 s timeout and panic enabled; feeds
+   sit between bounded phases. The synthetic hang is a hardware bench step.
 2. **The modem/GPS path still blocks.** `main.ino` has bounded waits, but several
    AT calls block the loop for seconds; `delay()` is used inside the transport
-   and during PWRKEY power-on.
+   and during PWRKEY power-on. The watchdog now bounds a hang that outlives
+   those waits.
 3. **No offline alert queue.** A failed SMS/HTTP alert is retried only while the
    device stays in the alert state; it is not replayed after a reboot.
 4. **No reset-reason logging or boot self-test.** The reset history class exists,
    but `main.ino` does not feed it from `esp_reset_reason()`, and there is no
    boot check for the IMU, GPS, modem and rail.
-5. **Docs overstate two behaviours.** `docs/safety.md` says a pending countdown
-   is recovered from NVS and that three abnormal resets enter safe mode. The
-   current `main.ino` implements neither; the pure `ResetHistory` helper exists
-   but is not wired in, and the incident id is not persisted before the
-   countdown.
+5. **No reset recovery or safe-mode escalation.** Because nothing records
+   abnormal resets (gap 4), safe mode never activates. The incident id is not
+   persisted before the countdown, so a reset during a countdown is not
+   recovered either. `docs/safety.md` now states both limits plainly.
 6. **No structured logging or flash event history.** Serial logs are ad-hoc
    `Serial.printf` lines.
 7. **No OTA update path** in the firmware (the server endpoint exists, the
