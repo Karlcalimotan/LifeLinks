@@ -4,7 +4,7 @@
  * version. `firmware/main/main.ino` is the source of truth and the test beside
  * this file fails when the two drift.
  */
-export const KNOWN_FIRMWARE_VERSION = "0.3.0";
+export const KNOWN_FIRMWARE_VERSION = "0.3.1";
 
 const VERSION_PATTERN = /^v?(\d{1,4})(?:\.(\d{1,4}))?(?:\.(\d{1,4}))?$/;
 

@@ -17,6 +17,7 @@
 		"copy": "Copy",
 		"copied": "Copied",
 		"close": "Close",
+		"language": "Language",
 		"skipToContent": "Skip to main content"
 	},
 	"pwa": {
@@ -100,12 +101,21 @@
 		"settings": "Settings",
 		"signOut": "Sign out",
 		"menu": "Menu",
+		"more": "More",
+		"account": "Account",
+		"primary": "Primary navigation",
 		"notifications": "Notifications"
 	},
 	"roles": {
 		"user": "Vehicle owner",
 		"responder": "CDRRMO / Pulis",
 		"admin": "Admin"
+	},
+	"theme": {
+		"label": "Appearance",
+		"light": "Light",
+		"dark": "Dark",
+		"system": "System"
 	},
 	"auth": {
 		"signIn": "Sign in",
@@ -148,6 +158,7 @@
 		"viewAll": "View all",
 		"attention": "Needs attention",
 		"allClear": "All clear",
+		"kpiDefinitions": "What these numbers mean",
 		"kpiOpenIncidents": "Open incidents",
 		"kpiOpenHint": "Suspected, confirmed or acknowledged",
 		"kpiAwaitingAck": "Awaiting acknowledgement",
@@ -227,7 +238,12 @@
 		"errorTransition": "The incident changed before the action ran. Open it to see the current state.",
 		"errorAckNotDispatched": "The tracker is still in its cancel window. Wait until the alert dispatches, then acknowledge it.",
 		"errorCommandConflict": "Another command is still waiting for the tracker. Wait for it to answer before sending a different one.",
-		"errorNotFound": "That incident no longer exists."
+		"errorNotFound": "That incident no longer exists.",
+		"thresholdTitle": "Impact alert threshold",
+		"thresholdBody": "A device queues an alert at or above this impact. It picks up a new value on its next config poll.",
+		"thresholdSaved": "Impact threshold saved. Trackers pick it up on their next config poll.",
+		"thresholdInvalid": "Enter a value between 1.5 and 16 g.",
+		"thresholdForbidden": "Only admins can change the alert threshold."
 	},
 	"analytics": {
 		"title": "Response analytics",
@@ -889,6 +905,7 @@
 		"emails": "Email addresses",
 		"emailsHint": "One per line. The server queues an email alert.",
 		"impactThreshold": "Impact threshold (g)",
+		"impactThresholdHint": "Alert at or above this impact. 15 g is the severe-crash default; the allowed range is 1.5–16 g.",
 		"tiltThreshold": "Tilt threshold (degrees)",
 		"cancelWindow": "Cancel window (seconds)",
 		"heartbeatInterval": "Heartbeat interval (seconds)",

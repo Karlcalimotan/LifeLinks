@@ -20,23 +20,26 @@ export default function DashboardLoading() {
 			<Card className="overflow-hidden">
 				<div className="grid grid-cols-2 gap-px bg-ink-700 sm:grid-cols-3 xl:grid-cols-6">
 					{KPIS.map((key) => (
-						<div key={key} className="bg-ink-800 p-4">
+						<div key={key} className="min-w-0 bg-ink-800 p-3 sm:p-4">
 							<Skeleton className="h-3 w-24" />
 							<Skeleton className="mt-2 h-7 w-16" />
-							<Skeleton className="mt-2 h-3 w-28" />
+							<Skeleton className="mt-2 hidden h-3 w-28 sm:block" />
 						</div>
 					))}
+				</div>
+				<div className="border-t border-ink-700 px-3 py-1 sm:hidden">
+					<Skeleton className="my-2 h-3 w-40" />
 				</div>
 			</Card>
 
 			<div className="mt-4 grid gap-4 xl:grid-cols-[1.2fr_1fr]">
-				<Card className="flex flex-col">
+				<Card className="flex min-w-0 flex-col">
 					<CardHeader>
 						<Skeleton className="h-4 w-32" />
 						<Skeleton className="h-3 w-64 max-w-full" />
 					</CardHeader>
 					<CardContent>
-						<Skeleton className="h-56 w-full" />
+						<Skeleton className="aspect-video w-full" />
 						<div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
 							{["incident", "online", "weak", "offline", "stale"].map((key) => (
 								<Skeleton key={key} className="h-3 w-20" />

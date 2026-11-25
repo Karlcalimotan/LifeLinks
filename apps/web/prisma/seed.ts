@@ -23,7 +23,7 @@ const ago = (ms: number) => new Date(now.getTime() - ms);
  * the confirmed state without a fabricated number.
  */
 const DEMO_ORG_CONFIG: FirmwareConfigValues = {
-	impactThresholdG: 2.5,
+	impactThresholdG: 15,
 	tiltThresholdDeg: 60,
 	confirmWindowMs: 200,
 	cancelWindowS: 15,

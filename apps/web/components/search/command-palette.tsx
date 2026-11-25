@@ -272,7 +272,7 @@ export function CommandPalette({ role }: { role: MemberRoleName }) {
 				aria-label={t("open")}
 				aria-haspopup="dialog"
 				aria-keyshortcuts="Control+K Meta+K"
-				className="inline-flex h-8 items-center gap-1.5 rounded-control border border-ink-600 bg-ink-800 px-2 text-meta text-fog-300 transition-colors hover:bg-ink-700 hover:text-fog-100"
+				className="inline-flex h-11 w-11 items-center justify-center gap-1.5 rounded-control border border-ink-600 bg-ink-800 px-2 text-meta text-fog-300 transition-colors hover:bg-ink-700 hover:text-fog-100 sm:h-8 sm:w-auto"
 			>
 				<Search className="size-4" aria-hidden="true" />
 				<span className="hidden md:inline">{t("open")}</span>
@@ -288,9 +288,9 @@ export function CommandPalette({ role }: { role: MemberRoleName }) {
 							onMouseDown={(event) => {
 								if (event.target === event.currentTarget) close();
 							}}
-							className="fixed inset-0 z-50 m-0 flex h-full max-h-none w-full max-w-none items-stretch justify-center border-0 bg-ink-950/80 p-0 text-fog-100 sm:items-center sm:p-6"
+							className="fixed inset-0 z-50 m-0 flex h-full max-h-none w-full max-w-none items-stretch justify-center border-0 bg-ink-950/80 p-0 text-fog-100 max-sm:h-dvh max-sm:pt-[env(safe-area-inset-top)] sm:items-center sm:p-6"
 						>
-							<div className="flex h-full w-full flex-col overflow-hidden border border-ink-600 bg-ink-900 shadow-overlay sm:h-auto sm:max-h-[70vh] sm:max-w-xl sm:rounded-overlay">
+							<div className="flex h-full w-full flex-col overflow-hidden border border-ink-600 bg-ink-900 shadow-overlay max-sm:pb-[env(safe-area-inset-bottom)] sm:h-auto sm:max-h-[70vh] sm:max-w-xl sm:rounded-overlay">
 								<h2 id="command-palette-title" className="sr-only">
 									{t("title")}
 								</h2>
@@ -309,13 +309,13 @@ export function CommandPalette({ role }: { role: MemberRoleName }) {
 										aria-label={t("title")}
 										autoComplete="off"
 										spellCheck={false}
-										className="h-8 w-full border-0 bg-transparent text-body text-fog-100 placeholder:text-fog-500 focus:outline-none"
+										className="h-11 w-full border-0 bg-transparent text-[16px] text-fog-100 placeholder:text-fog-500 focus:outline-none sm:h-8 sm:text-body"
 									/>
 									<button
 										type="button"
 										onClick={close}
 										aria-label={t("close")}
-										className="grid size-8 shrink-0 place-items-center rounded-control text-fog-500 transition-colors hover:bg-ink-700 hover:text-fog-100"
+										className="grid size-11 shrink-0 place-items-center rounded-control text-fog-500 transition-colors hover:bg-ink-700 hover:text-fog-100 sm:size-8"
 									>
 										<X className="size-4" aria-hidden="true" />
 									</button>
@@ -435,7 +435,7 @@ export function CommandPalette({ role }: { role: MemberRoleName }) {
 									</ul>
 								)}
 
-								<div className="flex items-center justify-between gap-3 border-t border-ink-700 px-4 py-2.5 text-meta text-fog-500">
+								<div className="hidden items-center justify-between gap-3 border-t border-ink-700 px-4 py-2.5 text-meta text-fog-500 sm:flex">
 									<span>{t("moveHint")}</span>
 									<kbd className="hidden rounded-control border border-ink-600 px-1 font-mono text-meta sm:inline">
 										{t("shortcut")}

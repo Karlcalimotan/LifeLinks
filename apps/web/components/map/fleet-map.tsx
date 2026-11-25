@@ -59,13 +59,13 @@ export function FleetMap({
 	}));
 
 	return (
-		<div>
-			<div className="relative overflow-hidden rounded-panel border border-ink-700 bg-ink-900">
+		<div className="min-w-0">
+			<div className="relative min-w-0 overflow-hidden rounded-panel border border-ink-700 bg-ink-900">
 				<svg
 					viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
 					role="img"
 					aria-label={ariaLabel}
-					className="block h-auto w-full"
+					className="block h-auto w-full max-w-full"
 				>
 					<title>{ariaLabel}</title>
 					<defs>

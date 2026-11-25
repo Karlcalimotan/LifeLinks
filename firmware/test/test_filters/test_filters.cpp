@@ -17,8 +17,17 @@ static ImuSample sample(float accelG, float tiltDeg, bool vibration, float speed
 	return ImuSample{accelG, tiltDeg, vibration, speedKph, true, ms};
 }
 
+// The production default is 15 g (severe impacts only). These tests exercise
+// the candidate/confirm logic with a lower envelope value so a pothole and a
+// normal crash remain distinguishable.
+static DeviceConfig normalCrashConfig() {
+	DeviceConfig config = defaultConfig();
+	config.impactThresholdG = 2.5f;
+	return config;
+}
+
 void test_a_pothole_is_rejected(void) {
-	ImpactFilter filter;
+	ImpactFilter filter(normalCrashConfig());
 	TEST_ASSERT_EQUAL(static_cast<int>(ImpactDecision::Candidate),
 	                  static_cast<int>(filter.update(sample(3.2f, 8.0f, false, 50.0f, 0))));
 	TEST_ASSERT_EQUAL(static_cast<int>(ImpactDecision::Reject),
@@ -26,7 +35,7 @@ void test_a_pothole_is_rejected(void) {
 }
 
 void test_a_crash_is_confirmed(void) {
-	ImpactFilter filter;
+	ImpactFilter filter(normalCrashConfig());
 	TEST_ASSERT_EQUAL(static_cast<int>(ImpactDecision::Candidate),
 	                  static_cast<int>(filter.update(sample(3.5f, 55.0f, true, 60.0f, 0))));
 	TEST_ASSERT_EQUAL(static_cast<int>(ImpactDecision::Confirm),
@@ -50,11 +59,17 @@ void test_a_below_threshold_sample_does_not_start_a_candidate(void) {
 }
 
 void test_a_door_slam_at_rest_is_rejected(void) {
-	ImpactFilter filter;
+	ImpactFilter filter(normalCrashConfig());
 	TEST_ASSERT_EQUAL(static_cast<int>(ImpactDecision::Candidate),
 	                  static_cast<int>(filter.update(sample(2.8f, 4.0f, false, 0.0f, 0))));
 	TEST_ASSERT_EQUAL(static_cast<int>(ImpactDecision::Reject),
 	                  static_cast<int>(filter.update(sample(0.1f, 1.0f, false, 0.0f, 300))));
+}
+
+void test_a_15g_impact_starts_a_candidate_by_default(void) {
+	ImpactFilter filter;
+	TEST_ASSERT_EQUAL(static_cast<int>(ImpactDecision::Candidate),
+	                  static_cast<int>(filter.update(sample(15.0f, 5.0f, true, 60.0f, 0))));
 }
 
 void test_debouncer_fires_once_on_a_stable_change(void) {
@@ -73,6 +88,7 @@ int main(int, char**) {
 	RUN_TEST(test_a_sustained_rollover_is_confirmed_by_tilt);
 	RUN_TEST(test_a_below_threshold_sample_does_not_start_a_candidate);
 	RUN_TEST(test_a_door_slam_at_rest_is_rejected);
+	RUN_TEST(test_a_15g_impact_starts_a_candidate_by_default);
 	RUN_TEST(test_debouncer_fires_once_on_a_stable_change);
 	return UNITY_END();
 }

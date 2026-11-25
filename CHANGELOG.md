@@ -6,6 +6,39 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-11-25
+
+### Added
+
+- Light and dark appearance modes with a system default, a persisted
+  preference, and a toggle on the login board and in the console header. The
+  dark palette is unchanged; light mode maps the ink/fog scales to paper and
+  text so existing components switch without per-screen overrides.
+- Mobile console shell: a one-row header with an account sheet, a five-slot
+  bottom navigation with a More sheet, 44px header controls, safe-area insets
+  and 16px form controls (no iOS focus zoom). Vehicles and the notifications
+  delivery log get card lists below `lg`; filter toolbars collapse, the
+  settings save action sticks above the bottom bar, and analytics/pagers get
+  larger touch targets.
+- The live map now uses Leaflet with OpenStreetMap tiles, plotted from each
+  tracker's last GPS fix. The dashboard keeps the offline schematic for a
+  quick fleet overview. Adds the `leaflet` dependency and its typings.
+- An admin-only dashboard editor for the impact alert threshold (1.5–16 g),
+  with the same validation and audit trail as the settings form.
+- Bench-unit handoff for `34:84:A9:7B:8A:C8`, including the local provisioning
+  path, the token contract and the reachability requirement for the A7670E
+  modem ([`docs/bench-device.md`](docs/bench-device.md)).
+
+### Changed
+
+- Impact alert default is now **15 g** (envelope 1.5–16 g). The MPU-6050 runs
+  its ±16 g range so the threshold is measurable instead of clipping at ±8 g.
+  The web settings form and the dashboard quick editor accept the same
+  envelope. A migration changes the default for new organizations; the local
+  demo org is updated to 15 g. A reflashed unit with an older NVS `cfg_json`
+  must run `RESET_CONFIG` (or receive a server config sync) before the new
+  default takes effect.
+
 ## [0.4.0] - 2026-11-25
 
 ### Added

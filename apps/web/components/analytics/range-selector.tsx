@@ -19,7 +19,7 @@ export function RangeSelector({
 					href={`/analytics?range=${range}`}
 					aria-current={range === active ? "page" : undefined}
 					className={cn(
-						"rounded-control border px-3 py-1.5 text-meta transition-colors",
+						"inline-flex h-10 items-center rounded-control border px-3 text-meta transition-colors sm:h-8",
 						range === active
 							? "border-signal-500/40 bg-signal-500/10 text-signal-300"
 							: "border-ink-700 text-fog-500 hover:border-ink-600 hover:text-fog-100",

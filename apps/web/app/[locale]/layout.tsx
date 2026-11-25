@@ -1,14 +1,17 @@
 import { InstallPromptProvider } from "@/components/pwa/install-prompt";
 import { ServiceWorkerRuntime } from "@/components/pwa/service-worker-runtime";
+import { ThemeToaster } from "@/components/ui/theme-toaster";
 import { type Locale, locales } from "@/i18n/routing";
 import { APP_NAME, APP_TAGLINE } from "@/lib/constants";
 import { resolveSiteUrl } from "@/lib/site-url";
+import { readThemePreference } from "@/lib/theme-server";
 import type { Metadata, Viewport } from "next";
 import { NextIntlClientProvider } from "next-intl";
 import { getMessages, getTranslations } from "next-intl/server";
 import { Barlow, Barlow_Condensed, JetBrains_Mono } from "next/font/google";
 import { notFound } from "next/navigation";
-import { Toaster } from "sonner";
+import Script from "next/script";
+import "leaflet/dist/leaflet.css";
 import "../globals.css";
 
 const barlow = Barlow({
@@ -54,9 +57,14 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-	themeColor: "#071013",
+	// Browser chrome needs literal colours; these mirror ink-950 in both themes.
+	themeColor: [
+		{ media: "(prefers-color-scheme: dark)", color: "rgb(7 16 19)" },
+		{ media: "(prefers-color-scheme: light)", color: "rgb(238 243 242)" },
+	],
 	width: "device-width",
 	initialScale: 1,
+	viewportFit: "cover",
 };
 
 export function generateStaticParams() {
@@ -73,33 +81,30 @@ export default async function LocaleLayout({
 	const { locale } = await params;
 	if (!locales.includes(locale as Locale)) notFound();
 
-	const [messages, t] = await Promise.all([
+	const [messages, t, themePreference] = await Promise.all([
 		getMessages(),
 		getTranslations({ locale, namespace: "common" }),
+		readThemePreference(),
 	]);
 
 	return (
-		<html lang={locale} className="dark">
+		<html
+			lang={locale}
+			data-theme={themePreference === "system" ? undefined : themePreference}
+			data-theme-preference={themePreference}
+			suppressHydrationWarning
+		>
 			<body
 				className={`${barlow.variable} ${barlowCondensed.variable} ${jetbrainsMono.variable} font-sans`}
 			>
+				<Script id="ll-theme-init" strategy="beforeInteractive">
+					{`(function(){try{var root=document.documentElement;var preference=root.getAttribute("data-theme-preference")||"system";var resolved=preference==="system"?(window.matchMedia("(prefers-color-scheme: light)").matches?"light":"dark"):preference;root.setAttribute("data-theme",resolved);root.style.colorScheme=resolved;}catch(error){}})();`}
+				</Script>
 				<NextIntlClientProvider messages={messages}>
 					<InstallPromptProvider>
 						{children}
 						<ServiceWorkerRuntime />
-						<Toaster
-							theme="dark"
-							position="top-right"
-							toastOptions={{
-								style: {
-									background: "var(--color-ink-800)",
-									border: "1px solid var(--color-ink-600)",
-									color: "var(--color-fog-100)",
-									borderRadius: "var(--radius-panel)",
-									fontFamily: "var(--font-barlow), sans-serif",
-								},
-							}}
-						/>
+						<ThemeToaster />
 					</InstallPromptProvider>
 				</NextIntlClientProvider>
 				<span className="sr-only">{t("tagline")}</span>

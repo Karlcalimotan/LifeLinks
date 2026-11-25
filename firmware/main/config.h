@@ -21,7 +21,7 @@ namespace fw {
 static const int kConfigContractVersion = 1;
 
 #define FW_CONFIG_FIELDS(X)                                                   \
-	X(impactThresholdG, "impact_threshold_g", 1.5f, 5.0f, false, 2.5f)        \
+	X(impactThresholdG, "impact_threshold_g", 1.5f, 16.0f, false, 15.0f)      \
 	X(tiltThresholdDeg, "tilt_threshold_deg", 30.0f, 90.0f, false, 60.0f)     \
 	X(confirmWindowMs, "confirm_window_ms", 100.0f, 2000.0f, true, 200.0f)    \
 	X(cancelWindowS, "cancel_window_s", 5.0f, 60.0f, true, 15.0f)             \

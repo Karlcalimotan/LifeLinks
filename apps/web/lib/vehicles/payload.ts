@@ -15,7 +15,7 @@ export const VEHICLE_LIST_SELECT = {
 	driverPhone: true,
 	status: true,
 	devices: {
-		select: { id: true, label: true, lastSeenAt: true },
+		select: { id: true, label: true, mac: true, lastSeenAt: true },
 		orderBy: { createdAt: "asc" },
 		take: 1,
 	},
