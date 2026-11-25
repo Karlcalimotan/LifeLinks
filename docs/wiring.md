@@ -2,7 +2,8 @@
 
 This is the canonical wiring reference. The code source of truth is
 [`firmware/include/pins.h`](../firmware/include/pins.h); the two must agree.
-Do not duplicate the pin map in other documents.
+Do not duplicate the pin map in other documents; the visual companion is
+[`wiring-diagram.md`](wiring-diagram.md), updated in the same change.
 
 Hardware bring-up, bench testing and flashing are owned by the human hardware
 owner (Jeff). The agent may write and test code but must not power, wire or
@@ -150,6 +151,7 @@ Recommended additions for the vehicle 12 V input:
 
 ## Related documents
 
+- [`wiring-diagram.md`](wiring-diagram.md) — visual pin map, I2C/UART and power diagrams.
 - [`hardware.md`](hardware.md) — sensor notes, bench checklist, bill of materials.
 - [`safety.md`](safety.md) — crash/cancel/alert state machine and false-positive
   matrix.

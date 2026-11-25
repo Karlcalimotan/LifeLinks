@@ -112,7 +112,9 @@ stack/                    reusable scaffold + generators (not copied to new proj
 Start with the [`user guide`](docs/user-guide.md) if you are a driver, responder
 or administrator. For the system design, read
 [`docs/architecture.md`](docs/architecture.md), then
-[`docs/wiring.md`](docs/wiring.md), [`docs/hardware.md`](docs/hardware.md),
+[`docs/wiring.md`](docs/wiring.md),
+[`docs/wiring-diagram.md`](docs/wiring-diagram.md),
+[`docs/hardware.md`](docs/hardware.md),
 [`docs/safety.md`](docs/safety.md), [`docs/runbook.md`](docs/runbook.md),
 [`docs/api.md`](docs/api.md), the [`API regulation`](API_REGULATION.md) and the
 [`design system`](docs/design.md). If you need a database, see
