@@ -34,37 +34,36 @@ grade.
 - Crash logic must be pure functions (no hardware calls) so it can be unit
   tested.
 - Never flash hardware, never push to main, never change CI secrets.
-- `develop` and `staging` are PR-only protected branches. Do not push directly to
-  them.
+- Agents open PRs to `develop`. Karl may use `develop` and `staging` directly for
+  small changes; `main` is PR-only, owner-approved and never merged by an agent.
 - Hardware bring-up and bench tests belong to the human hardware owner (Jeff).
   The agent may write and test code, but must not power, wire or flash the
   device.
 
-## Issue-first workflow
+## Task records
 
-1. Before creating an issue or starting work, run `pnpm overlap:check` to list
-   J-Akiru5's open issues and pull requests. If an item already covers the task,
-   coordinate on it instead of creating a duplicate. Do not take over an issue
-   assigned to someone else. If there is an overlap decision, J-Akiru5's
-   decision takes priority: pause the conflicting work, comment on his issue or
-   PR, and align with his design instead of merging a competing one.
-2. Create a GitHub issue from `.github/ISSUE_TEMPLATE/`.
-3. Put the objective, scope, acceptance criteria and test plan in the issue.
-4. Open the PR against `develop` and link the issue with `Closes #N`,
-   `Fixes #N`, `Refs #N` or `Part of #N`.
-5. The `Issue policy` check enforces this. Do not start work without an issue.
+- Issue-first is recommended, not required, for feature, `develop` and `staging`
+  work. A clear PR description is enough for a small change; use an issue for
+  multi-day or cross-team work.
+- Run `pnpm overlap:check` before starting to avoid duplicate work. If J-Akiru5's
+  issue or PR already covers the task, coordinate on it instead of creating a
+  duplicate. Do not take over an issue assigned to someone else.
+- Main-bound release PRs require the owner's approval and release notes; they do
+  not require a separate issue.
+- The `Issue policy` check is advisory on `develop` and `staging`. `main` remains
+  owner-approved.
 
 ## Workflow
 
-1. Work on a new feature branch; never work directly on `main`, `staging` or
-   `develop`.
-2. Small changes, one concern per PR.
-3. Open feature PRs against `develop`.
-4. Promote `develop` to `staging` through a PR after the checks pass. `staging`
-   is the preview deployment; `develop` is the reconciliation gate and does not
-   deploy.
+1. Agents work on feature branches. Karl may work directly on `develop` or
+   `staging` for small changes; `main` is always a PR.
+2. Small changes, one concern per PR (or direct commit for Karl).
+3. Feature PRs target `develop`. Karl may merge his own green PRs without a
+   separate approval.
+4. Promote `develop` to `staging` after checks pass. `staging` is the preview;
+   `develop` is the reconciliation gate and does not deploy.
 5. Promote `staging` to `main` through a versioned release PR. Only the human
-   owner merges `main`.
+   owner approves and merges `main`; agents never merge `main`.
 6. Run `bash scripts/verify.sh` before finishing.
 7. Commit often.
 8. The firmware version is independent of the application/PWA version. Bump
@@ -79,8 +78,8 @@ grade.
   check passes. It uses `node scripts/merge-pr.mjs` and cannot merge `main`.
 - The parent agent owns the issue, worktree, scope, verification and final
   report. It verifies subagent work instead of trusting a report.
-- One task, one issue, one worktree, one branch. Never edit another agent's
-  worktree.
+- One task, one worktree, one branch. An issue is optional. Never edit another
+  agent's worktree.
 - See [`docs/agents.md`](docs/agents.md) for the full protocol.
 
 ## Done means

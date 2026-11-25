@@ -513,7 +513,7 @@ model Geofence {
 model OrgSettings {
   id                     String  @id @default(cuid())
   orgId                  String  @unique
-  impactThresholdG       Float   @default(2.5)
+  impactThresholdG       Float   @default(15)
   tiltThresholdDeg       Float   @default(60)
   confirmWindowMs        Int     @default(200)
   cancelWindowS          Int     @default(15)

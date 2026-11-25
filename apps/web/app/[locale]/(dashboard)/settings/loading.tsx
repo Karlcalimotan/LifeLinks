@@ -12,9 +12,9 @@ export default function SettingsLoading() {
 			</div>
 
 			<div className="lg:flex lg:items-start lg:gap-6">
-				<div className="mb-4 flex flex-wrap gap-2 lg:mb-0 lg:w-52 lg:shrink-0 lg:flex-col">
+				<div className="mb-4 -mx-4 flex gap-1 overflow-x-auto border-b border-ink-700 px-4 sm:mx-0 sm:px-0 lg:mb-0 lg:w-52 lg:shrink-0 lg:flex-col lg:overflow-visible lg:border-b-0">
 					{TABS.map((tab) => (
-						<Skeleton key={tab} className="h-11 w-24 lg:h-9 lg:w-full" />
+						<Skeleton key={tab} className="h-11 w-24 shrink-0 lg:h-9 lg:w-full" />
 					))}
 				</div>
 
@@ -47,8 +47,8 @@ export default function SettingsLoading() {
 							<Skeleton className="h-3 w-4/5" />
 							<Skeleton className="h-3 w-2/3" />
 						</CardContent>
-						<div className="border-t border-ink-700/70 p-5">
-							<Skeleton className="h-10 w-36" />
+						<div className="sticky bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-10 border-t border-ink-700/70 bg-ink-800 p-4 sm:static sm:p-5">
+							<Skeleton className="h-11 w-full sm:h-10 sm:w-36" />
 						</div>
 					</Card>
 				</div>

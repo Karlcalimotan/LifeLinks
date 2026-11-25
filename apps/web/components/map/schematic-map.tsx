@@ -110,7 +110,7 @@ export function SchematicMap({
 							aria-current={point.selected ? "true" : undefined}
 							title={name}
 							style={{ left: percentX(point.x), top: percentY(point.y) }}
-							className="absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-full p-2"
+							className="absolute z-10 -translate-x-1/2 -translate-y-1/2 rounded-full p-3 sm:p-2"
 						>
 							<span className="relative inline-flex">
 								{point.state === "incident" ? (

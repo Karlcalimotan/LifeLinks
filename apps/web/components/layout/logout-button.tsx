@@ -2,6 +2,7 @@
 
 import { logoutAction } from "@/lib/actions/auth";
 import { currentPushEndpoint } from "@/lib/push/client";
+import { cn } from "@/lib/utils";
 import { LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -11,7 +12,15 @@ import { useEffect, useState } from "react";
  * service worker, or with JavaScript disabled, falls back to the user-agent
  * match in the logout action. Revocation never blocks sign out.
  */
-export function LogoutButton({ locale, label }: { locale: string; label: string }) {
+export function LogoutButton({
+	locale,
+	label,
+	block = false,
+}: {
+	locale: string;
+	label: string;
+	block?: boolean;
+}) {
 	const [endpoint, setEndpoint] = useState("");
 
 	useEffect(() => {
@@ -29,12 +38,15 @@ export function LogoutButton({ locale, label }: { locale: string; label: string 
 	}, []);
 
 	return (
-		<form action={logoutAction}>
+		<form action={logoutAction} className={block ? "w-full" : undefined}>
 			<input type="hidden" name="locale" value={locale} />
 			<input type="hidden" name="pushEndpoint" value={endpoint} />
 			<button
 				type="submit"
-				className="inline-flex h-8 items-center gap-2 rounded border border-ink-600/80 px-2.5 text-xs text-fog-500 transition-colors hover:border-ink-600 hover:text-fog-100"
+				className={cn(
+					"inline-flex items-center gap-2 rounded border border-ink-600/80 text-fog-500 transition-colors hover:border-ink-600 hover:text-fog-100",
+					block ? "h-11 w-full justify-start px-3 text-body" : "h-11 px-2.5 text-xs sm:h-8",
+				)}
 			>
 				<LogOut className="size-3.5" />
 				{label}

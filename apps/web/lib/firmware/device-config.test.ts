@@ -49,7 +49,7 @@ describe("validateDeviceConfigOverride", () => {
 	});
 
 	it("rejects an out-of-envelope value with a field code instead of clamping it", () => {
-		const tooHigh = validateDeviceConfigOverride({ impactThresholdG: 9 });
+		const tooHigh = validateDeviceConfigOverride({ impactThresholdG: 17 });
 		const tooLow = validateDeviceConfigOverride({ heartbeatIntervalS: 4 });
 
 		expect(tooHigh.ok).toBe(false);

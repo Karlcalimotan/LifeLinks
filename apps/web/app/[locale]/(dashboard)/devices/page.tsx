@@ -6,7 +6,11 @@ import {
 } from "@/components/devices/bulk-approve";
 import { CopyMac } from "@/components/devices/copy-mac";
 import { DeviceCardList } from "@/components/devices/device-card-list";
-import { DevicesToolbar } from "@/components/devices/devices-toolbar";
+import {
+	DevicesFilterProvider,
+	DevicesFilterResults,
+	DevicesToolbar,
+} from "@/components/devices/devices-toolbar";
 import { RegisterTrackerDrawer } from "@/components/devices/register-tracker-drawer";
 import { SignalStrength } from "@/components/devices/signal-strength";
 import { ApprovalBadge, DeviceStatusBadge } from "@/components/domain/badges";
@@ -242,211 +246,215 @@ export default async function DevicesPage({
 
 			<Card>
 				<CardContent className="pt-5">
-					<DevicesToolbar query={effectiveQuery} total={total} />
-					<div className="hidden lg:block">
-						<BulkApproveProvider locale={locale} pendingIds={pendingIds}>
-							{devices.length === 0 ? (
-								emptyState
-							) : (
-								<Table className="min-w-[1040px]">
-									<TableHeader>
-										<TableRow>
-											<TableHead className="w-10">
-												<BulkSelectAll />
-											</TableHead>
-											<TableHead>
-												<Link
-													href={sortHref("label")}
-													className="inline-flex items-center gap-1 hover:text-fog-100"
-												>
-													{t("label")}
-													{sortIcon("label")}
-												</Link>
-											</TableHead>
-											<TableHead>
-												<Link
-													href={sortHref("mac")}
-													className="inline-flex items-center gap-1 hover:text-fog-100"
-												>
-													{t("mac")}
-													{sortIcon("mac")}
-												</Link>
-											</TableHead>
-											<TableHead>{t("vehicle")}</TableHead>
-											<TableHead>
-												<Link
-													href={sortHref("approval")}
-													className="inline-flex items-center gap-1 hover:text-fog-100"
-												>
-													{t("approval")}
-													{sortIcon("approval")}
-												</Link>
-											</TableHead>
-											<TableHead>
-												<Link
-													href={sortHref("lastSeen")}
-													className="inline-flex items-center gap-1 hover:text-fog-100"
-												>
-													{t("connection")}
-													{sortIcon("lastSeen")}
-												</Link>
-											</TableHead>
-											<TableHead>{t("signal")}</TableHead>
-											<TableHead>
-												<Link
-													href={sortHref("battery")}
-													className="inline-flex items-center gap-1 hover:text-fog-100"
-												>
-													{t("battery")}
-													{sortIcon("battery")}
-												</Link>
-											</TableHead>
-											<TableHead>{t("firmware")}</TableHead>
-											<TableHead className="text-right">{t("actions")}</TableHead>
-										</TableRow>
-									</TableHeader>
-									<TableBody>
-										{devices.map((device) => {
-											const connectionState = deviceConnectionState(device.lastSeenAt);
-											const installedFirmware = device.firmwareVersion?.trim() || null;
-
-											return (
-												<TableRow key={device.id}>
-													<TableCell className="w-10">
-														{device.approvalStatus === "PENDING" ? (
-															<BulkRowCheckbox deviceId={device.id} label={device.label} />
-														) : null}
-													</TableCell>
-													<TableCell>
+					<DevicesFilterProvider>
+						<DevicesToolbar query={effectiveQuery} total={total} />
+						<DevicesFilterResults>
+							<div className="hidden lg:block">
+								<BulkApproveProvider locale={locale} pendingIds={pendingIds}>
+									{devices.length === 0 ? (
+										emptyState
+									) : (
+										<Table className="min-w-[1040px]">
+											<TableHeader>
+												<TableRow>
+													<TableHead className="w-10">
+														<BulkSelectAll />
+													</TableHead>
+													<TableHead>
 														<Link
-															href={`/devices/${device.id}`}
-															className="font-medium text-fog-100 hover:text-signal-300 hover:underline"
+															href={sortHref("label")}
+															className="inline-flex items-center gap-1 hover:text-fog-100"
 														>
-															{device.label}
+															{t("label")}
+															{sortIcon("label")}
 														</Link>
-													</TableCell>
-													<TableCell>
-														<CopyMac value={device.mac} />
-													</TableCell>
-													<TableCell className="text-fog-300">
-														{device.vehicle?.plateNo ?? t("unassigned")}
-													</TableCell>
-													<TableCell>
-														<ApprovalBadge status={device.approvalStatus} />
-													</TableCell>
-													<TableCell>
-														<div className="flex flex-col gap-1">
-															<DeviceStatusBadge state={connectionState} />
-															<span
-																className="text-meta text-fog-500"
-																title={
-																	device.lastSeenAt
-																		? formatDateTime(device.lastSeenAt, locale)
-																		: undefined
-																}
-															>
-																{device.lastSeenAt
-																	? formatRelative(device.lastSeenAt)
-																	: t("noHeartbeat")}
-															</span>
-														</div>
-													</TableCell>
-													<TableCell>
-														<SignalStrength
-															rssiDbm={device.rssiDbm}
-															state={connectionState}
-															labels={signalLabels}
-														/>
-													</TableCell>
-													<TableCell>
-														<BatteryLevel voltage={device.batteryV} />
-													</TableCell>
-													<TableCell>
-														<span className="flex flex-col items-start gap-1">
-															<span className="font-mono text-meta text-fog-500">
-																{installedFirmware ?? "—"}
-															</span>
-															{firmwareUpdateAvailable(installedFirmware, latestFirmware) ? (
-																<Badge tone="info">{t("updateAvailable")}</Badge>
-															) : null}
-														</span>
-													</TableCell>
-													<TableCell className="text-right">
+													</TableHead>
+													<TableHead>
 														<Link
-															href={`/devices/${device.id}`}
-															className="inline-flex items-center gap-1 text-meta text-fog-400 hover:text-signal-300"
+															href={sortHref("mac")}
+															className="inline-flex items-center gap-1 hover:text-fog-100"
 														>
-															{t("open")}
-															<ChevronRight className="size-3.5" aria-hidden="true" />
+															{t("mac")}
+															{sortIcon("mac")}
 														</Link>
-													</TableCell>
+													</TableHead>
+													<TableHead>{t("vehicle")}</TableHead>
+													<TableHead>
+														<Link
+															href={sortHref("approval")}
+															className="inline-flex items-center gap-1 hover:text-fog-100"
+														>
+															{t("approval")}
+															{sortIcon("approval")}
+														</Link>
+													</TableHead>
+													<TableHead>
+														<Link
+															href={sortHref("lastSeen")}
+															className="inline-flex items-center gap-1 hover:text-fog-100"
+														>
+															{t("connection")}
+															{sortIcon("lastSeen")}
+														</Link>
+													</TableHead>
+													<TableHead>{t("signal")}</TableHead>
+													<TableHead>
+														<Link
+															href={sortHref("battery")}
+															className="inline-flex items-center gap-1 hover:text-fog-100"
+														>
+															{t("battery")}
+															{sortIcon("battery")}
+														</Link>
+													</TableHead>
+													<TableHead>{t("firmware")}</TableHead>
+													<TableHead className="text-right">{t("actions")}</TableHead>
 												</TableRow>
-											);
-										})}
-									</TableBody>
-								</Table>
-							)}
-						</BulkApproveProvider>
-					</div>
-					<div className="lg:hidden">
-						{devices.length === 0 ? (
-							emptyState
-						) : (
-							<>
-								<div className="mb-3 flex flex-wrap gap-2">
-									{SORT_FIELDS.map((field) => {
-										const active = effectiveQuery.sort === field;
-										return (
-											<Link
-												key={field}
-												href={sortHref(field)}
-												className={`inline-flex h-8 items-center gap-1 rounded-control border px-2 text-meta ${
-													active
-														? "border-signal-500/40 bg-signal-500/10 text-signal-300"
-														: "border-ink-700 text-fog-400 hover:border-ink-600 hover:text-fog-100"
-												}`}
-											>
-												{t(SORT_LABELS[field])}
-												{sortIcon(field)}
-											</Link>
-										);
-									})}
-								</div>
-								<DeviceCardList
-									locale={locale}
-									devices={devices}
-									signalLabels={signalLabels}
-									latestFirmware={latestFirmware}
-									canApprove={canAdminister(current.role)}
-								/>
-							</>
-						)}
-					</div>
-					{pageCount > 1 ? (
-						<div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-							<span className="text-meta text-fog-500">
-								{t("pageSummary", { page, pages: pageCount, total })}
-							</span>
-							<div className="flex gap-2">
-								{page > 1 ? (
-									<Link
-										href={buildDevicesHref(effectiveQuery, { page: page - 1 })}
-										className="inline-flex h-8 items-center rounded-panel border border-ink-600 px-3 text-meta text-fog-300 hover:bg-ink-700/60"
-									>
-										{t("previous")}
-									</Link>
-								) : null}
-								{page < pageCount ? (
-									<Link
-										href={buildDevicesHref(effectiveQuery, { page: page + 1 })}
-										className="inline-flex h-8 items-center rounded-panel border border-ink-600 px-3 text-meta text-fog-300 hover:bg-ink-700/60"
-									>
-										{t("next")}
-									</Link>
-								) : null}
+											</TableHeader>
+											<TableBody>
+												{devices.map((device) => {
+													const connectionState = deviceConnectionState(device.lastSeenAt);
+													const installedFirmware = device.firmwareVersion?.trim() || null;
+
+													return (
+														<TableRow key={device.id}>
+															<TableCell className="w-10">
+																{device.approvalStatus === "PENDING" ? (
+																	<BulkRowCheckbox deviceId={device.id} label={device.label} />
+																) : null}
+															</TableCell>
+															<TableCell>
+																<Link
+																	href={`/devices/${device.id}`}
+																	className="font-medium text-fog-100 hover:text-signal-300 hover:underline"
+																>
+																	{device.label}
+																</Link>
+															</TableCell>
+															<TableCell>
+																<CopyMac value={device.mac} />
+															</TableCell>
+															<TableCell className="text-fog-300">
+																{device.vehicle?.plateNo ?? t("unassigned")}
+															</TableCell>
+															<TableCell>
+																<ApprovalBadge status={device.approvalStatus} />
+															</TableCell>
+															<TableCell>
+																<div className="flex flex-col gap-1">
+																	<DeviceStatusBadge state={connectionState} />
+																	<span
+																		className="text-meta text-fog-500"
+																		title={
+																			device.lastSeenAt
+																				? formatDateTime(device.lastSeenAt, locale)
+																				: undefined
+																		}
+																	>
+																		{device.lastSeenAt
+																			? formatRelative(device.lastSeenAt)
+																			: t("noHeartbeat")}
+																	</span>
+																</div>
+															</TableCell>
+															<TableCell>
+																<SignalStrength
+																	rssiDbm={device.rssiDbm}
+																	state={connectionState}
+																	labels={signalLabels}
+																/>
+															</TableCell>
+															<TableCell>
+																<BatteryLevel voltage={device.batteryV} />
+															</TableCell>
+															<TableCell>
+																<span className="flex flex-col items-start gap-1">
+																	<span className="font-mono text-meta text-fog-500">
+																		{installedFirmware ?? "—"}
+																	</span>
+																	{firmwareUpdateAvailable(installedFirmware, latestFirmware) ? (
+																		<Badge tone="info">{t("updateAvailable")}</Badge>
+																	) : null}
+																</span>
+															</TableCell>
+															<TableCell className="text-right">
+																<Link
+																	href={`/devices/${device.id}`}
+																	className="inline-flex items-center gap-1 text-meta text-fog-400 hover:text-signal-300"
+																>
+																	{t("open")}
+																	<ChevronRight className="size-3.5" aria-hidden="true" />
+																</Link>
+															</TableCell>
+														</TableRow>
+													);
+												})}
+											</TableBody>
+										</Table>
+									)}
+								</BulkApproveProvider>
 							</div>
-						</div>
-					) : null}
+							<div className="lg:hidden">
+								{devices.length === 0 ? (
+									emptyState
+								) : (
+									<>
+										<div className="mb-3 flex flex-wrap gap-2">
+											{SORT_FIELDS.map((field) => {
+												const active = effectiveQuery.sort === field;
+												return (
+													<Link
+														key={field}
+														href={sortHref(field)}
+														className={`inline-flex h-10 items-center gap-1 rounded-control border px-2 text-meta sm:h-8 ${
+															active
+																? "border-signal-500/40 bg-signal-500/10 text-signal-300"
+																: "border-ink-700 text-fog-400 hover:border-ink-600 hover:text-fog-100"
+														}`}
+													>
+														{t(SORT_LABELS[field])}
+														{sortIcon(field)}
+													</Link>
+												);
+											})}
+										</div>
+										<DeviceCardList
+											locale={locale}
+											devices={devices}
+											signalLabels={signalLabels}
+											latestFirmware={latestFirmware}
+											canApprove={canAdminister(current.role)}
+										/>
+									</>
+								)}
+							</div>
+							{pageCount > 1 ? (
+								<div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+									<span className="text-meta text-fog-500">
+										{t("pageSummary", { page, pages: pageCount, total })}
+									</span>
+									<div className="flex gap-2">
+										{page > 1 ? (
+											<Link
+												href={buildDevicesHref(effectiveQuery, { page: page - 1 })}
+												className="inline-flex h-10 items-center rounded-panel border border-ink-600 px-3 text-meta text-fog-300 hover:bg-ink-700/60 sm:h-8"
+											>
+												{t("previous")}
+											</Link>
+										) : null}
+										{page < pageCount ? (
+											<Link
+												href={buildDevicesHref(effectiveQuery, { page: page + 1 })}
+												className="inline-flex h-10 items-center rounded-panel border border-ink-600 px-3 text-meta text-fog-300 hover:bg-ink-700/60 sm:h-8"
+											>
+												{t("next")}
+											</Link>
+										) : null}
+									</div>
+								</div>
+							) : null}
+						</DevicesFilterResults>
+					</DevicesFilterProvider>
 				</CardContent>
 			</Card>
 		</>
