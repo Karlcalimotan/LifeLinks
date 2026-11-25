@@ -341,7 +341,7 @@ export default async function AnalyticsPage({
 										<TableHead>{t("tableVehicle")}</TableHead>
 										<TableHead>{t("tableDetected")}</TableHead>
 										<TableHead>{t("tableElapsed")}</TableHead>
-										<TableHead>{t("tableActor")}</TableHead>
+										<TableHead className="hidden sm:table-cell">{t("tableActor")}</TableHead>
 									</TableRow>
 								</TableHeader>
 								<TableBody>
@@ -350,7 +350,7 @@ export default async function AnalyticsPage({
 											<TableCell className="whitespace-nowrap text-fog-100">
 												{response.plateNo}
 											</TableCell>
-											<TableCell className="whitespace-nowrap">
+											<TableCell>
 												<Link
 													href={`/incidents/${response.incidentId}`}
 													className="font-medium text-fog-100 hover:underline"
@@ -361,7 +361,7 @@ export default async function AnalyticsPage({
 											<TableCell className="whitespace-nowrap font-medium text-fog-100">
 												{formatDuration(response.elapsedMs)}
 											</TableCell>
-											<TableCell className="whitespace-nowrap text-fog-500">
+											<TableCell className="hidden whitespace-nowrap text-fog-500 sm:table-cell">
 												{response.actorName ?? "—"}
 											</TableCell>
 										</TableRow>

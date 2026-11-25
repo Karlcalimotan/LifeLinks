@@ -79,7 +79,7 @@ export function VehiclePanel({
 				<Link
 					href={closeHref}
 					aria-label={labels.close}
-					className="grid size-8 shrink-0 place-items-center rounded-control border border-ink-700 text-fog-400 transition-colors hover:border-ink-600 hover:bg-ink-700/60 hover:text-fog-50"
+					className="grid size-10 shrink-0 place-items-center rounded-control border border-ink-700 text-fog-40 sm:size-80 transition-colors hover:border-ink-600 hover:bg-ink-700/60 hover:text-fog-50"
 				>
 					<X className="size-4" aria-hidden="true" />
 				</Link>

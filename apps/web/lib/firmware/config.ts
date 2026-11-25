@@ -35,9 +35,9 @@ export const CONFIG_FIELDS: readonly ConfigField[] = [
 		key: "impactThresholdG",
 		firmwareKey: "impact_threshold_g",
 		min: 1.5,
-		max: 5.0,
+		max: 16.0,
 		integer: false,
-		defaultValue: 2.5,
+		defaultValue: 15.0,
 	},
 	{
 		key: "tiltThresholdDeg",
